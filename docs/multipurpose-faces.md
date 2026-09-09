@@ -14,6 +14,11 @@ Adopt focused tabs, recognizable file thumbnails, and a separate settings window
 
 Music controls change a fictional playlist without playing audio. Drag sample documents from the mock Finder into the notch, then drag shelf items into the Finder's destination area. Keyboard users can use Add to Tray and Take out instead. Real filesystem drops are ignored. Preferences and demo activity last only for the current window session; Reset Preview restores defaults.
 
+## Live levels in the Music wing
+The five bars used to loop a fixed keyframe animation regardless of the sound. They now follow Spotify's output: `native/audiotap.swift` taps the Spotify process through Core Audio (`CATapDescription` + a private aggregate device, macOS 14.2+), runs a 2048-point FFT thirty times a second, and prints five band levels, bass to treble. `src/main/audioLevels.ts` compiles and supervises the helper, only while Spotify is playing, the Music view is showing, the visualizer preference is on, and reduced motion is off. Levels reach the notch and customize windows over the `music:levels` channel and are written straight to the bar transforms without a React render.
+
+Each bar sits against its own running average (±11 dB spans the bar) scaled by overall loudness, with instant attack and ~120 ms release. That keeps compressed pop moving as much as a sparse piano piece. Whenever levels stop arriving — helper unavailable, capture refused, playback on another device, silence for 1.5 s — the bars drop back to the old animation, so nothing ever looks broken.
+
 ## Intended follow-up
 Real music adapters, native filesystem drag-out, persistent preferences, and distribution are separate work. No integration permission is requested by this prototype.
 

@@ -237,6 +237,14 @@ Requires macOS with a notch, and `swiftc` (Xcode command line tools) to measure
 it. Without `swiftc` it falls back to the configured width and is wrong by a few
 points; without a notch, set `allowWithoutNotch`.
 
+The bars beside the artwork in the Music wing follow what Spotify is actually
+playing. A second Swift helper (`native/audiotap.swift`, compiled the same way
+into `~/.claude-light/bin`) opens a Core Audio process tap on Spotify's output
+and streams five band levels while a track plays and the wing is showing.
+Nothing is recorded; samples become five numbers and are dropped. macOS 14.2+
+asks once to allow audio capture. Say no, run without `swiftc`, or send the
+music to another speaker, and the bars keep their canned rhythm instead.
+
 
 ## Multipurpose design preview
 
