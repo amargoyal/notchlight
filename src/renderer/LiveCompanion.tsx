@@ -41,6 +41,37 @@ function LiveArtwork({ live, mini = false }: { live: LiveController; mini?: bool
   const [failed, setFailed] = useState<string>();
   return <div className={`mp-artwork ${mini ? 'mp-artwork-mini' : ''}`}>{source && source !== failed ? <img src={source} alt={mini ? '' : live.state.music.track?.album || 'Album artwork'} draggable={false} onError={() => setFailed(source)}/> : <Icon name="music" size={mini ? 14 : 34}/>}</div>;
 }
+const BARS = [0, 1, 2, 3, 4];
+/**
+ * Five bars that follow Spotify's actual output. Levels arrive ~30 times a
+ * second and are written straight to the DOM — re-rendering the whole surface
+ * at that rate would be silly. Without levels (no helper, refused prompt, music
+ * playing on another device) the bars keep the canned rhythm from the preview.
+ */
+function LiveEqualizer({ active, live }: { active: boolean; live: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !active || !live || !window.claudeLight?.onMusicLevels || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const bars = Array.from(el.children) as HTMLElement[];
+    let idle: ReturnType<typeof setTimeout> | null = null;
+    let lastSound = 0;
+    const rest = () => { el.classList.remove('is-live'); for (const bar of bars) bar.style.transform = ''; };
+    const stop = window.claudeLight.onMusicLevels(levels => {
+      const now = Date.now();
+      if (levels.some(level => level > 0.03)) lastSound = now;
+      // Silence for a while with the track still "playing" means the sound is
+      // somewhere else — another speaker, another room. Fall back rather than flatline.
+      if (now - lastSound > 1500) { rest(); return; }
+      el.classList.add('is-live');
+      bars.forEach((bar, i) => { bar.style.transform = `scaleY(${(0.18 + 0.82 * Math.min(1, Math.max(0, levels[i] ?? 0))).toFixed(3)})`; });
+      if (idle) clearTimeout(idle);
+      idle = setTimeout(rest, 400);
+    });
+    return () => { stop(); if (idle) clearTimeout(idle); rest(); };
+  }, [active, live]);
+  return <span ref={ref} className={`mp-equalizer ${active ? 'is-playing' : ''}`} aria-hidden="true">{BARS.map(i => <i key={i} style={{ animationDelay: `${i * -.19}s` }}/>)}</span>;
+}
 function LiveMusic({ live }: { live: LiveController }) {
   const { music } = live.state;
   const [seek, setSeek] = useState<number | null>(null);
@@ -79,7 +110,7 @@ export function CompanionSurface({ live, open, hovering, onBox, onCustomize }: {
   const navigation = <nav className="mp-nav" aria-label="Notch views"><div role="tablist" aria-label="Companion view">{views.map((item,index) => <button key={item} role="tab" id={`${id}-${item}`} aria-controls={`${id}-panel`} aria-selected={view === item} tabIndex={view === item ? 0 : -1} onClick={() => choose(item,true)} onKeyDown={e => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return; e.preventDefault(); choose(views[e.key === 'Home' ? 0 : e.key === 'End' ? 2 : (index + (e.key === 'ArrowRight' ? 1 : 2)) % 3],true); }}>{item === 'claude' ? <Buddy size={15}/> : <Icon name={item} size={14}/>} {names[item]}{item === 'claude' && snapshot.overall === 'asking' && <span className="mp-attention-dot" aria-label="Needs your attention"/>}{item === 'tray' && <span className="mp-count">{live.state.files.length}</span>}</button>)}</div><button className="mp-icon-button" aria-label="Open customization" onClick={onCustomize}><Icon name="settings" size={16}/></button></nav>;
   const active = !snapshot.dormant || live.state.files.length > 0 || live.state.music.status === 'ready';
   const left = <div className="mp-left-wing">{view === 'music' ? <LiveArtwork live={live} mini/> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
-  const right = <div className="mp-right-wing">{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Claude needs attention" onClick={() => choose('claude')}><span className="mp-attention-dot"/></button>}{view === 'music' ? <span className={`mp-equalizer ${live.state.music.playing && preferences.visualizer ? 'is-playing' : ''}`} aria-hidden="true">{[0,1,2,3,4].map(i => <i key={i} style={{ animationDelay: `${i * -.19}s` }}/>)}</span> : <Icon name="file" size={16}/>}</div>;
+  const right = <div className="mp-right-wing">{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Claude needs attention" onClick={() => choose('claude')}><span className="mp-attention-dot"/></button>}{view === 'music' ? <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion}/> : <Icon name="file" size={16}/>}</div>;
   const wing = (full: boolean) => <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={full ? PANEL_W : undefined} left={left} right={right}/>;
   const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
   return <div className={`mp-surface ${preferences.density} ${preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!preferences.buddy ? 'mp-hide-buddy' : ''}`}
