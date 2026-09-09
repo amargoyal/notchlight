@@ -1,0 +1,141 @@
+/* Shared preview surfaces. All selectors are scoped away from the live island. */
+.mp-surface { position: absolute; inset: 0; pointer-events: none; color: #f2ede7; font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; z-index: 3; }
+.mp-surface button, .mp-surface input { pointer-events: auto; }
+.mp-surface button, .mp-finder button, .mp-preview-toolbar button, .mp-walkthrough button { font: inherit; }
+.mp-surface button { color: inherit; border: 0; }
+.mp-nav { height: 43px; display: flex; align-items: center; justify-content: space-between; padding: 0 13px; border-bottom: 1px solid #24211e; }
+.mp-nav [role=tablist] { display: flex; gap: 4px; }
+.mp-nav [role=tab] { background: transparent; color: #a69c93; display: flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 7px; cursor: pointer; font-size: 12px; }
+.mp-nav [role=tab][aria-selected=true] { background: #26221f; color: #f2ede7; }
+.mp-nav [role=tab]:hover { background: #1c1917; color: #f2ede7; }
+.mp-mini-buddy { display: flex; }
+.mp-count { font: 10px/1.4 ui-monospace, monospace; color: #c8bfb5; }
+.mp-icon-button, .mp-text-button { border: 0; background: transparent; color: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.mp-icon-button { width: 32px; height: 32px; border-radius: 7px; }
+.mp-icon-button:hover { background: #ffffff12; }
+.mp-attention-dot { width: 6px; height: 6px; border-radius: 50%; background: #e0b04a; display: inline-block; flex: none; }
+.mp-attention-button { display: grid; place-items: center; background: transparent; width: 24px; height: 26px; cursor: pointer; border-radius: 5px; }
+.mp-left-wing { display: flex; align-items: center; padding: 0 16px; }
+.mp-right-wing { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 0 16px; min-height: 30px; }
+.mp-shelf-wing { display: flex; gap: 7px; align-items: center; color: #c7beb2; font: 11px/1 ui-monospace, monospace; }
+.mp-artwork { width: 118px; height: 118px; border-radius: 10px; overflow: hidden; background: #28231e; color: #c3a88e; display: grid; place-items: center; flex: none; }
+.mp-artwork img { width: 100%; height: 100%; object-fit: cover; }
+.mp-artwork-mini { width: 23px; height: 23px; border-radius: 5px; }
+.mp-music { padding: 21px 24px 18px; }
+.mp-track-row { display: flex; align-items: center; gap: 22px; }
+.mp-track-meta { min-width: 0; flex: 1; }
+.mp-source { font-size: 10px; color: #a69c93; display: flex; gap: 6px; align-items: center; }
+.mp-track-meta h2 { font-size: 19px; line-height: 1.22; font-weight: 550; margin: 7px 0 4px; letter-spacing: -.025em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.mp-track-meta p { font-size: 12px; color: #b5aaa0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-transport { display: flex; align-items: center; gap: 14px; margin: 13px 0 0 -5px; }
+.mp-play { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: #eee5da; color: #171411 !important; cursor: pointer; }
+.mp-play:hover { background: #fff; }
+.mp-seek { margin-top: 17px; }
+.mp-seek input { width: 100%; height: 14px; margin: 0; accent-color: #d1bca2; cursor: pointer; }
+.mp-seek > div { display: flex; justify-content: space-between; font: 10px/1.5 ui-monospace, monospace; color: #a69c93; }
+.mp-equalizer { height: 18px; display: flex; align-items: center; gap: 2px; }
+.mp-equalizer i { display: block; width: 2px; height: 4px; background: #c9b79d; border-radius: 2px; }
+.mp-equalizer.is-playing i { height: 14px; animation: mp-wave 1.1s ease-in-out infinite alternate; }
+@keyframes mp-wave { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
+.mp-empty { padding: 28px 24px; text-align: center; display: flex; flex-direction: column; align-items: center; color: #b7a797; min-height: 195px; justify-content: center; }
+.mp-empty p { font-size: 16px; font-weight: 500; color: #f2ede7; margin: 13px 0 5px; }
+.mp-empty span { max-width: 300px; font-size: 12px; color: #a69c93; }
+.mp-soft-button { display: inline-flex; align-items: center; justify-content: center; background: #ffffff0c; color: inherit; border: 1px solid #ffffff20 !important; padding: 7px 11px; border-radius: 7px; cursor: pointer; font: inherit; }
+.mp-empty .mp-soft-button { margin-top: 17px; font-size: 11px; }
+.mp-soft-button:hover { background: #ffffff18; }
+.mp-tray { padding: 15px 17px 0; }
+.mp-tray-heading { display: flex; justify-content: space-between; color: #a69c93; font-size: 11px; margin-bottom: 13px; }
+.mp-tray-heading > span:last-child { color: #b6ada1; }
+.mp-file-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; max-height: 188px; overflow-y: auto; padding: 4px 2px 8px; scrollbar-width: thin; scrollbar-color: #4c443b transparent; }
+.mp-file-grid.small { grid-template-columns: repeat(5,minmax(0,1fr)); }
+.mp-shelf-item { position: relative; border-radius: 8px; min-width: 0; }
+.mp-shelf-item:hover { background: #ffffff0a; }
+.mp-shelf-item.is-selected { background: #baa18325; outline: 1px solid #9a826a; }
+.mp-file-button { display: flex; align-items: center; flex-direction: column; gap: 7px; padding: 10px 5px; width: 100%; background: transparent; cursor: grab; min-width: 0; }
+.mp-file-button > span:not(.mp-file-thumb) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; font-size: 10px; }
+.mp-file-button small { font-size: 9px; color: #a69c93; }
+.mp-file-thumb { display: inline-flex; position: relative; width: 58px; height: 62px; align-items: center; justify-content: center; flex-direction: column; flex: none; color: #b8c8cf; }
+.mp-file-thumb img { width: 58px; height: 48px; object-fit: cover; border: 3px solid #eee8df; border-radius: 3px; }
+.mp-file-thumb.small { width: 38px; height: 40px; }
+.mp-file-thumb.small img { width: 36px; height: 30px; border-width: 2px; }
+.mp-file-pdf, .mp-file-text { color: #cdbda7; }
+.mp-file-pdf > span:not(.mp-file-missing), .mp-file-text > span:not(.mp-file-missing) { font: 8px/1 ui-monospace,monospace; margin-top: 3px; }
+.mp-file-missing { position: absolute; right: 4px; top: 0; font-size: 12px; font-weight: 700; color: #171411; background: #e0b04a; width: 15px; height: 15px; border-radius: 50%; }
+.mp-remove { position: absolute; top: 1px; right: 1px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #2f2923; cursor: pointer; opacity: 0; }
+.mp-shelf-item:hover .mp-remove, .mp-shelf-item:focus-within .mp-remove, .mp-shelf-item.is-selected .mp-remove { opacity: 1; }
+.mp-tray-footer { height: 40px; border-top: 1px solid #27211b; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #a69c93; font-size: 10px; }
+.mp-tray-footer > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-tray-footer button { flex: none; color: #e1d2bf; }
+.mp-text-button { padding: 5px 0; font: inherit; }
+.mp-text-button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.mp-tray.is-drop-target { background: #b89d7920; outline: 1px dashed #d3b38e; outline-offset: -7px; border-radius: 0 0 23px 23px; }
+.mp-empty-tray { min-height: 180px; padding-top: 14px; }
+.mp-surface.compact .mp-music { padding: 14px 20px 12px; }
+.mp-surface.compact .mp-artwork:not(.mp-artwork-mini) { width: 96px; height: 96px; }
+.mp-surface.compact .mp-tray { padding-top: 9px; }
+.mp-surface.compact .mp-file-button { padding-top: 5px; padding-bottom: 5px; }
+.mp-surface.compact .mp-empty { padding-top: 15px; padding-bottom: 15px; min-height: 165px; }
+.mp-hide-buddy [data-cl-buddy] { visibility: hidden; }
+.mp-preview-column { min-width: 0; }
+.mp-preview-toolbar { display: flex; align-items: center; justify-content: space-between; font-size: 11px; margin-bottom: 12px; color: var(--ui-muted,#73695e); }
+.mp-preview-toolbar > span { display: flex; gap: 7px; align-items: center; }
+.mp-preview-toolbar i { width: 5px; height: 5px; border-radius: 50%; background: #73947f; }
+.mp-desktop { position: relative; width: 100%; height: 568px; background: #526c65 url('./assets/landscape.svg') center/cover; border-radius: 13px; overflow: hidden; border: 1px solid #00000015; box-shadow: 0 14px 24px -22px #00000080; }
+.mp-camera { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: #000; border-radius: 0 0 12px 12px; }
+.mp-menubar { display: flex; justify-content: space-between; height: 23px; align-items: center; font-size: 8px; color: #293b34; background: #d5d8cd77; padding: 0 12px; }
+.mp-menubar b { font-weight: 400; margin-left: 9px; }
+.mp-finder-position { position: absolute; left: 22px; right: 22px; bottom: 18px; }
+.mp-finder { border-radius: 10px; background: #f5f2ed; color: #45423c; overflow: hidden; box-shadow: 0 18px 35px -15px #162c3580; font: 11px/1.5 -apple-system,BlinkMacSystemFont,sans-serif; border: 1px solid #ffffff66; }
+.mp-finder-title { display: flex; align-items: center; gap: 7px; background: #eae7e1; height: 36px; padding: 0 12px; border-bottom: 1px solid #d4cfc5; }
+.mp-finder-title > span:last-child { margin-left: auto; color: #706b62; font-size: 9px; }
+.mp-traffic { display: flex; gap: 5px; margin-right: 10px; }
+.mp-traffic i { width: 7px; height: 7px; border-radius: 50%; background: #c8bfb1; }
+.mp-traffic i:first-child { background: #c4836d; }.mp-traffic i:nth-child(2) { background: #cdbb86; }.mp-traffic i:nth-child(3) { background: #9daa8c; }
+.mp-finder-body { display: flex; min-height: 120px; }
+.mp-finder-body aside { background: #e6e5dd; width: 95px; flex: none; padding: 12px 6px; display: flex; flex-direction: column; gap: 8px; font-size: 9px; }
+.mp-finder-body aside > span, .mp-finder-body aside > b { padding: 3px 5px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.mp-finder-body aside > b { background: #d4d9d0; border-radius: 4px; font-weight: 500; }
+.mp-finder-files { padding: 8px 9px; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; flex: 1; min-width: 0; }
+.mp-finder-file { min-width: 0; }
+.mp-finder-file button { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; background: transparent; border: 0; color: #45423c; padding: 3px; border-radius: 5px; cursor: grab; }
+.mp-finder-file button:hover { background: #d9ded5; }
+.mp-finder-file button > span:last-child { font-size: 9px; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.mp-finder .mp-file-folder { color: #739aa9; }
+.mp-finder .mp-file-pdf, .mp-finder .mp-file-text { color: #8e7258; }
+.mp-destination { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: #eaece4; border-top: 1px dashed #c0c7b6; color: #58694d; font-size: 10px; }
+.mp-destination > span { flex: none; }
+.mp-destination small { margin-left: auto; font-size: 9px; color: #677260; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mp-destination.is-drop-target { background: #ced9bf; outline: 2px dashed #6a8055; outline-offset: -4px; }
+.mp-preview-note { margin: 15px 0 0; font-size: 12px; color: var(--ui-text,#4c4339); }
+.mp-preview-note span { display: block; margin-top: 4px; font-size: 10px; color: var(--ui-muted,#756b60); }
+.mp-notice { min-height: 30px; margin-top: 12px; font-size: 10px; color: var(--ui-muted,#756b60); }
+.mp-gallery { width: 1230px; color: #28221c; font-family: -apple-system,BlinkMacSystemFont,sans-serif; }
+.mp-walkthrough { display: grid; grid-template-columns: 330px 1fr; gap: 72px; padding: 35px 0 25px; align-items: center; }
+.mp-walkthrough .mp-preview-column { width: 100%; max-width: 730px; }
+.mp-walkthrough-intro h2 { font-size: 39px; line-height: 1.12; letter-spacing: -.04em; font-weight: 550; margin: 18px 0; }
+.mp-walkthrough-intro p { font-size: 15px; line-height: 1.7; color: #6d6357; max-width: 280px; }
+.mp-kicker { font-size: 12px; color: #7b6450; }
+.mp-primary-button { margin-top: 18px; border: 0; background: #332b25; color: #f5eee4; border-radius: 8px; display: flex; align-items: center; gap: 18px; padding: 12px 15px; cursor: pointer; }
+.mp-primary-button:hover { background: #514234; }
+.mp-walkthrough-intro small { display: block; color: #7b7165; font-size: 10px; margin-top: 12px; }
+.mp-gallery-heading { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid #d4ccbf; margin: 28px 0; }
+.mp-gallery-heading h2 { font-size: 23px; font-weight: 550; letter-spacing: -.025em; }
+.mp-gallery-heading p { font-size: 12px; color: #776b5c; }
+.mp-scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px 24px; }
+.mp-scenario-screen { position: relative; height: 398px; background: #526c65 url('./assets/landscape.svg') center/cover; border-radius: 11px; overflow: hidden; }
+.mp-scenario h3 { margin: 11px 0 3px; font-size: 13px; font-weight: 600; }
+.mp-scenario p { margin: 0; color: #71675b; font-size: 12px; }
+.mp-reduced-motion *, .mp-reduced-motion *::before, .mp-reduced-motion *::after { animation: none !important; transition: none !important; }
+.mp-surface button:disabled, .customize-app button:disabled { opacity: .45; cursor: default; }
+.mp-surface button:focus-visible, .mp-surface input:focus-visible, .mp-finder button:focus-visible, .mp-preview-toolbar button:focus-visible, .mp-walkthrough button:focus-visible { outline: 2px solid #c89970; outline-offset: 3px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .cl-body, .cl-fade, .mp-equalizer i, .mp-surface * { animation: none !important; transition: none !important; } }
+
+.mp-surface.compact .cl-row { padding-top: 5px !important; padding-bottom: 5px !important; }
+.mp-live-error { margin: 0; padding: 9px 18px 13px; color: #e7b4a1; font-size: 11px; line-height: 1.5; }
+.mp-real-drop { min-height: 120px; display: flex; align-items: center; gap: 14px; padding: 22px; color: #665d50; }
+.mp-real-drop > svg { flex: none; }
+.mp-real-drop strong { font-size: 12px; font-weight: 500; }
+.mp-real-drop p { font-size: 10px; margin: 4px 0 0; }
+.mp-real-drop button { margin-left: auto; white-space: nowrap; border-color: #cfc7b8 !important; color: #443a2e; background: #e8e0d2; font-size: 10px; }
+.mp-real-files .mp-destination { font-size: 9px; }
