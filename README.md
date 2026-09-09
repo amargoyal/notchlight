@@ -237,6 +237,12 @@ Requires macOS with a notch, and `swiftc` (Xcode command line tools) to measure
 it. Without `swiftc` it falls back to the configured width and is wrong by a few
 points; without a notch, set `allowWithoutNotch`.
 
+**While resting**, the collapsed bar shows whichever faces you switch on under
+Customize → Appearance: Claude's light and buddy while a session runs, album
+art and playback while a track is ready, a count while Tray holds something.
+Faces share the bar, mirrored around the cutout, Claude outermost. A hidden
+Claude still shows a dot when it needs you.
+
 The bars beside the artwork in the Music wing follow what Spotify is actually
 playing. A second Swift helper (`native/audiotap.swift`, compiled the same way
 into `~/.claude-light/bin`) opens a Core Audio process tap on Spotify's output

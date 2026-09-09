@@ -177,52 +177,66 @@ function markOf(s: Session): Activity {
   return mainAgent(s).activity;
 }
 
+/**
+ * What Claude puts on the resting bar: lights on the left, marks and buddies on
+ * the right. Exposed bare, without wing padding, so the companion surface can
+ * set it beside the music and tray pieces on one bar.
+ */
+export function restingClaude(sessions: Session[], snap: Snapshot): { left: ReactNode; right: ReactNode } | null {
+  if (sessions.length === 0) return null;
+  if (sessions.length === 1) {
+    const s = sessions[0];
+    return {
+      left: <Light status={s.status} pulse={snap.pulse} />,
+      right: (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Mark activity={markOf(s)} color={s.status === 'asking' ? C.yellow : C.dim} />
+          <Buddy face={faceOf(s)} size={24} />
+        </div>
+      )
+    };
+  }
+  return {
+    left: (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+        <div style={{ display: 'flex', gap: 5 }}>
+          {sessions.slice(0, 4).map((s, i) => (
+            <Light key={s.id} status={s.status} pulse={snap.pulse && i === 0} />
+          ))}
+        </div>
+        <Mono>{sessions.length}</Mono>
+      </div>
+    ),
+    right: <BuddyStack faces={sessions.map(faceOf)} size={22} />
+  };
+}
+
 function CollapsedOne({ s, snap }: { s: Session; snap: Snapshot }) {
+  const parts = restingClaude([s], snap)!;
   return (
     <Wings
       notchW={snap.notchW}
       height={snap.notchH}
-      left={
-        <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px' }}>
-          <Light status={s.status} pulse={snap.pulse} />
-        </div>
-      }
-      right={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px' }}>
-          <Mark activity={markOf(s)} color={s.status === 'asking' ? C.yellow : C.dim} />
-          <Buddy face={faceOf(s)} size={24} />
-        </div>
-      }
+      left={<div style={{ display: 'flex', alignItems: 'center', padding: '0 12px' }}>{parts.left}</div>}
+      right={<div style={{ display: 'flex', alignItems: 'center', padding: '0 12px' }}>{parts.right}</div>}
     />
   );
 }
 
 function CollapsedMany({ sessions, snap }: { sessions: Session[]; snap: Snapshot }) {
+  const parts = restingClaude(sessions, snap)!;
   return (
     <Wings
       notchW={snap.notchW}
       height={snap.notchH}
-      left={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 13px' }}>
-          <div style={{ display: 'flex', gap: 5 }}>
-            {sessions.slice(0, 4).map((s, i) => (
-              <Light key={s.id} status={s.status} pulse={snap.pulse && i === 0} />
-            ))}
-          </div>
-          <Mono>{sessions.length}</Mono>
-        </div>
-      }
-      right={
-        <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px 0 8px' }}>
-          <BuddyStack faces={sessions.map(faceOf)} size={22} />
-        </div>
-      }
+      left={<div style={{ display: 'flex', alignItems: 'center', padding: '0 13px' }}>{parts.left}</div>}
+      right={<div style={{ display: 'flex', alignItems: 'center', padding: '0 12px 0 8px' }}>{parts.right}</div>}
     />
   );
 }
 
 /** Cursor on the notch, dwell not yet met: two hairlines, no commitment. */
-function Stubs({ snap }: { snap: Snapshot }) {
+export function Stubs({ snap }: { snap: Snapshot }) {
   const stub = (
     <div style={{ width: STUB_W, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: 14, height: 2, borderRadius: 1, background: 'rgba(255,255,255,.3)' }} />

@@ -14,6 +14,9 @@ Adopt focused tabs, recognizable file thumbnails, and a separate settings window
 
 Music controls change a fictional playlist without playing audio. Drag sample documents from the mock Finder into the notch, then drag shelf items into the Finder's destination area. Keyboard users can use Add to Tray and Take out instead. Real filesystem drops are ignored. Preferences and demo activity last only for the current window session; Reset Preview restores defaults.
 
+## Resting faces
+The collapsed bar no longer mirrors the selected tab. Three preferences (`restClaude`, `restMusic`, `restTray`) choose which faces keep a presence on it; each appears only when it has something to show (a session, a ready track, files in Tray). `RestingWings` in `Preview.tsx` lays them out mirrored around the cutout with hairline dividers, Claude outermost and Tray nearest the lens, so each face's two halves sit the same distance from the camera. `restingClaude` in `IslandView.tsx` exposes Claude's own collapsed pieces for this. With Claude hidden, an asking session still surfaces the attention dot. The gallery has five resting scenarios.
+
 ## Live levels in the Music wing
 The five bars used to loop a fixed keyframe animation regardless of the sound. They now follow Spotify's output: `native/audiotap.swift` taps the Spotify process through Core Audio (`CATapDescription` + a private aggregate device, macOS 14.2+), runs a 2048-point FFT thirty times a second, and prints five band levels, bass to treble. `src/main/audioLevels.ts` compiles and supervises the helper, only while Spotify is playing, the Music view is showing, the visualizer preference is on, and reduced motion is off. Levels reach the notch and customize windows over the `music:levels` channel and are written straight to the bar transforms without a React render.
 

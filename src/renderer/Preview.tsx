@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useReducer, useRef, type Dispatch, type DragEvent, type ReactNode } from 'react';
-import { Island, Wings } from './IslandView';
+import { Island, Stubs, Wings, restingClaude } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import { initialPreview, previewReducer, previewSnapshot, SAMPLE_FILES, TRACKS,
@@ -79,6 +79,19 @@ function Artwork({ state, mini = false }: { state: PreviewState; mini?: boolean 
       : <Icon name="music" size={mini ? 14 : 34}/>}
   </div>;
 }
+export interface RestingPart { left: ReactNode; right: ReactNode }
+/**
+ * The resting bar, assembled from whichever faces are switched on and have
+ * something to say. Mirrored: Claude sits outermost on both sides, the tray
+ * nearest the lens, so each face's two halves are the same distance from the
+ * cutout. A hairline keeps neighbours from reading as one object.
+ */
+export function RestingWings({ notchW, height, parts, attention }: { notchW: number; height: number; parts: RestingPart[]; attention?: ReactNode }) {
+  const join = (items: ReactNode[]) => items.flatMap((item, i) => i ? [<i key={`d${i}`} className="mp-rest-divider" aria-hidden="true"/>, item] : [item]);
+  const right = [...parts].reverse().map(p => p.right);
+  if (attention) right.unshift(attention);
+  return <Wings notchW={notchW} height={height} left={<div className="mp-rest-wing">{join(parts.map(p => p.left))}</div>} right={<div className="mp-rest-wing">{join(right)}</div>}/>;
+}
 function Equalizer({ active }: { active: boolean }) {
   return <span className={`mp-equalizer ${active ? 'is-playing' : ''}`} aria-hidden="true">{[0, 1, 2, 3, 4].map(i => <i key={i} style={{ animationDelay: `${i * -0.19}s` }}/>)}</span>;
 }
@@ -155,14 +168,25 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
     {music ? <Equalizer active={playing}/> : <Icon name="file" size={16}/>}
   </div>;
   const wing = (expanded: boolean) => <Wings notchW={notchW} height={notchH} width={expanded ? PANEL_W : undefined} left={<div className="mp-left-wing">{headLeft}</div>} right={headRight}/>;
+  const snap = previewSnapshot(state.claude, state.preferences.pulse, notchW, notchH);
+  const prefs = state.preferences;
+  const claudePart = prefs.restClaude ? restingClaude(snap.sessions, snap) : null;
+  const parts: RestingPart[] = [
+    ...(claudePart ? [claudePart] : []),
+    ...(prefs.restMusic && state.music.source === 'ready' ? [{ left: <Artwork state={state} mini/>, right: <Equalizer active={playing}/> }] : []),
+    ...(prefs.restTray && state.files.length > 0 || state.drag?.origin === 'finder' ? [{ left: <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>, right: <Icon name="file" size={16}/> }] : [])
+  ];
+  const attention = !claudePart && state.claude === 'asking' ? <button className="mp-attention-button" aria-label="Claude needs attention" title="Claude needs attention" onClick={() => dispatch({ type: 'view', view: 'claude' })}><span className="mp-attention-dot"/></button> : undefined;
+  const resting = parts.length || attention ? <RestingWings notchW={notchW} height={notchH} parts={parts} attention={attention}/>
+    : !prefs.restClaude && snap.sessions.length ? <Stubs snap={snap}/> : undefined;
   return <div className={`mp-surface ${state.preferences.density} ${state.preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!state.preferences.buddy ? 'mp-hide-buddy' : ''}`}
     onDragOver={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; dispatch({ type: 'drag-enter' }); } }}
     onDrop={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); dispatch({ type: 'add', id: state.drag.id }); } }}>
-    <Island snap={previewSnapshot(state.claude, state.preferences.pulse, notchW, notchH)} open={state.open} hovering
+    <Island snap={snap} open={state.open} hovering
       onDismiss={() => dispatch({ type: 'claude', value: 'idle' })}
       surface={{ navigation: nav, active: true, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${state.view}` },
         expanded: state.view === 'claude' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{nav}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${state.view}`}>{music ? <MusicFace state={state} dispatch={dispatch}/> : <TrayFace state={state} dispatch={dispatch}/>}</div></div>,
-        collapsed: state.view === 'claude' ? undefined : wing(false) }}/>
+        collapsed: resting }}/>
   </div>;
 }
 
@@ -210,14 +234,17 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'Music · missing artwork', note: 'The music symbol holds the composition together.', patch: s => ({ ...s, music: { ...s.music, missingArtwork: true } }) },
   { name: 'Music · unavailable', note: 'Explain what happened and offer a way back.', patch: s => ({ ...s, music: { ...s.music, source: 'unavailable' } }) },
   { name: 'Music · long title, wider notch', note: 'A two-line title and a 240 × 38pt camera exclusion.', notchW: 240, notchH: 38, patch: s => ({ ...s, music: { ...s.music, index: 2 } }) },
-  { name: 'Music · collapsed', note: 'Album on the left. Playback on the right.', patch: s => ({ ...s, open: false }) },
+  { name: 'Resting · everything on', note: 'Claude outermost, tray nearest the lens, music between.', patch: s => ({ ...s, open: false }) },
+  { name: 'Resting · music only', note: 'Album on the left. Playback on the right.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
+  { name: 'Resting · Claude and music', note: 'Two faces share the bar without crowding it.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restTray: false } }) },
+  { name: 'Resting · Claude hidden, needs you', note: 'A hidden face still gets a word in when it must.', patch: s => ({ ...s, open: false, claude: 'asking', preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
   { name: 'Tray · empty', note: 'A clear target for the next thing you pick up.', patch: s => ({ ...s, view: 'tray', files: [] }) },
   { name: 'Tray · populated', note: 'Recognizable thumbnails, readable names.', patch: s => ({ ...s, view: 'tray' }) },
   { name: 'Tray · selected', note: 'Select a file, then take it out with the keyboard.', patch: s => ({ ...s, view: 'tray', selected: 'brief' }) },
   { name: 'Tray · drag over', note: 'A sample drag temporarily reveals the shelf.', patch: s => ({ ...s, view: 'tray', drag: { origin: 'finder', id: 'assets', previousView: 'music', previousOpen: true } }) },
   { name: 'Tray · overflow', note: 'A bounded shelf scrolls; filenames never widen it.', patch: s => ({ ...s, view: 'tray', files: Array.from({ length: 12 }, (_, i) => ({ ...SAMPLE_FILES[i % 4], id: `overflow-${i}` })) }) },
   { name: 'Tray · unavailable file', note: 'Keep the filename and a safe removal action.', patch: s => ({ ...s, view: 'tray', files: [{ ...SAMPLE_FILES[1], unavailable: true }], selected: 'brief' }) },
-  { name: 'Tray · collapsed', note: 'A small stack, a count, and nothing under the lens.', patch: s => ({ ...s, view: 'tray', open: false }) },
+  { name: 'Resting · tray only', note: 'A small stack, a count, and nothing under the lens.', patch: s => ({ ...s, view: 'tray', open: false, preferences: { ...s.preferences, restClaude: false, restMusic: false } }) },
   { name: 'Claude · needs you', note: 'Attention stays visible without changing your tab.', patch: s => ({ ...s, claude: 'asking' }) },
   ...(['working', 'asking', 'done', 'idle', 'many'] as const).map(claude => ({ name: `Claude · ${claude}`, note: 'The existing Claude face inside shared navigation.', patch: (s: PreviewState): PreviewState => ({ ...s, view: 'claude', claude }) }))
 ];

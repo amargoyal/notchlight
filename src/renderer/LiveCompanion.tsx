@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type DragEvent } from 'react';
-import { Island, Wings } from './IslandView';
-import { Icon, FileThumb } from './Preview';
+import { Island, Stubs, Wings, restingClaude } from './IslandView';
+import { Icon, FileThumb, RestingWings, type RestingPart } from './Preview';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import type { Snapshot } from '../shared/types';
@@ -108,7 +108,20 @@ export function CompanionSurface({ live, open, hovering, onBox, onCustomize }: {
   useEffect(() => () => { if (leaveTimer.current) clearTimeout(leaveTimer.current); }, []);
   const choose = (view: CompanionView, keyboard = false) => { focus.current = keyboard; void live.run(() => window.claudeLight.setView(view)); };
   const navigation = <nav className="mp-nav" aria-label="Notch views"><div role="tablist" aria-label="Companion view">{views.map((item,index) => <button key={item} role="tab" id={`${id}-${item}`} aria-controls={`${id}-panel`} aria-selected={view === item} tabIndex={view === item ? 0 : -1} onClick={() => choose(item,true)} onKeyDown={e => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return; e.preventDefault(); choose(views[e.key === 'Home' ? 0 : e.key === 'End' ? 2 : (index + (e.key === 'ArrowRight' ? 1 : 2)) % 3],true); }}>{item === 'claude' ? <Buddy size={15}/> : <Icon name={item} size={14}/>} {names[item]}{item === 'claude' && snapshot.overall === 'asking' && <span className="mp-attention-dot" aria-label="Needs your attention"/>}{item === 'tray' && <span className="mp-count">{live.state.files.length}</span>}</button>)}</div><button className="mp-icon-button" aria-label="Open customization" onClick={onCustomize}><Icon name="settings" size={16}/></button></nav>;
-  const active = !snapshot.dormant || live.state.files.length > 0 || live.state.music.status === 'ready';
+  const { music, files } = live.state;
+  const claudePart = preferences.restClaude ? restingClaude(snapshot.sessions, snapshot) : null;
+  const parts: RestingPart[] = [
+    ...(claudePart ? [claudePart] : []),
+    ...(preferences.restMusic && music.status === 'ready' && music.track ? [{ left: <LiveArtwork live={live} mini/>, right: <LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion}/> }] : []),
+    ...(preferences.restTray && files.length > 0 || dragging ? [{ left: <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{files.length}</span>, right: <Icon name="file" size={16}/> }] : [])
+  ];
+  const attention = !claudePart && snapshot.overall === 'asking' ? <button className="mp-attention-button" aria-label="Claude needs attention" onClick={() => choose('claude')}><span className="mp-attention-dot"/></button> : undefined;
+  // Nothing switched on and nothing to say: leave the bar to the island, which
+  // knows about stubs and the void. Claude hidden while it runs is the one
+  // case the island cannot express, so hand it stubs or a notch-sized void.
+  const resting = parts.length || attention ? <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={parts} attention={attention}/>
+    : !preferences.restClaude && snapshot.sessions.length ? (hovering ? <Stubs snap={snapshot}/> : <div style={{ width: snapshot.notchW, height: snapshot.notchH }}/>) : undefined;
+  const active = !snapshot.dormant || parts.length > 0;
   const left = <div className="mp-left-wing">{view === 'music' ? <LiveArtwork live={live} mini/> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
   const right = <div className="mp-right-wing">{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Claude needs attention" onClick={() => choose('claude')}><span className="mp-attention-dot"/></button>}{view === 'music' ? <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion}/> : <Icon name="file" size={16}/>}</div>;
   const wing = (full: boolean) => <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={full ? PANEL_W : undefined} left={left} right={right}/>;
@@ -117,7 +130,7 @@ export function CompanionSurface({ live, open, hovering, onBox, onCustomize }: {
     onDragOver={e => { if (isFileDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; if (leaveTimer.current) clearTimeout(leaveTimer.current); setDragging(true); } }}
     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) leaveTimer.current = setTimeout(() => setDragging(false),220); }}
     onDrop={e => { if (!isFileDrag(e)) return; e.preventDefault(); if (leaveTimer.current) clearTimeout(leaveTimer.current); const files = Array.from(e.dataTransfer.files); void live.run(() => window.claudeLight.addFiles(files)).finally(() => setDragging(false)); }}>
-    <Island snap={snapshot} open={expanded} hovering={hovering} onBox={onBox} onDismiss={sessionId => window.claudeLight.dismiss(sessionId)} onDecide={(sessionId,askId,decision) => window.claudeLight.decide(sessionId,askId,decision)} surface={{ active, navigation, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${view}` }, expanded: view === 'claude' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{navigation}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${view}`}>{view === 'music' ? <LiveMusic live={live}/> : <LiveTray live={live} dragging={dragging}/>}</div>{live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</div>, collapsed: view === 'claude' || !active && !hovering ? undefined : wing(false) }}/>
+    <Island snap={snapshot} open={expanded} hovering={hovering} onBox={onBox} onDismiss={sessionId => window.claudeLight.dismiss(sessionId)} onDecide={(sessionId,askId,decision) => window.claudeLight.decide(sessionId,askId,decision)} surface={{ active, navigation, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${view}` }, expanded: view === 'claude' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{navigation}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${view}`}>{view === 'music' ? <LiveMusic live={live}/> : <LiveTray live={live} dragging={dragging}/>}</div>{live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</div>, collapsed: resting }}/>
   </div>;
 }
 

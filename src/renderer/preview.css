@@ -17,6 +17,8 @@
 .mp-attention-button { display: grid; place-items: center; background: transparent; width: 24px; height: 26px; cursor: pointer; border-radius: 5px; }
 .mp-left-wing { display: flex; align-items: center; padding: 0 16px; }
 .mp-right-wing { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 0 16px; min-height: 30px; }
+.mp-rest-wing { display: flex; align-items: center; gap: 10px; padding: 0 12px; min-height: 30px; }
+.mp-rest-divider { display: block; width: 1px; height: 12px; background: #ffffff1f; flex: none; }
 .mp-shelf-wing { display: flex; gap: 7px; align-items: center; color: #c7beb2; font: 11px/1 ui-monospace, monospace; }
 .mp-artwork { width: 88px; height: 88px; border-radius: 9px; overflow: hidden; background: #28231e; color: #c3a88e; display: grid; place-items: center; flex: none; }
 .mp-artwork img { width: 100%; height: 100%; object-fit: cover; }
