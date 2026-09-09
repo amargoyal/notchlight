@@ -26,7 +26,8 @@ const web = {
   logLevel: 'info',
   jsx: 'automatic',
   define: { 'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production') },
-  loader: { '.css': 'css' }
+  loader: { '.css': 'css', '.svg': 'file' },
+  assetNames: 'assets/[name]'
 };
 
 const targets = [
@@ -34,7 +35,7 @@ const targets = [
   { ...node, entryPoints: [path.join(root, 'src/preload/index.ts')], outfile: path.join(root, 'dist/preload/index.js') },
   {
     ...web,
-    entryPoints: [path.join(root, 'src/renderer/island.tsx'), path.join(root, 'src/renderer/gallery.tsx')],
+    entryPoints: [path.join(root, 'src/renderer/island.tsx'), path.join(root, 'src/renderer/gallery.tsx'), path.join(root, 'src/renderer/customize.tsx')],
     outdir: path.join(root, 'dist/renderer')
   }
 ];
@@ -51,6 +52,8 @@ if (watch) {
   await Promise.all(targets.map((t) => build(t)));
 }
 
-for (const f of ['island.html', 'gallery.html']) {
+for (const f of ['island.html', 'gallery.html', 'customize.html']) {
   await cp(path.join(root, 'src/renderer', f), path.join(root, 'dist/renderer', f));
 }
+
+await cp(path.join(root, 'src/renderer/assets'), path.join(root, 'dist/renderer/assets'), { recursive: true });
