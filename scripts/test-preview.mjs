@@ -1,0 +1,72 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const dir = await mkdtemp(path.join(os.tmpdir(), 'claude-light-preview-'));
+try {
+  const outfile = path.join(dir, 'preview.mjs');
+  await build({ entryPoints: ['src/renderer/previewModel.ts'], bundle: true, platform: 'node', format: 'esm', outfile });
+  const { initialPreview, previewReducer: reduce, SAMPLE_FILES, TRACKS } = await import(pathToFileURL(outfile).href);
+  let s = initialPreview();
+  s = reduce(s, { type: 'add', id: 'coast' });
+  assert.equal(s.files.length, 2, 'adding the same sample twice must not duplicate it');
+  s = reduce(s, { type: 'add', id: '/Users/real/private.pdf' });
+  assert.equal(s.files.length, 2, 'unrecognized/real paths must never become sample files');
+  s = reduce(s, { type: 'take', id: 'coast' });
+  assert.equal(s.received[0].id, 'coast');
+  assert.equal(s.files.length, 1, 'default successful transfer clears the shelf item');
+  s = reduce(s, { type: 'preferences', patch: { removeAfterTransfer: false } });
+  s = reduce(s, { type: 'take', id: 'brief' });
+  s = reduce(s, { type: 'take', id: 'brief' });
+  assert.equal(s.files.length, 1, 'keep-after-transfer preserves the source');
+  assert.equal(s.received.length, 2, 'repeated transfers do not duplicate the destination');
+  s = reduce(s, { type: 'files', files: [{ ...SAMPLE_FILES[0], unavailable: true }] });
+  const before = s.received;
+  s = reduce(s, { type: 'take', id: 'coast' });
+  assert.equal(s.received, before, 'unavailable items cannot be transferred');
+  assert.equal(s.files.length, 1);
+
+  s = { ...initialPreview(), open: false, view: 'music' };
+  s = reduce(s, { type: 'drag-start', origin: 'finder', id: 'assets' });
+  s = reduce(s, { type: 'drag-enter' });
+  assert.equal(s.view, 'tray'); assert.equal(s.open, true);
+  s = reduce(s, { type: 'drag-end' });
+  assert.equal(s.view, 'music', 'cancel restores the explicitly chosen view');
+  assert.equal(s.open, false, 'cancel also restores the collapsed state');
+  s = reduce(s, { type: 'drag-start', origin: 'finder', id: 'assets' });
+  s = reduce(s, { type: 'drag-enter' });
+  s = reduce(s, { type: 'add', id: 'assets' });
+  s = reduce(s, { type: 'drag-end' });
+  assert.equal(s.view, 'tray', 'dragend after a successful drop must not undo the result');
+  assert.equal(s.files.length, 3);
+
+  s = initialPreview();
+  s = reduce(s, { type: 'play' });
+  const paused = s.music.position;
+  s = reduce(s, { type: 'tick' });
+  assert.equal(s.music.position, paused, 'paused playback stays still');
+  s = reduce(s, { type: 'skip', delta: -1 });
+  assert.equal(s.music.index, TRACKS.length - 1, 'previous wraps through the sample playlist');
+  s = reduce(s, { type: 'seek', position: 100000 });
+  assert.equal(s.music.position, TRACKS.at(-1).duration);
+  s = reduce(s, { type: 'play' });
+  s = reduce(s, { type: 'tick' });
+  assert.equal(s.music.index, 0, 'track end advances and wraps');
+  s = reduce(s, { type: 'music-state', source: 'unavailable' });
+  const unavailable = s.music;
+  s = reduce(s, { type: 'play' }); s = reduce(s, { type: 'tick' }); s = reduce(s, { type: 'skip', delta: 1 });
+  assert.equal(s.music, unavailable, 'unavailable player ignores transport actions');
+  s = reduce(s, { type: 'music-state', source: 'empty' });
+  s = reduce(s, { type: 'start-playlist' });
+  assert.equal(s.music.playing, true, 'Start sample playlist plays even after a previous pause');
+  assert.equal(s.music.source, 'ready');
+  s = reduce(s, { type: 'preferences', patch: { theme: 'dark', buddy: false } });
+  assert.deepEqual(reduce(s, { type: 'reset' }), initialPreview(), 'reset restores all preview state');
+  assert.equal(initialPreview().preferences.buddy, true, 'window defaults are independent');
+  console.log('Preview behavior checks passed: playback, transfers, cancellation, isolation, reset.');
+} finally {
+  await rm(dir, { recursive: true, force: true });
+}
