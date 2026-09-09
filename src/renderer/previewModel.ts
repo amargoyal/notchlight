@@ -11,6 +11,9 @@ export interface PreviewPreferences {
   visualizer: boolean;
   thumbnails: 'small' | 'large';
   removeAfterTransfer: boolean;
+  restClaude: boolean;
+  restMusic: boolean;
+  restTray: boolean;
 }
 export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string }
 export interface PreviewFile { id: string; name: string; kind: 'image' | 'pdf' | 'folder' | 'text'; size: string; unavailable?: boolean }
@@ -28,7 +31,8 @@ export interface PreviewState {
 }
 export const DEFAULT_PREFERENCES: PreviewPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
-  artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true
+  artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true,
+  restClaude: true, restMusic: true, restTray: true
 };
 export const TRACKS: PreviewTrack[] = [
   { id: 'late-light', title: 'Late Light', artist: 'The Quiet Hours', album: 'Somewhere, Slowly', duration: 234, artwork: './assets/late-light.svg' },

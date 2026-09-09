@@ -10,10 +10,15 @@ export interface CompanionPreferences {
   thumbnails: 'small' | 'large';
   removeAfterTransfer: boolean;
   spotifyEnabled: boolean;
+  /** Which faces keep a presence on the resting bar. */
+  restClaude: boolean;
+  restMusic: boolean;
+  restTray: boolean;
 }
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
-  artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false
+  artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false,
+  restClaude: true, restMusic: true, restTray: true
 };
 export interface ShelfFile {
   id: string;

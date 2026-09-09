@@ -21,6 +21,8 @@ try {
   await Promise.all([store.updatePreferences({theme:'dark'}),store.updatePreferences({buddy:false}),store.add([original])]);
   assert.equal(store.current().preferences.theme,'dark');
   assert.equal(store.current().preferences.buddy,false);
+  await store.updatePreferences({restClaude:false,restTray:false});
+  assert.deepEqual([store.current().preferences.restClaude,store.current().preferences.restMusic,store.current().preferences.restTray],[false,true,false],'resting faces are independent toggles');
   assert.equal(store.current().files.length,1);
   await symlink(original,path.join(source,'alias.txt'));
   await store.add([path.join(source,'alias.txt'), original]);
