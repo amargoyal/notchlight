@@ -31,5 +31,6 @@ contextBridge.exposeInMainWorld('claudeLight', {
   startFileDrag: (id: string) => ipcRenderer.send('shelf:drag', id),
   connectSpotify: () => ipcRenderer.invoke('spotify:connect'),
   openSpotify: () => ipcRenderer.invoke('spotify:open'),
-  controlSpotify: (command: SpotifyCommand, position?: number) => ipcRenderer.invoke('spotify:control', command, position)
+  controlSpotify: (command: SpotifyCommand, position?: number) => ipcRenderer.invoke('spotify:control', command, position),
+  onMusicLevels: (cb: (levels: number[]) => void) => subscribe('music:levels', cb)
 });

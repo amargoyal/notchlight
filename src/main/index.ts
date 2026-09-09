@@ -13,6 +13,7 @@ import { CL_DIR, config, ensureDir } from './config';
 import { CompanionStore } from './companionStore';
 import { SpotifyPlayer } from './spotify';
 import { installCompanionIpc } from './companionIpc';
+import { AudioLevels, wantsLevels } from './audioLevels';
 import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
 import { createGalleryWindow, createCustomizeWindow, NotchWindow } from './notchWindow';
@@ -44,6 +45,7 @@ let gallery: BrowserWindow | null = null;
 let customize: BrowserWindow | null = null;
 let companion: CompanionStore;
 let spotify: SpotifyPlayer;
+let levels: AudioLevels;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
 
@@ -233,12 +235,18 @@ async function boot(): Promise<void> {
   store = DEMO ? new DemoStore() : new Store();
   companion = new CompanionStore(path.join(CL_DIR, 'companion.json'), async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(), config().pulse);
   spotify = new SpotifyPlayer();
+  levels = new AudioLevels();
+  levels.on('levels', (bands: number[]) => {
+    send(notch?.win ?? null, 'music:levels', bands);
+    send(customize, 'music:levels', bands);
+  });
   await companion.load();
   let spotifyEnabled = companion.current().preferences.spotifyEnabled;
   spotify.on('change', music => companion.setMusic(music));
   companion.on('change', state => {
     send(notch?.win ?? null, 'companion', state);
     send(customize, 'companion', state);
+    levels.setActive(wantsLevels(state));
     if (state.preferences.spotifyEnabled !== spotifyEnabled) {
       spotifyEnabled = state.preferences.spotifyEnabled;
       spotify.setEnabled(spotifyEnabled);
@@ -367,6 +375,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   if (shelfTimer) clearInterval(shelfTimer);
   spotify?.stop();
+  levels?.stop();
   store?.stop();
   hooks?.stop();
   notch?.destroy();

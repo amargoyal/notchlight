@@ -56,6 +56,8 @@ export interface CompanionBridge {
   connectSpotify(): Promise<OperationResult>;
   openSpotify(): Promise<OperationResult>;
   controlSpotify(command: SpotifyCommand, position?: number): Promise<OperationResult>;
+  /** Five band levels, bass first, each 0…1, while Spotify plays and the bars are on screen. */
+  onMusicLevels(cb: (levels: number[]) => void): () => void;
 }
 
 /** Only known, correctly typed preferences may cross the renderer boundary. */
