@@ -13,13 +13,17 @@ When a session is running, the light says what it wants from you:
 | 🟡 yellow | it wants something from you |
 | 🔴 red | finished with what it was doing |
 
-Hovering unfolds it. One session drops you straight onto its agents; one agent
-skips the list entirely and shows the work. Several sessions give you a list you
-click into.
+Collapsed it is a light, an activity mark and a buddy, and nothing else — no
+clock, no token count. That bar is on screen for as long as something is
+running, so anything on it is something you did not ask to read. The numbers are
+one hover away.
+
+Hovering unfolds it. One session drops you straight onto its agents, however
+many there are. Several sessions give you a list you click into.
 
 ```
    ┌──────────────────────────────────────────┐
-   │  ● 4m 12s        [ notch ]      🖥  🤖   │   collapsed
+   │  ●               [ notch ]      🖥  🤖   │   collapsed
    └──────────────────────────────────────────┘
 
    ┌──────────────────────────────────────────┐
@@ -232,3 +236,20 @@ pixels:
 Requires macOS with a notch, and `swiftc` (Xcode command line tools) to measure
 it. Without `swiftc` it falls back to the configured width and is wrong by a few
 points; without a notch, set `allowWithoutNotch`.
+
+
+## Multipurpose design preview
+
+Run `npm run customize` for the new desktop customization window, or choose
+**Customize Claude Light…** from the menu bar. The faces gallery now includes
+an interactive Claude / Music / Tray walkthrough and every new state.
+
+Music, files, and preferences use sample data for this design iteration. Try
+play/pause, track seeking, dragging mock Finder files into Tray and out to the
+sample destination, or changing appearance beside a live preview. Keyboard
+alternatives are available for the sample transfers. Settings reset when the
+window closes; **Reset Preview** restores everything immediately.
+
+The normal notch still shows real Claude activity. This prototype does not
+control your music apps, move real files, or change the production config.
+See [design notes and research](docs/multipurpose-faces.md).
