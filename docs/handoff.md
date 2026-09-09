@@ -124,6 +124,33 @@ CoreAudio's latency figure for AirPods is an estimate. If the bars still feel
 early or late, add a `levelsOffsetMs` config key in `src/main/config.ts` and
 pass it to `audiotap` as an argument to add to `delayFrames`.
 
+### 12. Clipboard manager (a fourth face)
+Not the one-shot clipboard drop in item 8. A history of what was copied,
+shown as its own tab beside Tray, with a resting wing that shows the latest
+item's kind and a count.
+- **Watching**: macOS has no clipboard change event. Poll
+  `clipboard.readText()` / `readImage()` in main every ~500 ms and compare
+  against the last seen value; on macOS Electron exposes no `changeCount`, so
+  a cheap hash of the text or image bytes is the comparison. Skip when the
+  pasteboard carries `org.nspasteboard.ConcealedType` or
+  `org.nspasteboard.TransientType` (password managers, autofill) — read them
+  with `clipboard.availableFormats()`.
+- **Storage**: `~/.claude-light/clipboard.json`, capped (50 items, images
+  under 2 MB as PNG data URLs, text under 20 kB). Pinned items survive the cap
+  and the clear action. Nothing leaves the Mac.
+- **Face**: list of entries newest first, each with a preview (first line of
+  text, image thumbnail, URL host), a time, pin, and remove. Click to copy it
+  back; the poller must ignore its own write. Cmd-K style filter box when
+  the list grows.
+- **Preferences**: `clipboardEnabled` (off by default — it is a privacy
+  choice), `clipboardHistorySize`, `restClipboard` for the resting bar.
+- **Where it plugs in**: `CompanionView` gains `'clipboard'`; `CompanionStore`
+  or a sibling `ClipboardStore` owns the list; IPC in `companionIpc.ts`
+  (`clipboard:copy`, `clipboard:pin`, `clipboard:remove`, `clipboard:clear`);
+  the nav in `LiveCompanion.tsx` and `Preview.tsx` gets a fourth tab, and
+  `RestingWings` a fourth part. Add gallery scenarios and a
+  `scripts/test-clipboard.mjs` for the store and the poller's skip rules.
+
 ## Things to know before touching the music code
 
 - `SpotifyPlayer` serializes every command and status read through one promise
