@@ -249,7 +249,14 @@ into `~/.claude-light/bin`) opens a Core Audio process tap on Spotify's output
 and streams five band levels while a track plays and the wing is showing.
 Nothing is recorded; samples become five numbers and are dropped. macOS 14.2+
 asks once to allow audio capture. Say no, run without `swiftc`, or send the
-music to another speaker, and the bars keep their canned rhythm instead.
+music to another speaker, and the bars keep their canned rhythm instead. The
+levels are held back by the output device's reported latency, so over AirPods
+the bars land with the sound rather than a beat ahead of it.
+
+Spotify's scripting dictionary names only the lead artist. Claude Light asks
+the track's public page once per track for the full credit, so a collaboration
+reads "Internet Money, Lil Tecca" rather than a solo record. Offline, the lead
+artist stands.
 
 
 ## Multipurpose design preview

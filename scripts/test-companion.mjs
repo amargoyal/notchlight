@@ -9,7 +9,7 @@ const root = await mkdtemp(path.join(os.tmpdir(), 'claude-light-companion-'));
 try {
   await build({ entryPoints: ['src/main/companionStore.ts','src/main/spotify.ts','src/main/audioLevels.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   const { CompanionStore } = await import(pathToFileURL(path.join(root,'companionStore.js')).href);
-  const { SpotifyPlayer, normalizeSpotify, validArtwork } = await import(pathToFileURL(path.join(root,'spotify.js')).href);
+  const { SpotifyPlayer, normalizeSpotify, validArtwork, artistsFromPage } = await import(pathToFileURL(path.join(root,'spotify.js')).href);
   const { AudioLevels, wantsLevels } = await import(pathToFileURL(path.join(root,'audioLevels.js')).href);
   const source = path.join(root,'source'), dest = path.join(root,'destination');
   await mkdir(source); await mkdir(dest);
@@ -93,6 +93,29 @@ try {
   pending.setEnabled(false); finish({status:'ready',track:{title:'Stale response',durationMs:1000}});
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(pending.current().status,'disconnected','late reads cannot reconnect a disabled player'); pending.stop();
+  assert.equal(artistsFromPage('<meta property="og:title" content="Nunchucks"/><meta property="og:description" content="Kodak Black, 1900Rugrat · Kodak The Blessing · Song · 2026"/><meta name="music:musician_description" content="Kodak Black, 1900Rugrat"/>'),'Kodak Black, 1900Rugrat');
+  assert.equal(artistsFromPage('<meta property="og:description" content="Tyler, The Creator &amp; Friends · Album · Song · 2020"/>'),'Tyler, The Creator & Friends','falls back to the description and decodes entities');
+  assert.equal(artistsFromPage('<html>nothing useful</html>'),undefined);
+  const lookups = [];
+  let resolveLookup;
+  const credited = new SpotifyPlayer(async()=>({status:'ready',playing:true,position:1,track:{id:'spotify:track:abc',title:'Falsetto',artist:'Internet Money',durationMs:1000}}), id=>{ lookups.push(id); return new Promise(r=>{resolveLookup=r;}); });
+  const seen = [];
+  credited.on('change',s=>seen.push(s.track?.artist));
+  credited.setEnabled(true);
+  await new Promise(r=>setTimeout(r,20));
+  assert.equal(credited.current().track.artist,'Internet Money','the lead shows while the credit loads');
+  resolveLookup('Internet Money, Lil Tecca');
+  await new Promise(r=>setTimeout(r,20));
+  assert.equal(credited.current().track.artist,'Internet Money, Lil Tecca','every artist once the page answers');
+  await credited.command('toggle');
+  assert.equal(credited.current().track.artist,'Internet Money, Lil Tecca','the credit sticks across later polls');
+  assert.deepEqual(lookups,['spotify:track:abc'],'one lookup per track');
+  credited.stop();
+  const mismatched = new SpotifyPlayer(async()=>({status:'ready',playing:true,position:1,track:{id:'spotify:track:xyz',title:'T',artist:'Someone',durationMs:1000}}), async()=>'Somebody Else');
+  mismatched.setEnabled(true);
+  await new Promise(r=>setTimeout(r,30));
+  assert.equal(mismatched.current().track.artist,'Someone','a credit that drops the lead is not trusted');
+  mismatched.stop();
   const ready = { preferences:{spotifyEnabled:true,visualizer:true,reducedMotion:false}, view:'music', music:{status:'ready',playing:true} };
   assert.equal(wantsLevels(ready),true);
   assert.equal(wantsLevels({...ready,view:'claude'}),false,'no helper while the bars are off screen');
@@ -129,5 +152,5 @@ try {
   await new Promise(r=>setTimeout(r,50));
   assert.equal(missing.retryTimer,null,'a missing compiler never schedules a retry');
   missing.stop();
-  console.log('Companion checks passed: real filesystem persistence/copy/conflicts, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle.');
+  console.log('Companion checks passed: real filesystem persistence/copy/conflicts, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle, full artist credits.');
 } finally { await rm(root,{recursive:true,force:true}); }

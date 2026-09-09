@@ -103,6 +103,33 @@ guard let outputDevice = read(AudioObjectID(kAudioObjectSystemObject), kAudioHar
       let outputUID = readString(outputDevice, kAudioDevicePropertyDeviceUID)
 else { bail("no-output-device") }
 
+// What the speakers play now left Spotify a little while ago — on Bluetooth,
+// noticeably so. Hold the levels back by the output's own reported latency so
+// the bars land with the sound rather than ahead of it.
+func frames(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector, _ scope: AudioObjectPropertyScope) -> UInt32 {
+    var addr = AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
+    var value: UInt32 = 0
+    var size = UInt32(MemoryLayout<UInt32>.size)
+    return AudioObjectGetPropertyData(object, &addr, 0, nil, &size, &value) == noErr ? value : 0
+}
+let outputScope = kAudioObjectPropertyScopeOutput
+let outputRate = read(outputDevice, kAudioDevicePropertyNominalSampleRate, Double(0)).flatMap { $0 > 0 ? $0 : nil } ?? sampleRate
+var latencyFrames = frames(outputDevice, kAudioDevicePropertyLatency, outputScope)
+    + frames(outputDevice, kAudioDevicePropertySafetyOffset, outputScope)
+    + frames(outputDevice, kAudioDevicePropertyBufferFrameSize, outputScope)
+do {
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreams, mScope: outputScope, mElement: kAudioObjectPropertyElementMain)
+    var size: UInt32 = 0
+    if AudioObjectGetPropertyDataSize(outputDevice, &addr, 0, nil, &size) == noErr, size > 0 {
+        var streams = [AudioStreamID](repeating: 0, count: Int(size) / MemoryLayout<AudioStreamID>.size)
+        if AudioObjectGetPropertyData(outputDevice, &addr, 0, nil, &size, &streams) == noErr, let first = streams.first {
+            latencyFrames += frames(first, kAudioStreamPropertyLatency, kAudioObjectPropertyScopeGlobal)
+        }
+    }
+}
+let latencySeconds = Double(latencyFrames) / outputRate
+let delayFrames = Int((latencySeconds * framesPerSecond).rounded())
+
 let aggregateDescription: [String: Any] = [
     kAudioAggregateDeviceNameKey: "Claude Light levels",
     kAudioAggregateDeviceUIDKey: "com.claude-light.levels.\(UUID().uuidString)",
@@ -255,7 +282,8 @@ func analyze() -> [Float] {
 
 // MARK: - Run
 
-emit("{\"ok\":true,\"rate\":\(Int(sampleRate))}")
+emit("{\"ok\":true,\"rate\":\(Int(sampleRate)),\"latencyMs\":\(Int(latencySeconds * 1000))}")
+var held: [String] = []
 
 // The aggregate is pinned to one output device. When the default output moves
 // (headphones in, AirPods on) the tap goes quiet, so leave and let the app
@@ -274,8 +302,8 @@ Thread.detachNewThread {
 
 let timer = Timer(timeInterval: 1 / framesPerSecond, repeats: true) { _ in
     if kill(pid, 0) != 0 { teardown(); exit(0) }
-    let line = analyze().map { String(format: "%.2f", $0) }.joined(separator: " ")
-    emit(line)
+    held.append(analyze().map { String(format: "%.2f", $0) }.joined(separator: " "))
+    if held.count > delayFrames { emit(held.removeFirst()) }
 }
 RunLoop.main.add(timer, forMode: .common)
 RunLoop.main.run()
