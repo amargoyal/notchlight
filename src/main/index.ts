@@ -1,9 +1,8 @@
 /**
  * The daemon.
  *
- * Wires four things together and does nothing else: hooks in, transcripts in,
- * one store in the middle, one overlay window out. There is no dock icon, no
- * main window, and no state anywhere but the store.
+ * Hooks and transcripts feed one live store and one notch overlay. The gallery
+ * and customization preview are ordinary windows with a shared Dock lifecycle.
  */
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from 'electron';
 import { execFile } from 'node:child_process';
@@ -11,9 +10,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CL_DIR, config, ensureDir } from './config';
+import { CompanionStore } from './companionStore';
+import { SpotifyPlayer } from './spotify';
+import { installCompanionIpc } from './companionIpc';
 import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
-import { createGalleryWindow, NotchWindow } from './notchWindow';
+import { createGalleryWindow, createCustomizeWindow, NotchWindow } from './notchWindow';
 import { notchState, probeNotch } from './notchProbe';
 import { trayIcon } from './png';
 import { Store } from './store';
@@ -21,6 +23,7 @@ import type { HitRect, Snapshot } from '../shared/types';
 
 const DEMO = process.argv.includes('--demo');
 const GALLERY_ONLY = process.argv.includes('--gallery');
+const CUSTOMIZE = process.argv.includes('--customize');
 
 /**
  * A second copy would bind the same socket and draw a second island on the same
@@ -38,18 +41,23 @@ let hooks: HookServer | null = null;
 let notch: NotchWindow | null = null;
 let tray: Tray | null = null;
 let gallery: BrowserWindow | null = null;
+let customize: BrowserWindow | null = null;
+let companion: CompanionStore;
+let spotify: SpotifyPlayer;
+let shelfTimer: NodeJS.Timeout | null = null;
+let pickFiles: (() => Promise<void>) | null = null;
 
 function send(win: BrowserWindow | null, channel: string, payload: unknown): void {
   if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send(channel, payload);
 }
 
 /**
- * The gallery is the only ordinary window this app has.
+ * The gallery and customization preview are ordinary desktop windows.
  *
  * With the dock icon hidden the process is an accessory and cannot become the
  * frontmost app, so a window opened from the tray appears *behind* whatever you
  * were using. The dock icon comes back for as long as the gallery is open, and
- * goes away again with it.
+ * goes away when the last ordinary window closes.
  */
 function openGallery(): void {
   if (gallery && !gallery.isDestroyed()) {
@@ -69,8 +77,37 @@ function openGallery(): void {
   });
   gallery.on('closed', () => {
     gallery = null;
-    if (GALLERY_ONLY) return app.quit();
-    app.dock?.hide();
+    syncDock();
+  });
+}
+
+/** Keep the Dock available while either ordinary desktop window is open. */
+function syncDock(): void {
+  if (gallery || customize) void app.dock?.show();
+  else app.dock?.hide();
+}
+
+function openCustomize(): void {
+  if (customize && !customize.isDestroyed()) {
+    app.focus({ steal: true });
+    customize.show();
+    customize.focus();
+    return;
+  }
+  void app.dock?.show();
+  customize = createCustomizeWindow();
+  customize.webContents.on('did-finish-load', () => {
+    send(customize, 'snapshot', store.current());
+    send(customize, 'companion', companion.current());
+  });
+  customize.once('ready-to-show', () => {
+    app.focus({ steal: true });
+    customize?.show();
+    customize?.focus();
+  });
+  customize.on('closed', () => {
+    customize = null;
+    syncDock();
   });
 }
 
@@ -126,6 +163,8 @@ function refreshTray(): void {
             : 'Cutout not measured',
         enabled: false
       },
+      { label: 'Add files to Tray…', click: () => { void pickFiles?.().catch(e => companion.notice(String(e.message))); } },
+      { label: 'Customize Claude Light…', click: () => openCustomize() },
       { label: 'Open faces gallery', click: () => openGallery() },
       hooksInstalled()
         ? { label: 'Claude Code hooks installed', enabled: false }
@@ -143,6 +182,7 @@ function startTray(): void {
   img.setTemplateImage(true);
   tray = new Tray(img);
   tray.setToolTip('Claude Light');
+  tray.on('drop-files', (_event, files) => { void companion.add(files).catch(e => companion.notice(String(e.message))); });
   refreshTray();
 }
 
@@ -188,9 +228,32 @@ class Hover {
   }
 }
 
-function boot(): void {
+async function boot(): Promise<void> {
   ensureDir();
   store = DEMO ? new DemoStore() : new Store();
+  companion = new CompanionStore(path.join(CL_DIR, 'companion.json'), async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(), config().pulse);
+  spotify = new SpotifyPlayer();
+  await companion.load();
+  let spotifyEnabled = companion.current().preferences.spotifyEnabled;
+  spotify.on('change', music => companion.setMusic(music));
+  companion.on('change', state => {
+    send(notch?.win ?? null, 'companion', state);
+    send(customize, 'companion', state);
+    if (state.preferences.spotifyEnabled !== spotifyEnabled) {
+      spotifyEnabled = state.preferences.spotifyEnabled;
+      spotify.setEnabled(spotifyEnabled);
+    }
+  });
+  ipcMain.handle('snapshot:get', event => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (event.senderFrame !== event.sender.mainFrame || !win || win !== customize && win !== notch?.win) throw new Error('Unknown snapshot consumer.');
+    return store.current();
+  });
+  pickFiles = installCompanionIpc(companion, spotify,
+    win => !!win && (win === customize || win === notch?.win),
+    () => { openCustomize(); return customize!; });
+  if (spotifyEnabled) spotify.setEnabled(true);
+  shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);
 
   const hover = new Hover((open) => send(notch?.win ?? null, 'open', open));
   notch = new NotchWindow(
@@ -208,11 +271,13 @@ function boot(): void {
   win.webContents.on('did-finish-load', () => {
     applyNotchGeometry();
     send(win, 'snapshot', store.current());
+    send(win, 'companion', companion.current());
   });
 
   store.on('snapshot', (s: Snapshot) => {
     send(notch?.win ?? null, 'snapshot', s);
     send(gallery, 'snapshot', s);
+    send(customize, 'snapshot', s);
     refreshTray();
   });
 
@@ -234,7 +299,10 @@ function boot(): void {
 
   store.start();
   startTray();
-  if (GALLERY_ONLY) openGallery();
+  ready = true;
+  if (GALLERY_ONLY || pendingWindow === 'gallery') openGallery();
+  if (CUSTOMIZE || pendingWindow === 'customize') openCustomize();
+  pendingWindow = null;
 }
 
 /** Hand the measured cutout to both the store and the window's own sizing. */
@@ -268,7 +336,19 @@ ipcMain.on('dismiss', (_e, sessionId: string) => {
   if (typeof sessionId === 'string' && sessionId) store.dismiss(sessionId);
 });
 
-app.on('second-instance', () => openGallery());
+ipcMain.on('open-customize', (event) => {
+  const sender = BrowserWindow.fromWebContents(event.sender);
+  if (sender === gallery || sender === customize || sender === notch?.win) openCustomize();
+});
+
+let ready = false;
+let pendingWindow: 'customize' | 'gallery' | null = null;
+app.on('second-instance', (_event, argv) => {
+  const target = argv.includes('--customize') ? 'customize' : 'gallery';
+  if (!ready) { pendingWindow = target; return; }
+  target === 'customize' ? openCustomize() : openGallery();
+});
+app.on('activate', () => { if (ready && !gallery && !customize) openCustomize(); });
 app.on('window-all-closed', () => {
   // The overlay is not a window in the usual sense; closing the gallery must
   // not take the island down with it.
@@ -281,10 +361,12 @@ app.whenReady().then(() => {
   if (notchState() === 'no' && !config().allowWithoutNotch && !DEMO) {
     console.log('[claude-light] no cutout on this display — set allowWithoutNotch to run anyway');
   }
-  boot();
+  void boot().catch(error => { console.error('[companion] startup failed:', error.message); app.quit(); });
 });
 
 app.on('before-quit', () => {
+  if (shelfTimer) clearInterval(shelfTimer);
+  spotify?.stop();
   store?.stop();
   hooks?.stop();
   notch?.destroy();
