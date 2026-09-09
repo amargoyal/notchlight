@@ -68,8 +68,7 @@ const claudeLight = () =>
       agent('a2', 'sub', 'Running test suite', 'shell', 'working', 12_900, 63),
       agent('a3', 'sub', 'Searching hover-intent patterns', 'search', 'working', 8_400, 41),
       agent('a4', 'sub', 'Wrote island geometry spec', 'done', 'done', 15_900, 202, 20)
-    ],
-    tail: ['$ npm run lint --silent', '✓ 0 problems · 41 files']
+    ]
   });
 
 const archive = () =>
@@ -121,8 +120,7 @@ const solo = () =>
     tokens: 9_700,
     startedAt: T0 - 48_000,
     tool: 'Bash',
-    agents: [agent('main', 'main', 'Migrating tokens to inline styles', 'shell', 'working', 9_700, 48)],
-    tail: ['$ npm run lint --silent', '✓ 0 problems · 41 files']
+    agents: [agent('main', 'main', 'Migrating tokens to inline styles', 'shell', 'working', 9_700, 48)]
   });
 
 /** Each stage holds for its own number of seconds, then the reel advances. */
