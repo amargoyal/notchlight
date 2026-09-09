@@ -27,6 +27,35 @@ export function validArtwork(value: string): string | undefined {
     return u.protocol === 'https:' && (u.hostname === 'i.scdn.co' || u.hostname.endsWith('.scdn.co')) && !u.username && !u.password ? u.href : undefined;
   } catch { return undefined; }
 }
+/**
+ * Every artist on the track, not just the first.
+ *
+ * Spotify's scripting dictionary hands back one `artist` string and it is only
+ * the lead: a collaboration shows as a solo record. The public track page
+ * still lists everyone, so ask it once per track and remember the answer.
+ * Best effort — offline, throttled, or oddly shaped, the lead artist stands.
+ */
+export type ArtistLookup = (trackId: string) => Promise<string | undefined>;
+const decode = (v: string) => v.replace(/&amp;/g, '&').replace(/&#39;/g, '\'').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#x27;/g, '\'');
+export function artistsFromPage(html: string): string | undefined {
+  const meta = /<meta\s+(?:name|property)="music:musician_description"\s+content="([^"]*)"/.exec(html)?.[1]
+    ?? /<meta\s+property="og:description"\s+content="([^"]*?) · /.exec(html)?.[1];
+  const artists = meta ? decode(meta).trim() : '';
+  return artists && artists.length <= 300 ? artists : undefined;
+}
+async function fetchArtists(trackId: string): Promise<string | undefined> {
+  const id = /^[A-Za-z0-9]{22}$/.test(trackId) ? trackId : /^spotify:track:([A-Za-z0-9]{22})$/.exec(trackId)?.[1];
+  if (!id) return undefined;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const response = await fetch(`https://open.spotify.com/track/${id}`, { signal: controller.signal, headers: { 'user-agent': 'Mozilla/5.0', accept: 'text/html' }, redirect: 'follow' });
+    if (!response.ok) return undefined;
+    return artistsFromPage((await response.text()).slice(0, 400_000));
+  } catch { return undefined; }
+  finally { clearTimeout(timer); }
+}
+
 async function runSpotify(command: string, position?: number): Promise<unknown> {
   const script = path.join(__dirname, '../../native/spotify.js');
   try {
@@ -46,7 +75,9 @@ export class SpotifyPlayer extends EventEmitter {
   private queue: Promise<unknown> = Promise.resolve();
   private polling = false;
   private generation = 0;
-  constructor(private run: SpotifyRunner = runSpotify) { super(); }
+  private artists = new Map<string, string | undefined>();
+  private pendingArtists = new Set<string>();
+  constructor(private run: SpotifyRunner = runSpotify, private lookup: ArtistLookup = fetchArtists) { super(); }
   current() { return this.state; }
   private publish(state: SpotifySnapshot) { this.state = state; this.emit('change', state); }
   setEnabled(enabled: boolean): void {
@@ -76,10 +107,32 @@ export class SpotifyPlayer extends EventEmitter {
       if (!this.enabled || generation !== this.generation) return;
       if (command !== 'status') this.publish({ ...this.state, busy: true });
       const next = normalizeSpotify(await this.run(command, position).catch(() => ({ status: 'error' })));
-      if (this.enabled && generation === this.generation) this.publish(next);
+      if (this.enabled && generation === this.generation) this.publish(this.withArtists(next));
     });
     this.queue = work.catch(() => {});
     return work;
+  }
+  /** Swap in the full credit when known; otherwise start finding it and keep the lead for now. */
+  private withArtists(state: SpotifySnapshot): SpotifySnapshot {
+    const track = state.track;
+    if (!track?.id) return state;
+    if (this.artists.has(track.id)) {
+      const full = this.artists.get(track.id);
+      return full ? { ...state, track: { ...track, artist: full } } : state;
+    }
+    if (!this.pendingArtists.has(track.id)) {
+      this.pendingArtists.add(track.id);
+      const generation = this.generation;
+      void this.lookup(track.id).catch(() => undefined).then(full => {
+        this.pendingArtists.delete(track.id);
+        // Only trust a credit that still names the lead Spotify told us about.
+        const usable = full && track.artist && full.toLowerCase().includes(track.artist.toLowerCase()) && full !== track.artist ? full : undefined;
+        this.artists.set(track.id, usable);
+        if (this.artists.size > 60) this.artists.delete(this.artists.keys().next().value!);
+        if (usable && this.enabled && generation === this.generation && this.state.track?.id === track.id) this.publish({ ...this.state, track: { ...this.state.track, artist: usable } });
+      });
+    }
+    return state;
   }
   stop() { this.enabled = false; this.generation++; if (this.timer) clearInterval(this.timer); this.timer = null; }
 }
