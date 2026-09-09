@@ -1,3 +1,4 @@
+import type { CompanionBridge } from './companion';
 /**
  * The contract between the daemon and the island.
  *
@@ -111,14 +112,17 @@ export interface HitRect {
   h: number;
 }
 
-export interface IslandBridge {
-  onSnapshot(cb: (s: Snapshot) => void): void;
+export interface IslandBridge extends CompanionBridge {
+  getSnapshot(): Promise<Snapshot>;
+  /** Open the separate sample-data customization window. */
+  openCustomize(): void;
+  onSnapshot(cb: (s: Snapshot) => void): () => void;
   /** Report the island's own on-screen box after every layout change. */
   setHitRect(r: HitRect): void;
   /** Cursor entered or left the island's box, decided by the daemon. */
-  onHover(cb: (inside: boolean) => void): void;
+  onHover(cb: (inside: boolean) => void): () => void;
   /** The hover dwell was satisfied — unfold. */
-  onOpen(cb: (open: boolean) => void): void;
+  onOpen(cb: (open: boolean) => void): () => void;
   /** Answer a held permission request. */
   decide(sessionId: string, askId: string, decision: 'allow' | 'deny'): void;
   /** Drop a finished session's red light. */

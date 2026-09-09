@@ -7,24 +7,29 @@
  *   cursor on the notch    → two hairline stubs, meaning "keep going"
  *   held past the dwell    → unfold
  *   one session            → its agents are the front page; no drilling
- *   one session, one agent → skip the list and show the work itself
  *   several sessions       → a list, and you click into one
  *
  * The status light is always on the left wing and the buddy is always on the
  * right, at every size, in every state. That is the whole visual contract: the
  * lens in the middle never has anything behind it.
+ *
+ * Collapsed, the bar carries a light, a mark and a buddy and nothing else. It
+ * is on screen the whole time a session runs, so every character it holds is a
+ * character you did not ask to read; the numbers live one hover away instead.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Buddy, BuddyStack, faceFor } from './Buddy';
 import { Mark } from './marks';
 import { C, MONO, PANEL_W, SANS, glow, lightColor } from './theme';
 import { duration, tokens as fmtTokens } from '../shared/fmt';
-import type { Agent, Face, HitRect, Session, Snapshot, Status } from '../shared/types';
+import type { Activity, Agent, Face, HitRect, Session, Snapshot, Status } from '../shared/types';
 
 const STUB_W = 26;
 
 export interface IslandProps {
   snap: Snapshot;
+  /** Optional presentation supplied only by the multipurpose design preview. */
+  surface?: { navigation: ReactNode; expanded?: ReactNode; collapsed?: ReactNode; active: boolean; panel?: { id: string; 'aria-labelledby': string } };
   /** The cursor is on the island right now. */
   hovering: boolean;
   /** The dwell has been satisfied. */
@@ -79,7 +84,7 @@ const CLIP: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whit
  * of the island no matter what the two wings are holding. Getting this wrong by
  * four pixels is exactly how text ends up under the camera.
  */
-function Wings({
+export function Wings({
   notchW,
   height,
   left,
@@ -98,11 +103,16 @@ function Wings({
   // same alignment would strand the lights and the buddy in the middle of a
   // header with empty margins either side — so there, content goes outward.
   const outward = width !== undefined;
+  // Collapsed, the tracks are sized to what they hold rather than to each
+  // other: a lone light does not get padded out to the width of the mark and
+  // the buddy. The wings then differ, so the notch column is no longer the
+  // middle of the bar — the root re-centres the whole shell on it instead.
+  const side = outward ? '1fr' : 'auto';
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: `1fr ${notchW}px 1fr`,
+        gridTemplateColumns: `${side} ${notchW}px ${side}`,
         alignItems: 'center',
         height,
         width: width ?? 'max-content'
@@ -111,7 +121,7 @@ function Wings({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: outward ? 'flex-start' : 'flex-end' }}>
         {left}
       </div>
-      <div />
+      <div data-cl-notch />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: outward ? 'flex-end' : 'flex-start' }}>
         {right}
       </div>
@@ -160,23 +170,26 @@ function tilde(p: string): string {
 
 /* ------------------------------------------------------------- collapsed */
 
-function CollapsedOne({ s, snap, now }: { s: Session; snap: Snapshot; now: number }) {
-  const m = mainAgent(s);
-  const finished = s.status === 'done' || s.status === 'failed';
-  const label = s.status === 'asking' ? 'asking' : finished ? `${elapsedOf(s, now)} · ${fmtTokens(s.tokens)}` : elapsedOf(s, now);
+/** The mark the wing shows for a session: the question and the tick outrank the work. */
+function markOf(s: Session): Activity {
+  if (s.status === 'asking') return 'ask';
+  if (s.status === 'done' || s.status === 'failed') return 'done';
+  return mainAgent(s).activity;
+}
+
+function CollapsedOne({ s, snap }: { s: Session; snap: Snapshot }) {
   return (
     <Wings
       notchW={snap.notchW}
       height={snap.notchH}
       left={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 13px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px' }}>
           <Light status={s.status} pulse={snap.pulse} />
-          <Mono color={s.status === 'asking' ? C.yellow : C.text}>{label}</Mono>
         </div>
       }
       right={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px' }}>
-          <Mark activity={s.status === 'asking' ? 'ask' : finished ? 'done' : m.activity} color={C.dim} />
+          <Mark activity={markOf(s)} color={s.status === 'asking' ? C.yellow : C.dim} />
           <Buddy face={faceOf(s)} size={24} />
         </div>
       }
@@ -348,53 +361,6 @@ function AgentList({ s, now }: { s: Session; now: number }) {
   );
 }
 
-/** One session, one agent: a list of one is not a list, so show the work. */
-function SoloAgent({ s, now }: { s: Session; now: number }) {
-  const a = mainAgent(s);
-  const stat = (label: string, value: string) => (
-    <div key={label}>
-      <div style={{ font: `600 9px/1 ${MONO}`, letterSpacing: '.14em', textTransform: 'uppercase', color: C.dim }}>
-        {label}
-      </div>
-      <div style={{ font: `500 13px/1 ${MONO}`, color: C.body, marginTop: 6 }}>{value}</div>
-    </div>
-  );
-  return (
-    <>
-      <div style={{ padding: '16px 16px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-        <Buddy face={faceOf(s)} size={52} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ font: `500 14px/1.3 ${SANS}`, color: C.text }}>{a.title}</div>
-          <div style={{ font: `400 11.5px/1.4 ${MONO}`, color: C.ghost, marginTop: 5, ...CLIP }}>
-            {s.project} · one agent, no subagents
-          </div>
-          <div style={{ display: 'flex', gap: 18, marginTop: 14 }}>
-            {stat('tokens', fmtTokens(s.tokens))}
-            {stat(s.endedAt ? 'ran for' : 'running', elapsedOf(s, now))}
-            {stat('tool', s.tool ?? '—')}
-          </div>
-        </div>
-      </div>
-      {s.tail.length > 0 && (
-        <div
-          style={{
-            margin: '0 14px 14px',
-            padding: '10px 12px',
-            background: C.well,
-            borderRadius: 10,
-            font: `400 11px/1.5 ${MONO}`,
-            color: C.faint,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word'
-          }}
-        >
-          {s.tail.join('\n')}
-        </div>
-      )}
-    </>
-  );
-}
-
 function AskCard({
   s,
   onDecide
@@ -524,8 +490,12 @@ function SessionList({
   sessions,
   snap,
   now,
-  onOpen
+  onOpen,
+  navigation,
+  panel
 }: {
+  panel?: { id: string; 'aria-labelledby': string };
+  navigation?: ReactNode;
   sessions: Session[];
   snap: Snapshot;
   now: number;
@@ -550,12 +520,15 @@ function SessionList({
           </div>
         }
       />
+      {navigation}
+      <PanelBody panel={panel}>
       <Divider />
       <div style={{ padding: '8px 8px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {sessions.slice(0, rowBudget()).map((s) => (
           <SessionRow key={s.id} s={s} now={now} onOpen={() => onOpen(s.id)} />
         ))}
       </div>
+      </PanelBody>
     </div>
   );
 }
@@ -566,8 +539,12 @@ function SessionPanel({
   now,
   onBack,
   onDecide,
-  onDismiss
+  onDismiss,
+  navigation,
+  panel
 }: {
+  panel?: { id: string; 'aria-labelledby': string };
+  navigation?: ReactNode;
   s: Session;
   snap: Snapshot;
   now: number;
@@ -575,9 +552,7 @@ function SessionPanel({
   onDecide?: (sessionId: string, askId: string, decision: 'allow' | 'deny') => void;
   onDismiss?: (sessionId: string) => void;
 }) {
-  const m = mainAgent(s);
   const finished = s.status === 'done' || s.status === 'failed';
-  const solo = s.agents.length <= 1 && !s.ask;
   return (
     <div style={{ width: PANEL_W }}>
       <PanelHeader
@@ -596,27 +571,27 @@ function SessionPanel({
             >
               <Light status={s.status} pulse={snap.pulse} />
             </div>
-            {!onBack && <Mono>{elapsedOf(s, now)}</Mono>}
           </div>
         }
         right={
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, paddingRight: 13 }}>
-            <Mark activity={s.status === 'asking' ? 'ask' : finished ? 'done' : m.activity} color={C.dim} />
+            <Mark activity={markOf(s)} color={s.status === 'asking' ? C.yellow : C.dim} />
             <Buddy face={faceOf(s)} size={26} />
           </div>
         }
       />
+      {navigation}
+      <PanelBody panel={panel}>
       <Divider />
-      {solo ? (
-        <SoloAgent s={s} now={now} />
-      ) : (
-        <>
-          <SessionMeta s={s} now={now} />
-          {s.ask ? <AskCard s={s} onDecide={onDecide} /> : <AgentList s={s} now={now} />}
-        </>
-      )}
+      <SessionMeta s={s} now={now} />
+      {s.ask ? <AskCard s={s} onDecide={onDecide} /> : <AgentList s={s} now={now} />}
+      </PanelBody>
     </div>
   );
+}
+
+function PanelBody({ panel, children }: { panel?: { id: string; 'aria-labelledby': string }; children: ReactNode }) {
+  return panel ? <div role="tabpanel" {...panel}>{children}</div> : <>{children}</>;
 }
 
 /* ------------------------------------------------------------------- root */
@@ -631,10 +606,10 @@ function useNow(active: boolean): number {
   return now;
 }
 
-export function Island({ snap, hovering, open, onDecide, onDismiss, onBox }: IslandProps) {
+export function Island({ snap, hovering, open, onDecide, onDismiss, onBox, surface }: IslandProps) {
   const [drill, setDrill] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [box, setBox] = useState({ w: 0, h: 0, dx: 0 });
   const now = useNow(!snap.dormant || open);
 
   // Closing forgets where you were. Re-opening onto a session you drilled into
@@ -659,13 +634,20 @@ export function Island({ snap, hovering, open, onDecide, onDismiss, onBox }: Isl
     const r = el.getBoundingClientRect();
     const w = Math.ceil(r.width);
     const h = Math.ceil(r.height);
-    setBox((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+    // The shell is centred on the display, and the cutout is too — but with
+    // wings of different widths the notch column is off the bar's own centre.
+    // Sliding the shell back by that difference puts the empty column over the
+    // camera again, which is the only alignment that matters.
+    const notch = el.querySelector('[data-cl-notch]');
+    const nr = notch?.getBoundingClientRect();
+    const dx = nr ? Math.round(r.left + w / 2 - (nr.left + nr.width / 2)) : 0;
+    setBox((prev) => (prev.w === w && prev.h === h && prev.dx === dx ? prev : { w, h, dx }));
     // The hit region is the island's *target* size, reported before the shell
     // has finished animating into it. Generous-early is the right way round: it
     // stops a panel that is still growing from collapsing out from under the
     // cursor that opened it.
     const next: HitRect = {
-      x: Math.round((window.innerWidth - w) / 2) - 4,
+      x: Math.round((window.innerWidth - w) / 2) + dx - 4,
       y: 0,
       w: w + 8,
       // Anything past the window's edge is clipped and invisible; claiming it
@@ -700,47 +682,55 @@ export function Island({ snap, hovering, open, onDecide, onDismiss, onBox }: Isl
   let content: ReactNode;
   let key: string;
 
-  if (snap.dormant) {
-    if (open) {
-      content = <IdleFace snap={snap} />;
+  if (open) {
+    if (snap.dormant) {
+      content = surface ? <div style={{ width: PANEL_W }}><div style={{ display: 'flex', justifyContent: 'center' }}><IdleFace snap={snap} /></div>{surface.navigation}<div role="tabpanel" {...surface.panel} className="mp-empty"><p>All quiet here.</p><span>Your Claude sessions will appear when work begins.</span></div></div> : <IdleFace snap={snap} />;
       key = 'idle';
-    } else if (hovering) {
-      content = <Stubs snap={snap} />;
-      key = 'stubs';
+    } else if (single) {
+      content = <SessionPanel s={single} snap={snap} now={now} onDecide={onDecide} onDismiss={onDismiss} navigation={surface?.navigation} panel={surface?.panel} />;
+      key = 'single-' + single.id;
+    } else if (drilled) {
+      content = (
+        <SessionPanel
+          s={drilled}
+          snap={snap}
+          now={now}
+          navigation={surface?.navigation} panel={surface?.panel}
+          onBack={() => setDrill(null)}
+          onDecide={onDecide}
+          onDismiss={onDismiss}
+        />
+      );
+      key = 'drill-' + drilled.id;
     } else {
-      // Invisible, but exactly the size of the cutout, so the cursor has
-      // something to find.
-      content = <div style={{ width: snap.notchW, height: snap.notchH }} />;
-      key = 'void';
+      content = <SessionList sessions={sessions} snap={snap} now={now} onOpen={setDrill} navigation={surface?.navigation} panel={surface?.panel} />;
+      key = 'list';
     }
-  } else if (!open) {
-    content = single ? (
-      <CollapsedOne s={single} snap={snap} now={now} />
-    ) : (
-      <CollapsedMany sessions={sessions} snap={snap} />
-    );
-    key = 'collapsed';
   } else if (single) {
-    content = <SessionPanel s={single} snap={snap} now={now} onDecide={onDecide} onDismiss={onDismiss} />;
-    key = 'single-' + single.id;
-  } else if (drilled) {
-    content = (
-      <SessionPanel
-        s={drilled}
-        snap={snap}
-        now={now}
-        onBack={() => setDrill(null)}
-        onDecide={onDecide}
-        onDismiss={onDismiss}
-      />
-    );
-    key = 'drill-' + drilled.id;
+    content = <CollapsedOne s={single} snap={snap} />;
+    key = 'collapsed';
+  } else if (sessions.length > 1) {
+    content = <CollapsedMany sessions={sessions} snap={snap} />;
+    key = 'collapsed';
+  } else if (hovering) {
+    content = <Stubs snap={snap} />;
+    key = 'stubs';
   } else {
-    content = <SessionList sessions={sessions} snap={snap} now={now} onOpen={setDrill} />;
-    key = 'list';
+    // Invisible, but exactly the size of the cutout, so the cursor has
+    // something to find.
+    content = <div style={{ width: snap.notchW, height: snap.notchH }} />;
+    key = 'void';
   }
 
-  const invisible = snap.dormant && !open && !hovering;
+  if (surface?.expanded !== undefined && open) {
+    content = surface.expanded;
+    key = 'surface';
+  } else if (surface?.collapsed !== undefined && !open) {
+    content = surface.collapsed;
+    key = 'surface-collapsed';
+  }
+
+  const invisible = !surface?.active && snap.dormant && !open && !hovering;
 
   return (
     <div className="cl-stage">
@@ -750,6 +740,7 @@ export function Island({ snap, hovering, open, onDecide, onDismiss, onBox }: Isl
           style={{
             width: box.w || snap.notchW,
             height: box.h || snap.notchH,
+            transform: `translateX(${box.dx}px)`,
             borderRadius: `0 0 ${radius}px ${radius}px`,
             background: invisible ? 'transparent' : C.ink,
             boxShadow: invisible

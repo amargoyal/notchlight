@@ -37,6 +37,7 @@ export function Buddy({ face = 'working', size = 44, opacity = 1 }: { face?: Fac
   const block = (style: React.CSSProperties) => ({ position: 'absolute' as const, background: C.buddy, ...style });
   return (
     <div
+      data-cl-buddy
       style={{
         position: 'relative',
         width: size,

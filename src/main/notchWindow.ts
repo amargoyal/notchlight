@@ -250,3 +250,23 @@ export function createGalleryWindow(): BrowserWindow {
   win.loadFile(path.join(__dirname, '../renderer/gallery.html'));
   return win;
 }
+
+/** A normal desktop window; preferences are preview-local, never production config. */
+export function createCustomizeWindow(): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 1240,
+    height: 860,
+    minWidth: 980,
+    minHeight: 700,
+    show: false,
+    title: 'Claude Light — Customize',
+    backgroundColor: '#F5F2ED',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  win.loadFile(path.join(__dirname, '../renderer/customize.html'));
+  return win;
+}

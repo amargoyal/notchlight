@@ -762,6 +762,21 @@ class SessionTranscript extends Reader {
     if (this.mainTool && this.mainTool.id === id) this.mainTool = null;
   }
 
+  /**
+   * Whether anyone has said anything in this file yet.
+   *
+   * Claude Code writes a `bridge-session` record into a transcript the moment
+   * a session is registered for remote control — before, and sometimes
+   * instead of, any conversation: leaving one session can create a file for
+   * the next that never gets used. Such a file has no timestamps, so on every
+   * tick it reported "started now, active now", which the store read as a
+   * session working forever under a bare uuid, with no project and no words —
+   * a phantom row that appeared exactly when a real session was closed.
+   */
+  empty(): boolean {
+    return !this.startedAt;
+  }
+
   /** What the main thread is doing, in one line. */
   private mainTitle(): string {
     if (this.mainTool) return phraseFor(this.mainTool.name, this.mainTool.input);
@@ -919,7 +934,10 @@ export class TranscriptWatcher {
         t = new SessionTranscript(file);
         this.open.set(id, t);
       }
-      facts.push(t.facts());
+      const f = t.facts();
+      // Registered but never spoken in: not a session anyone is sitting in.
+      if (t.empty()) continue;
+      facts.push(f);
     }
     return facts;
   }

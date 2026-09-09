@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './island.css';
 import { Buddy } from './Buddy';
+import { PreviewGallery } from './Preview';
 import { Island } from './IslandView';
 import { Mark } from './marks';
 import { C, MONO, SANS } from './theme';
@@ -101,8 +102,7 @@ const working = session({
     agent('a2', 'sub', 'Running test suite', 'shell', 'working', 12_900, 63),
     agent('a3', 'sub', 'Searching hover-intent patterns', 'search', 'working', 8_400, 41),
     agent('a4', 'sub', 'Wrote island geometry spec', 'done', 'done', 15_900, 202, 20)
-  ],
-  tail: ['$ npm run lint --silent', '✓ 0 problems · 41 files']
+  ]
 });
 
 const asking = session({
@@ -153,8 +153,7 @@ const solo = session({
   tokens: 9_700,
   startedAt: NOW - 48_000,
   tool: 'Bash',
-  agents: [agent('main', 'main', 'Migrating tokens to inline styles', 'shell', 'working', 9_700, 48)],
-  tail: ['$ npm run lint --silent', '✓ 0 problems · 41 files']
+  agents: [agent('main', 'main', 'Migrating tokens to inline styles', 'shell', 'working', 9_700, 48)]
 });
 
 /* ------------------------------------------------------------------- page */
@@ -325,7 +324,7 @@ function Sheet() {
 function Live() {
   const [live, setLive] = useState<Snapshot | null>(null);
   useEffect(() => {
-    window.claudeLight?.onSnapshot?.(setLive);
+    return window.claudeLight?.onSnapshot?.(setLive);
   }, []);
   const s = live ?? BASE;
   return (
@@ -358,6 +357,8 @@ function App() {
           </div>
         </div>
 
+        <PreviewGallery />
+
         <Band label="Nothing running">
           <Card title="Idle" note="No wings, no light, no buddy. Just the hardware notch.">
             <Island snap={snap([])} hovering={false} open={false} />
@@ -371,13 +372,13 @@ function App() {
         </Band>
 
         <Band label="Collapsed · the light carries the state">
-          <Card title="Green — working" note="Elapsed on the left, activity mark and buddy on the right.">
+          <Card title="Green — working" note="A light, the activity mark, the buddy. No numbers — this bar is on screen the whole time.">
             <Island snap={snap([working])} hovering={false} open={false} />
           </Card>
           <Card title="Yellow — needs you" note="Buddy looks up, question mark beside it.">
             <Island snap={snap([asking])} hovering={false} open={false} />
           </Card>
-          <Card title="Red — finished" note="Final time and token count, buddy pleased with itself.">
+          <Card title="Red — finished" note="Red light, a tick, buddy pleased with itself. Click the light to dismiss it.">
             <Island snap={snap([done])} hovering={false} open={false} />
           </Card>
           <Card title="Three sessions" note="One light each, worst state first. Buddies stack, most active in front.">
@@ -396,7 +397,7 @@ function App() {
           </Card>
           <Card
             title="One agent"
-            note="A list of one is not a list. Show the work itself: current tool, live output tail."
+            note="The same shape, one row long. Nothing special-cased for the count."
             w={600}
             h={330}
           >

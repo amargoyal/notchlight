@@ -8,9 +8,12 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "watch": "node scripts/build.mjs --watch",
+    "test:companion": "node scripts/test-companion.mjs",
+    "test:preview": "node scripts/test-preview.mjs",
     "typecheck": "tsc --noEmit",
     "start": "npm run build && electron .",
     "demo": "npm run build && electron . --demo",
+    "customize": "npm run build && electron . --customize",
     "gallery": "npm run build && electron . --gallery",
     "service": "node bin/service.mjs install",
     "service:restart": "node bin/service.mjs restart",
