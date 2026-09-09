@@ -95,17 +95,16 @@ function MusicFace({ state, dispatch }: Controls) {
     <div className="mp-track-row">
       <Artwork state={state}/>
       <div className="mp-track-meta">
-        <div className="mp-source">Sample playlist <span>·</span> {state.music.playing ? 'Playing' : 'Paused'}</div>
         <h2 title={track.title}>{track.title}</h2>
         <p title={track.artist}>{track.artist}</p>
+        <div className="mp-seek"><span>{time(state.music.position)}</span><input aria-label="Track position" aria-valuetext={`${time(state.music.position)} of ${time(track.duration)}`} type="range" min="0" max={track.duration} value={state.music.position} onChange={e => dispatch({ type: 'seek', position: Number(e.target.value) })}/><span>−{time(track.duration - state.music.position)}</span></div>
         <div className="mp-transport">
-          <button className="mp-icon-button" aria-label="Previous track" onClick={() => dispatch({ type: 'skip', delta: -1 })}><Icon name="back" size={22}/></button>
-          <button className="mp-play" aria-label={state.music.playing ? 'Pause sample music' : 'Play sample music'} onClick={() => dispatch({ type: 'play' })}><Icon name={state.music.playing ? 'pause' : 'play'} size={20}/></button>
-          <button className="mp-icon-button" aria-label="Next track" onClick={() => dispatch({ type: 'skip', delta: 1 })}><Icon name="next" size={22}/></button>
+          <button className="mp-icon-button" aria-label="Previous track" onClick={() => dispatch({ type: 'skip', delta: -1 })}><Icon name="back" size={18}/></button>
+          <button className="mp-icon-button mp-play" aria-label={state.music.playing ? 'Pause sample music' : 'Play sample music'} onClick={() => dispatch({ type: 'play' })}><Icon name={state.music.playing ? 'pause' : 'play'} size={18}/></button>
+          <button className="mp-icon-button" aria-label="Next track" onClick={() => dispatch({ type: 'skip', delta: 1 })}><Icon name="next" size={18}/></button>
         </div>
       </div>
     </div>
-    <div className="mp-seek"><input aria-label="Track position" aria-valuetext={`${time(state.music.position)} of ${time(track.duration)}`} type="range" min="0" max={track.duration} value={state.music.position} onChange={e => dispatch({ type: 'seek', position: Number(e.target.value) })}/><div><span>{time(state.music.position)}</span><span>−{time(track.duration - state.music.position)}</span></div></div>
   </div>;
 }
 

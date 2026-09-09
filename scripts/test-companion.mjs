@@ -104,7 +104,8 @@ try {
   const received = [];
   tap.on('levels',l=>received.push(l));
   tap.setActive(true);
-  await new Promise(r=>setTimeout(r,400));
+  const until = async (test, ms) => { const end = Date.now()+ms; while (!test() && Date.now()<end) await new Promise(r=>setTimeout(r,25)); };
+  await until(()=>received.length>3, 5000);
   assert.equal(tap.status,'listening');
   assert.ok(received.length>3,'levels stream while active');
   assert.deepEqual(received[0],[0.1,0.2,0.3,0.4,0.5]);
@@ -115,7 +116,7 @@ try {
   assert.equal(received.length,count,'nothing arrives after stop');
   const refused = new AudioLevels(async()=>{ await writeFile(script,`#!/bin/sh\necho '{"ok":false,"reason":"tap-1852797029"}'\n`,{mode:0o755}); return script; });
   refused.setActive(true);
-  await new Promise(r=>setTimeout(r,300));
+  await until(()=>refused.status==='unavailable', 5000);
   assert.equal(refused.status,'unavailable','a refused tap backs off instead of retrying');
   refused.stop();
   const missing = new AudioLevels(async()=>null);
