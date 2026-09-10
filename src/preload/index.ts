@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { HitRect, Snapshot } from '../shared/types';
+import type { ApprovalDecision, HitRect, Snapshot } from '../shared/types';
 import type { CompanionPreferences, CompanionSnapshot, CompanionView, SpotifyCommand } from '../shared/companion';
 
 function subscribe<T>(channel: string, cb: (value: T) => void): () => void {
@@ -7,15 +7,17 @@ function subscribe<T>(channel: string, cb: (value: T) => void): () => void {
   ipcRenderer.on(channel, listener);
   return () => ipcRenderer.removeListener(channel, listener);
 }
-contextBridge.exposeInMainWorld('claudeLight', {
+contextBridge.exposeInMainWorld('notchlight', {
   openCustomize: () => ipcRenderer.send('open-customize'),
   onSnapshot: (cb: (s: Snapshot) => void) => subscribe('snapshot', cb),
   onHover: (cb: (inside: boolean) => void) => subscribe('hover', cb),
   onOpen: (cb: (open: boolean) => void) => subscribe('open', cb),
   setHitRect: (r: HitRect) => ipcRenderer.send('hit-rect', r),
-  decide: (sessionId: string, askId: string, decision: 'allow' | 'deny') => ipcRenderer.send('decide', { sessionId, askId, decision }),
+  decide: (sessionId: string, askId: string, decision: ApprovalDecision) => ipcRenderer.invoke('decide', { sessionId, askId, decision }),
   dismiss: (sessionId: string) => ipcRenderer.send('dismiss', sessionId),
   getSnapshot: () => ipcRenderer.invoke('snapshot:get'),
+  installCodexHooks: (remove = false) => ipcRenderer.invoke('codex:hooks',remove),
+  chooseCodexHome: () => ipcRenderer.invoke('codex:home'),
   getCompanion: () => ipcRenderer.invoke('companion:get'),
   onCompanion: (cb: (s: CompanionSnapshot) => void) => subscribe('companion', cb),
   updatePreferences: (patch: Partial<CompanionPreferences>) => ipcRenderer.invoke('companion:preferences', patch),
