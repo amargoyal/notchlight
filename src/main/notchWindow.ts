@@ -7,7 +7,7 @@
  * fine, which is the whole reason the Allow/Deny buttons can work without ever
  * stealing focus from the terminal you are actually typing in.
  */
-import { BrowserWindow, screen, type Display } from 'electron';
+import { app, BrowserWindow, screen, type Display } from 'electron';
 import path from 'node:path';
 import { config } from './config';
 import { probeNotch, resetProbe } from './notchProbe';
@@ -25,6 +25,7 @@ export class NotchWindow {
   private pending = 0;
   private forceSettle = false;
   private lastSignature = '';
+  private wasActive = false;
 
   constructor(
     private onHover: (inside: boolean) => void,
@@ -226,6 +227,35 @@ export class NotchWindow {
    */
   private windowHeight(d: Display): number {
     return Math.min(config().windowHeight, d.bounds.height);
+  }
+
+  /**
+   * Let the island take the keyboard. Returns nothing; releaseKeyboard says
+   * whether the app had to come forward to do it.
+   */
+  takeKeyboard(): void {
+    const win = this.win;
+    if (!win || win.isDestroyed()) return;
+    this.wasActive = app.isActive?.() ?? false;
+    win.setFocusable(true);
+    win.setIgnoreMouseEvents(false);
+    this.engaged = true;
+    win.focus();
+    this.assertLevel();
+  }
+
+  /** Back to click-through and non-focusable. True if taking the keys activated the app. */
+  releaseKeyboard(): boolean {
+    const win = this.win;
+    if (!win || win.isDestroyed()) return false;
+    const cameForward = (app.isActive?.() ?? false) && !this.wasActive;
+    win.blur();
+    win.setFocusable(false);
+    // Let the cursor poll decide whether the island stays engaged.
+    this.engaged = false;
+    win.setIgnoreMouseEvents(true, { forward: true });
+    this.assertLevel();
+    return cameForward;
   }
 
   /** The island measured itself; this is where it says it ended up. */
