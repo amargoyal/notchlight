@@ -2,6 +2,13 @@ import type { ReactNode } from 'react';
 import type { AgentFilter, AgentProvider, Session, Snapshot } from '../shared/types';
 import { Buddy, faceFor } from './Buddy';
 import { lightColor } from './theme';
+import { pulseStyle, usePulse } from './pulse';
+
+/** The provider's light on the resting bar; breathes through the shared pulse timer while working. */
+function RestingLight({ status, pulse }: { status: Session['status']; pulse: boolean }) {
+  const pulsing = usePulse(pulse && status === 'working');
+  return <i style={{ background: lightColor(status), ...pulseStyle(pulsing) }}/>;
+}
 
 export const providerName = (p: AgentProvider) => p === 'codex' ? 'Codex' : 'Claude';
 export const providerOf = (s: Session): AgentProvider => s.provider ?? 'claude';
@@ -36,7 +43,7 @@ export function agentRestingParts(snapshot: Snapshot, preferences: {restClaude:b
     const name = providerName(provider), short = provider === 'claude' ? 'Cl' : 'Cx';
     const label = `${name}: ${sessions.length} session${sessions.length === 1 ? '' : 's'}, ${status}`;
     const pulse = provider === 'claude' ? preferences.pulse : preferences.codexPulse;
-    return [{provider:true,left:<button className="agent-resting" aria-label={label} onClick={() => onSelect(provider)}><i style={{background:lightColor(status),animation:pulse && status === 'working' ? 'cl-pulse 1.7s ease-in-out infinite' : undefined}}/>{mixed && <span>{short}</span>}{sessions.length > 1 && <small className="agent-rest-count">{Math.min(99,sessions.length)}{sessions.length > 99 ? '+' : ''}</small>}</button>,
+    return [{provider:true,left:<button className="agent-resting" aria-label={label} onClick={() => onSelect(provider)}><RestingLight status={status} pulse={pulse}/>{mixed && <span>{short}</span>}{sessions.length > 1 && <small className="agent-rest-count">{Math.min(99,sessions.length)}{sessions.length > 99 ? '+' : ''}</small>}</button>,
       right:<button className="agent-resting" aria-label={`Show ${name} sessions`} onClick={() => onSelect(provider)}>{visibleBuddy ? <Buddy provider={provider} face={snapshot.now - (sessions[0].approvedAt ?? 0) < 1800 ? 'approved' : faceFor(status,!!sessions[0].tool)} size={22}/> : <span>{short}</span>}</button>}];
   });
 }
