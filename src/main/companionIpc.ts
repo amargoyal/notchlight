@@ -1,5 +1,9 @@
 import { BrowserWindow, dialog, ipcMain, nativeImage, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { CompanionStore } from './companionStore';
 import { SpotifyPlayer } from './spotify';
 import { trayIcon } from './png';
@@ -46,6 +50,17 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
       event.sender.startDrag({ file: entry.path, icon });
       store.notice('Drag to another app. The item stays in Tray until you remove it.');
     } catch (error) { store.notice((error as Error).message || 'Could not start the file drag.'); }
+  });
+  handle('codex:home', async () => {
+    const result = await dialog.showOpenDialog(dialogWindow(), {title:'Choose Codex home', properties:['openDirectory','showHiddenFiles']});
+    if (!result.canceled && result.filePaths[0]) await store.updatePreferences({codexHome:result.filePaths[0]});
+  });
+  handle('codex:hooks', async (_event, remove) => {
+    if (typeof remove !== 'boolean') throw new Error('Invalid setup action.');
+    const home = store.current().preferences.codexHome || process.env.CODEX_HOME || path.join(os.homedir(),'.codex');
+    const script = path.join(__dirname,'../../bin/install-codex-hooks.mjs');
+    await promisify(execFile)(process.execPath,[script,'--home',home,...(remove ? ['--remove'] : [])],{env:{...process.env,ELECTRON_RUN_AS_NODE:'1'},timeout:5000});
+    store.notice(remove ? 'Notchlight Codex hooks removed. Reload your Codex sessions.' : 'Hooks installed. Review and trust them in Codex, then reload existing sessions.');
   });
   handle('spotify:connect', async () => {
     const alreadyEnabled = store.current().preferences.spotifyEnabled;

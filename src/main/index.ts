@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CL_DIR, config, ensureDir } from './config';
+import { APP_DIR, config, ensureDir } from './config';
 import { CompanionStore } from './companionStore';
 import { SpotifyPlayer } from './spotify';
 import { installCompanionIpc } from './companionIpc';
@@ -20,11 +20,15 @@ import { createGalleryWindow, createCustomizeWindow, NotchWindow } from './notch
 import { notchState, probeNotch } from './notchProbe';
 import { trayIcon } from './png';
 import { Store } from './store';
+import { CodexAdapter } from './codex';
+import { CodexApprovals } from './codexApprovals';
+import { AgentCoordinator } from './agentCoordinator';
 import type { HitRect, Snapshot } from '../shared/types';
 
 const DEMO = process.argv.includes('--demo');
 const GALLERY_ONLY = process.argv.includes('--gallery');
 const CUSTOMIZE = process.argv.includes('--customize');
+app.setName('Notchlight');
 
 /**
  * A second copy would bind the same socket and draw a second island on the same
@@ -35,10 +39,12 @@ const CUSTOMIZE = process.argv.includes('--customize');
 const PRIMARY = app.requestSingleInstanceLock();
 if (!PRIMARY) app.quit();
 
-type AnyStore = Store | DemoStore;
+type AnyStore = AgentCoordinator;
 
 let store: AnyStore;
 let hooks: HookServer | null = null;
+let codex: CodexAdapter;
+let codexApprovals: CodexApprovals;
 let notch: NotchWindow | null = null;
 let tray: Tray | null = null;
 let gallery: BrowserWindow | null = null;
@@ -131,7 +137,7 @@ function installHooks(): void {
 function hooksInstalled(): boolean {
   try {
     const text = fs.readFileSync(path.join(os.homedir(), '.claude', 'settings.json'), 'utf8');
-    return text.includes('cl-hook.mjs');
+    return text.includes('notchlight-hook.mjs') || text.includes('cl-hook.mjs');
   } catch {
     return false;
   }
@@ -151,7 +157,7 @@ function refreshTray(): void {
     { label: s.dormant ? 'Nothing running' : `${s.sessions.length} session${s.sessions.length === 1 ? '' : 's'}`, enabled: false }
   ];
   for (const sess of s.sessions.slice(0, 6)) {
-    lines.push({ label: `${sess.project} — ${sess.status}`, enabled: false });
+    lines.push({ label: `${sess.provider === 'codex' ? 'Codex' : 'Claude'} · ${sess.project} — ${sess.status}`, enabled: false });
   }
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -166,14 +172,14 @@ function refreshTray(): void {
         enabled: false
       },
       { label: 'Add files to Tray…', click: () => { void pickFiles?.().catch(e => companion.notice(String(e.message))); } },
-      { label: 'Customize Claude Light…', click: () => openCustomize() },
+      { label: 'Customize Notchlight…', click: () => openCustomize() },
       { label: 'Open faces gallery', click: () => openGallery() },
       hooksInstalled()
         ? { label: 'Claude Code hooks installed', enabled: false }
         : { label: 'Install Claude Code hooks…', click: () => installHooks() },
-      { label: 'Reveal config folder', click: () => shell.openPath(CL_DIR) },
+      { label: 'Reveal config folder', click: () => shell.openPath(APP_DIR) },
       { type: 'separator' },
-      { label: 'Quit Claude Light', click: () => app.quit() }
+      { label: 'Quit Notchlight', click: () => app.quit() }
     ])
   );
   tray.setTitle(trayTitle(s));
@@ -183,7 +189,7 @@ function startTray(): void {
   const img = nativeImage.createFromBuffer(trayIcon(), { scaleFactor: 2 });
   img.setTemplateImage(true);
   tray = new Tray(img);
-  tray.setToolTip('Claude Light');
+  tray.setToolTip('Notchlight');
   tray.on('drop-files', (_event, files) => { void companion.add(files).catch(e => companion.notice(String(e.message))); });
   refreshTray();
 }
@@ -232,8 +238,8 @@ class Hover {
 
 async function boot(): Promise<void> {
   ensureDir();
-  store = DEMO ? new DemoStore() : new Store();
-  companion = new CompanionStore(path.join(CL_DIR, 'companion.json'), async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(), config().pulse);
+  const claude = DEMO ? new DemoStore() : new Store();
+  companion = new CompanionStore(path.join(APP_DIR, 'companion.json'), async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(), config().pulse);
   spotify = new SpotifyPlayer();
   levels = new AudioLevels();
   levels.on('levels', (bands: number[]) => {
@@ -241,9 +247,27 @@ async function boot(): Promise<void> {
     send(customize, 'music:levels', bands);
   });
   await companion.load();
+  codex = new CodexAdapter();
+  codexApprovals = new CodexApprovals(path.join(APP_DIR,'codex.sock'), () => companion.current().preferences.codexEnabled, () => companion.current().preferences.codexApprovals);
+  codexApprovals.on('hook', p => codex.onHook(p));
+  codexApprovals.on('requests', (id, requests) => codex.setHeld(id,requests));
+  codexApprovals.on('answered', (id, decision) => codex.onAnswered(id,decision));
+  codex.on('terminal', (id, turn) => codexApprovals.releaseTurn(id,turn));
+  store = new AgentCoordinator(claude, codex, codexApprovals, () => hooks, hooksInstalled);
+  let lastCodexHome = '';
+  const syncCodex = () => {
+    const p = companion.current().preferences;
+    const home = p.codexHome || process.env.CODEX_HOME || path.join(os.homedir(),'.codex');
+    if (home !== lastCodexHome) { codexApprovals.releaseAll(); lastCodexHome = home; }
+    codex.configure(!DEMO && p.codexEnabled, home);
+    if (!p.codexEnabled || !p.codexApprovals) codexApprovals.releaseAll();
+  };
+  syncCodex();
+  if (!DEMO) codexApprovals.start();
   let spotifyEnabled = companion.current().preferences.spotifyEnabled;
   spotify.on('change', music => companion.setMusic(music));
   companion.on('change', state => {
+    syncCodex();
     send(notch?.win ?? null, 'companion', state);
     send(customize, 'companion', state);
     levels.setActive(wantsLevels(state));
@@ -291,7 +315,7 @@ async function boot(): Promise<void> {
 
   if (!DEMO) {
     hooks = new HookServer();
-    const real = store as Store;
+    const real = claude as Store;
     hooks.on('hook', (e: HookEvent) => {
       if (e.event === 'SessionEnd') hooks?.releaseSession(e.sessionId);
       real.onHook(e);
@@ -332,16 +356,19 @@ ipcMain.on('hit-rect', (_e, r: HitRect) => {
   notch?.setHitRect(r);
 });
 
-ipcMain.on('decide', (_e, msg: { sessionId: string; askId: string; decision: 'allow' | 'deny' }) => {
-  if (!hooks || DEMO) return;
-  if (!msg || typeof msg.sessionId !== 'string' || typeof msg.askId !== 'string') return;
-  if (msg.decision !== 'allow' && msg.decision !== 'deny') return;
-  const gate = (store as Store).gateFor(msg.sessionId, msg.askId);
-  if (gate) hooks.decide(gate, msg.decision);
+function trustedAgentWindow(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  return event.senderFrame === event.sender.mainFrame && !!win && (win === notch?.win || win === customize);
+}
+ipcMain.handle('decide', (event, msg) => {
+  try {
+    if (!trustedAgentWindow(event) || DEMO || !msg || typeof msg.sessionId !== 'string' || typeof msg.askId !== 'string' || !['allow','deny','defer'].includes(msg.decision)) throw new Error('Invalid approval request.');
+    store.decide(msg.sessionId,msg.askId,msg.decision);
+    return {ok:true};
+  } catch(error) { return {ok:false,error:(error as Error).message}; }
 });
-
-ipcMain.on('dismiss', (_e, sessionId: string) => {
-  if (typeof sessionId === 'string' && sessionId) store.dismiss(sessionId);
+ipcMain.on('dismiss', (event, id) => {
+  if (trustedAgentWindow(event) && typeof id === 'string') store.dismiss(id);
 });
 
 ipcMain.on('open-customize', (event) => {
@@ -367,7 +394,7 @@ app.whenReady().then(() => {
   /** No dock icon: the island is furniture, not an app you switch to. */
   app.dock?.hide();
   if (notchState() === 'no' && !config().allowWithoutNotch && !DEMO) {
-    console.log('[claude-light] no cutout on this display — set allowWithoutNotch to run anyway');
+    console.log('[notchlight] no cutout on this display — set allowWithoutNotch to run anyway');
   }
   void boot().catch(error => { console.error('[companion] startup failed:', error.message); app.quit(); });
 });
