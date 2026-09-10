@@ -4,14 +4,14 @@ import { Icon, FileThumb, RestingWings, type RestingPart } from './Preview';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import type { AgentFilter, Snapshot } from '../shared/types';
-import { DEFAULT_COMPANION_PREFERENCES, EMPTY_SPOTIFY, type CompanionSnapshot, type CompanionView, type OperationResult, type ShelfFile } from '../shared/companion';
+import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_SPOTIFY, type CompanionSnapshot, type CompanionView, type OperationResult, type ShelfFile } from '../shared/companion';
 import './preview.css';
 import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
 
 const EMPTY: Snapshot = { sessions: [], overall: 'idle', tokens: 0, elapsed: 0, dormant: true, notchW: 200, notchH: 32, hoverDelay: 550, pulse: true, now: Date.now() };
 export function useCompanion() {
   const available = !!window.notchlight?.getCompanion;
-  const [state, setState] = useState<CompanionSnapshot>({ preferences: { ...DEFAULT_COMPANION_PREFERENCES }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, notice: '' });
+  const [state, setState] = useState<CompanionSnapshot>({ preferences: { ...DEFAULT_COMPANION_PREFERENCES }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, notice: '' });
   const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');

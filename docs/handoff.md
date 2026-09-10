@@ -95,7 +95,7 @@ The owner specified **Spotify only** in this conversation. Apple Music remains
 an optional future expansion, not the next milestone. Existing item numbers
 below are retained for reference; use this priority order:
 
-1. Fix resting-wing audio capture eligibility and Spotify recovery (13–14).
+1. Fix resting-wing audio capture eligibility (13). Spotify and capture recovery (14) landed September 9.
 2. Improve transport feedback (2) and Tray multi-select/recovery (8, 16).
 3. Add keyboard access (15). Native lifecycle and energy checks (17) landed September 9.
 4. Apply the selected Notchlight identity and prepare distribution (18, 3–4).
@@ -238,19 +238,22 @@ the bars. If capture is unavailable, show a restrained playback indicator and
 explain its status in Music settings. Check runtime changes to the system's
 reduced-motion preference, not just the media-query value at effect setup.
 
-### 14. Recover Spotify and audio capture without repeated reconnects
-`SpotifyPlayer` stops automatic polls for both `permission` and `error`.
-Keep permission denial actionable, but retry transient read errors with bounded
-backoff and recover after Spotify relaunch or Mac wake. Preserve generation
-checks so an old read cannot reconnect a disabled integration.
+### 14. Recover Spotify and audio capture without repeated reconnects — implemented September 9, 2026
+`SpotifyPlayer` retries failed reads after 5, 10, 20, 40 then 60 seconds
+(`SpotifyPlayer.retryDelay`, overridable in tests), logs the failure and the
+recovery, and says in the message when the next try is. Permission denial
+still stops polling. Generation checks are unchanged. `refresh()` clears the
+wait, which is what a wake does.
 
-Expose capture status separately from the Spotify connection; track metadata
-and playback controls should still work when capture is denied. Add helper
-fixtures for output-device change, unexpected exit before the first status
-line, refusal, and permission granted later. In `AudioLevels`, a refusal calls
-`backOff()` and then `kill()`, which clears the scheduled retry; explicitly
-define and test the intended retry behavior instead of relying on later music
-polls to restart it.
+`AudioLevels` carries a `reason` with every unavailable status (`permission`,
+`not-running`, `unsupported`, `no-output`, `no-helper`, `crashed`, `failed`),
+its retry timer survives `kill()` and is cancelled only by `stop()` or
+`setActive(false)`, and an exit before the first status line backs off for
+15 seconds instead of respawning every 750 ms. The companion snapshot has a
+separate `capture` field; `describeCapture()` in `src/shared/companion.ts`
+words it for the **Audio capture** group in Customize → Music. Fixtures in
+`scripts/test-companion.mjs` cover refusal, permission granted later,
+output-device exit and a crash before the first line.
 
 ### 15. Keyboard access without stealing terminal focus
 The live overlay is intentionally non-focusable. Browser tab-key tests alone

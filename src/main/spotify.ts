@@ -16,7 +16,7 @@ export function normalizeSpotify(value: unknown): SpotifySnapshot {
   if (raw.status === 'not-running') return { ...base, status: 'not-running', message: 'Open Spotify to see what’s playing.' };
   if (raw.status === 'empty') return { ...base, status: 'empty', message: 'Choose something to play in Spotify.' };
   if (raw.status === 'permission') return { ...base, status: 'permission', message: 'Allow Notchlight to control Spotify in System Settings → Privacy & Security → Automation, then reconnect.' };
-  if (raw.status !== 'ready' || !raw.track || typeof raw.track !== 'object') return { ...base, status: 'error', message: 'Could not read Spotify. Try reconnecting.' };
+  if (raw.status !== 'ready' || !raw.track || typeof raw.track !== 'object') return { ...base, status: 'error', message: 'Could not read Spotify.' };
   const track = raw.track as Record<string, unknown>;
   const duration = number(track.durationMs) / 1000;
   return { ...base, status: 'ready', playing: raw.playing === true, position: Math.min(number(raw.position), duration),
@@ -79,7 +79,12 @@ export class SpotifyPlayer extends EventEmitter {
   private artists = new Map<string, string | undefined>();
   private pendingArtists = new Set<string>();
   private suspended = false;
-  constructor(private run: SpotifyRunner = runSpotify, private lookup: ArtistLookup = fetchArtists) { super(); }
+  /** Consecutive failed reads. Drives the retry delay and resets on the first good one. */
+  private failures = 0;
+  private retryAt = 0;
+  constructor(private run: SpotifyRunner = runSpotify, private lookup: ArtistLookup = fetchArtists, private interval = 2500) { super(); }
+  /** How long to wait after the nth failed read: 5 s, 10 s, 20 s, 40 s, then a minute. */
+  static retryDelay(failures: number): number { return Math.min(60_000, 5_000 * 2 ** Math.max(0, failures - 1)); }
   current() { return this.state; }
   private publish(state: SpotifySnapshot) {
     if (state.status !== this.state.status) logEvent('spotify', `status ${this.state.status} → ${state.status}`);
@@ -90,10 +95,25 @@ export class SpotifyPlayer extends EventEmitter {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     if (!enabled) { this.publish({ ...EMPTY_SPOTIFY }); return; }
+    this.failures = 0; this.retryAt = 0;
     this.publish({ ...EMPTY_SPOTIFY, status: 'empty', busy: true, message: 'Connecting to Spotify…' });
     void this.poll();
-    this.timer = setInterval(() => { if (!this.suspended && !['permission', 'error'].includes(this.state.status)) void this.poll(); }, 2500);
+    this.timer = setInterval(() => this.tick(), this.interval);
   }
+  /**
+   * The interval's decision. Permission denial stays put — polling cannot
+   * grant it and the message tells the user what to do. A read error is
+   * usually transient (Spotify mid-launch, a hung Apple Event, the Mac just
+   * back from sleep), so those retry with a growing delay rather than either
+   * hammering osascript or stopping for good.
+   */
+  private tick(): void {
+    if (this.suspended || this.state.status === 'permission') return;
+    if (this.state.status === 'error' && Date.now() < this.retryAt) return;
+    void this.poll();
+  }
+  /** When the next automatic read happens, for tests and the settings pane. */
+  nextRetry(): number | null { return this.state.status === 'error' ? this.retryAt : null; }
   /**
    * The Mac is going to sleep. Every poll spawns osascript, and a poll that
    * starts as the lid closes tends to time out and read as an error, which
@@ -114,6 +134,7 @@ export class SpotifyPlayer extends EventEmitter {
   /** One status read now, outside the interval. A no-op while disabled or asleep. */
   refresh(): void {
     if (!this.enabled || this.suspended) return;
+    this.retryAt = 0;
     void this.poll();
   }
   private async poll(): Promise<void> {
@@ -134,7 +155,18 @@ export class SpotifyPlayer extends EventEmitter {
       if (!this.enabled || generation !== this.generation) return;
       if (command !== 'status') this.publish({ ...this.state, busy: true });
       const next = normalizeSpotify(await this.run(command, position).catch(() => ({ status: 'error' })));
-      if (this.enabled && generation === this.generation) this.publish(this.withArtists(next));
+      if (!this.enabled || generation !== this.generation) return;
+      if (next.status === 'error') {
+        this.failures++;
+        const delay = SpotifyPlayer.retryDelay(this.failures);
+        this.retryAt = Date.now() + delay;
+        logEvent('spotify', `read failed (${this.failures}), retry in ${Math.round(delay / 1000)}s`);
+        this.publish({ ...next, message: `${next.message} Trying again in ${Math.round(delay / 1000)} seconds.` });
+        return;
+      }
+      if (this.failures) logEvent('spotify', `recovered after ${this.failures} failed read${this.failures === 1 ? '' : 's'}`);
+      this.failures = 0;
+      this.publish(this.withArtists(next));
     });
     this.queue = work.catch(() => {});
     return work;

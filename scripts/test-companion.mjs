@@ -10,7 +10,7 @@ try {
   await build({ entryPoints: ['src/main/companionStore.ts','src/main/spotify.ts','src/main/audioLevels.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   const { CompanionStore } = await import(pathToFileURL(path.join(root,'companionStore.js')).href);
   const { SpotifyPlayer, normalizeSpotify, validArtwork, artistsFromPage } = await import(pathToFileURL(path.join(root,'spotify.js')).href);
-  const { AudioLevels, wantsLevels } = await import(pathToFileURL(path.join(root,'audioLevels.js')).href);
+  const { AudioLevels, wantsLevels, captureReason } = await import(pathToFileURL(path.join(root,'audioLevels.js')).href);
   const source = path.join(root,'source'), dest = path.join(root,'destination');
   await mkdir(source); await mkdir(dest);
   const original = path.join(source,'notes.txt');
@@ -137,6 +137,35 @@ try {
   await new Promise(r=>setTimeout(r,30));
   assert.equal(mismatched.current().track.artist,'Someone','a credit that drops the lead is not trusted');
   mismatched.stop();
+  // Transient read errors retry with a growing delay and recover; permission denial stops polling.
+  const delays = [];
+  const originalDelay = SpotifyPlayer.retryDelay;
+  SpotifyPlayer.retryDelay = failures => { delays.push(failures); return 60; };
+  let flaky = 0;
+  const good = {status:'ready',playing:true,position:1,track:{id:'r',title:'Recovered',artist:'A',durationMs:1000}};
+  const recovering = new SpotifyPlayer(async()=>{ flaky++; return flaky <= 3 ? {status:'error'} : good; }, undefined, 15);
+  recovering.setEnabled(true);
+  await new Promise(r=>setTimeout(r,25));
+  assert.equal(recovering.current().status,'error');
+  assert.match(recovering.current().message,/Trying again/,'the error says a retry is coming');
+  assert.ok(recovering.nextRetry() > Date.now(),'a retry is scheduled');
+  await new Promise(r=>setTimeout(r,30));
+  assert.equal(flaky,1,'no reads until the retry delay has passed');
+  await new Promise(r=>setTimeout(r,400));
+  assert.equal(recovering.current().status,'ready','a transient error recovers on its own');
+  assert.equal(recovering.current().track.title,'Recovered');
+  assert.deepEqual(delays,[1,2,3],'each consecutive failure asks for a longer delay');
+  assert.equal(recovering.nextRetry(),null);
+  recovering.stop();
+  SpotifyPlayer.retryDelay = originalDelay;
+  assert.deepEqual([1,2,3,4,5,9].map(SpotifyPlayer.retryDelay),[5000,10000,20000,40000,60000,60000],'bounded backoff');
+  let denied = 0;
+  const forbidden = new SpotifyPlayer(async()=>{ denied++; return {status:'permission'}; }, undefined, 15);
+  forbidden.setEnabled(true);
+  await new Promise(r=>setTimeout(r,120));
+  assert.equal(denied,1,'permission denial is not polled again');
+  assert.equal(forbidden.current().status,'permission');
+  forbidden.stop();
   const ready = { preferences:{spotifyEnabled:true,visualizer:true,reducedMotion:false}, view:'music', music:{status:'ready',playing:true} };
   assert.equal(wantsLevels(ready),true);
   assert.equal(wantsLevels({...ready,view:'claude'}),false,'no helper while the bars are off screen');
@@ -171,7 +200,42 @@ try {
   refused.setActive(true);
   await until(()=>refused.status==='unavailable', 5000);
   assert.equal(refused.status,'unavailable','a refused tap backs off instead of retrying');
+  assert.equal(refused.reason,'permission','a refused prompt is named as one');
+  assert.ok(refused.nextRetry() > Date.now() + 30_000,'a refusal waits a while');
+  assert.notEqual(refused.retryTimer,null,'…but does try again on its own');
   refused.stop();
+  assert.equal(refused.retryTimer,null,'stop cancels the retry');
+  assert.deepEqual(['not-running','needs-macos-14.2','no-output-device','tap-1852797029','aggregate-560947818',undefined].map(captureReason),['not-running','unsupported','no-output','permission','failed','crashed']);
+  // Permission granted later: the refusal's retry fires and the helper comes up.
+  const later = new AudioLevels(async()=>script);
+  later.setActive(true);
+  await until(()=>later.status==='unavailable', 5000);
+  await writeFile(script,`#!/bin/sh\nexec "${process.execPath}" "${fakeTap}"\n`,{mode:0o755});
+  later.retryAt = Date.now() + 100; later.retryTimer && clearTimeout(later.retryTimer); later.retryTimer = null; later.scheduleRetry();
+  await until(()=>later.status==='listening', 5000);
+  assert.equal(later.status,'listening','the helper starts once the retry fires');
+  assert.equal(later.reason,null);
+  assert.equal(later.starts,2);
+  // Output device change: a clean exit while listening comes back on its own within a second.
+  const switching = new AudioLevels(async()=>script);
+  switching.setActive(true);
+  await until(()=>switching.status==='listening', 5000);
+  switching.child.kill('SIGTERM');
+  await until(()=>switching.status==='idle', 2000);
+  assert.equal(switching.status,'idle','an exit while listening reads as idle, not unavailable');
+  await until(()=>switching.status==='listening', 3000);
+  assert.equal(switching.status,'listening','…and the helper is back on the new device');
+  assert.equal(switching.starts,2);
+  switching.stop();
+  later.stop();
+  // Exit before the first status line is a broken helper, not a device change: back off, do not spin.
+  const broken = new AudioLevels(async()=>{ await writeFile(script,`#!/bin/sh\nexit 3\n`,{mode:0o755}); return script; });
+  broken.setActive(true);
+  await until(()=>broken.status==='unavailable', 5000);
+  assert.equal(broken.reason,'crashed');
+  assert.ok(broken.nextRetry() - Date.now() > 5000,'a crash waits before another attempt');
+  assert.equal(broken.starts,1,'no respawn loop');
+  broken.stop();
   const missing = new AudioLevels(async()=>null);
   missing.setActive(true);
   await new Promise(r=>setTimeout(r,50));
@@ -180,5 +244,5 @@ try {
   await new Promise(r=>setTimeout(r,50));
   assert.equal(missing.retryTimer,null,'a missing compiler never schedules a retry');
   missing.stop();
-  console.log('Companion checks passed: real filesystem persistence/copy/conflicts, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle, full artist credits.');
+  console.log('Companion checks passed: real filesystem persistence/copy/conflicts, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, full artist credits.');
 } finally { await rm(root,{recursive:true,force:true}); }
