@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Run Claude Light as a login item, so it survives closing the terminal.
+ * Run Notchlight as a login item, so it survives closing the terminal.
  *
  *   node bin/service.mjs install     build, write the LaunchAgent, start it
  *   node bin/service.mjs restart     rebuild and kick it
@@ -18,11 +18,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { migrateData } from './migrate-data.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const LABEL = 'com.claudelight.island';
+const LABEL = 'com.notchlight.island';
 const PLIST = path.join(os.homedir(), 'Library', 'LaunchAgents', `${LABEL}.plist`);
-const LOG_DIR = path.join(os.homedir(), '.claude-light');
+const LOG_DIR = path.join(os.homedir(), '.notchlight');
 const LOG = path.join(LOG_DIR, 'island.log');
 const TARGET = `gui/${process.getuid()}`;
 
@@ -92,8 +93,31 @@ function stop() {
   launchctl(['bootout', `${TARGET}/${LABEL}`]);
 }
 
-function start() {
-  const r = launchctl(['bootstrap', TARGET, PLIST]);
+function migratePreviousService() {
+  const previousLabel = 'com.claudelight.island';
+  const previousPlist = path.join(os.homedir(), 'Library', 'LaunchAgents', `${previousLabel}.plist`);
+  if (launchctl(['print', `${TARGET}/${previousLabel}`]).status === 0) {
+    const result = launchctl(['bootout', `${TARGET}/${previousLabel}`]);
+    if (result.status !== 0) fail('Could not stop the previous service: ' + result.stderr);
+  }
+  const directory = migrateData();
+  if (fs.existsSync(previousPlist)) {
+    const backup = path.join(directory, 'migration');
+    fs.mkdirSync(backup, { recursive: true });
+    fs.renameSync(previousPlist, path.join(backup, `${previousLabel}.${Date.now()}.plist`));
+  }
+}
+
+async function start() {
+  let r;
+  // bootout can return before launchd finishes removing the previous job.
+  // A valid plist can briefly fail bootstrap with EIO during that teardown.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    r = launchctl(['bootstrap', TARGET, PLIST]);
+    if (r.status === 0) return;
+    if (r.status !== 5 || attempt === 7) break;
+    await new Promise(resolve => setTimeout(resolve, 400));
+  }
   if (r.status !== 0) fail('launchctl bootstrap failed: ' + (r.stderr || r.stdout || r.status));
 }
 
@@ -101,8 +125,9 @@ switch (cmd) {
   case 'install': {
     build();
     stop();
+    migratePreviousService();
     writePlist();
-    start();
+    await start();
     console.log(`installed ${LABEL}`);
     console.log(`  plist  ${PLIST}`);
     console.log(`  log    ${LOG}`);
@@ -111,12 +136,10 @@ switch (cmd) {
   }
   case 'restart': {
     build();
-    if (!fs.existsSync(PLIST)) fail('Not installed. Run `npm run service` first.');
-    const r = launchctl(['kickstart', '-k', `${TARGET}/${LABEL}`]);
-    if (r.status !== 0) {
-      stop();
-      start();
-    }
+    stop();
+    migratePreviousService();
+    writePlist();
+    await start();
     console.log('restarted');
     break;
   }

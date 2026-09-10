@@ -1,14 +1,14 @@
 /**
  * Where the cutout is, measured rather than guessed.
  *
- * The Swift probe is compiled on first run into ~/.claude-light/bin. If swiftc
+ * The Swift probe is compiled on first run into ~/.notchlight/bin. If swiftc
  * is missing the whole thing degrades to the configured fallback width, which
  * is wrong by a few points and still perfectly usable.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { CL_DIR, ensureDir } from './config';
+import { APP_DIR, ensureDir } from './config';
 
 export interface NotchProbe {
   notch: boolean;
@@ -20,7 +20,7 @@ export interface NotchProbe {
   builtin?: boolean;
 }
 
-const BIN = path.join(CL_DIR, 'bin', 'notchprobe');
+const BIN = path.join(APP_DIR, 'bin', 'notchprobe');
 
 /** dist/main/index.js → ../../native/notchprobe.swift */
 function sourcePath(): string {
@@ -47,7 +47,7 @@ function ensureBinary(): string | null {
 
 /**
  * Three answers, not two. `no` is this hardware has no cutout; `unknown` is we
- * could not look. Collapsing them would make Claude Light refuse to run on a
+ * could not look. Collapsing them would make Notchlight refuse to run on a
  * notched MacBook that just lacks the Xcode command line tools.
  */
 export type NotchState = 'yes' | 'no' | 'unknown';

@@ -3,7 +3,7 @@
  *
  * A Swift helper taps Spotify's own audio output through Core Audio and streams
  * five band levels a few dozen times a second. It is compiled on first use into
- * ~/.claude-light/bin, the same way the notch probe is, and runs only while
+ * ~/.notchlight/bin, the same way the notch probe is, and runs only while
  * something is actually playing and the bars are on screen.
  *
  * Everything here degrades quietly. No swiftc, an older macOS, a refused audio
@@ -15,9 +15,9 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
-import { CL_DIR, ensureDir } from './config';
+import { APP_DIR, ensureDir } from './config';
 
-const BIN = path.join(CL_DIR, 'bin', 'audiotap');
+const BIN = path.join(APP_DIR, 'bin', 'audiotap');
 const BARS = 5;
 /** dist/main/index.js → ../../native/audiotap.swift */
 const source = () => path.join(__dirname, '..', '..', 'native', 'audiotap.swift');
