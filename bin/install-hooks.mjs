@@ -13,6 +13,14 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const HOOK = path.join(here, 'notchlight-hook.mjs');
+/**
+ * What runs the hook. From a checkout that is `node`. From the packaged app the
+ * installer is run by Notchlight's own Electron binary as Node, and a Mac
+ * without Node installed still has that — so the hook is spelled with it.
+ */
+const RUNTIME = process.env.ELECTRON_RUN_AS_NODE && /Electron|Notchlight/.test(process.execPath)
+  ? `ELECTRON_RUN_AS_NODE=1 "${process.execPath}"`
+  : 'node';
 const remove = process.argv.includes('--remove');
 const target = process.argv.includes('--project')
   ? path.join(process.cwd(), '.claude', 'settings.json')
@@ -65,7 +73,7 @@ for (const [event, timeout] of Object.entries(EVENTS)) {
   let next = groups.filter((g) => Array.isArray(g.hooks) && g.hooks.length > 0);
   if (!remove) {
     // Quoted: a checkout under a path with a space in it is not exotic.
-    const entry = { type: 'command', command: `node "${HOOK}"`, timeout };
+    const entry = { type: 'command', command: `${RUNTIME} "${HOOK}"`, timeout };
     const star = next.find((g) => g.matcher === '*' || g.matcher === undefined);
     if (star) star.hooks.push(entry);
     else next = [...next, { matcher: '*', hooks: [entry] }];

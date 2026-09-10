@@ -190,6 +190,7 @@ function refreshTray(): void {
       hooksInstalled()
         ? { label: 'Claude Code hooks installed', enabled: false }
         : { label: 'Install Claude Code hooks…', click: () => installHooks() },
+      ...(app.isPackaged ? [{ label: 'Start at login', type: 'checkbox' as const, checked: app.getLoginItemSettings().openAtLogin, click: (item: Electron.MenuItem) => { app.setLoginItemSettings({ openAtLogin: item.checked }); logEvent('notchlight', `start at login ${item.checked ? 'on' : 'off'}`); } }] : []),
       { label: 'Reveal config folder', click: () => shell.openPath(APP_DIR) },
       { type: 'separator' },
       { label: 'Quit Notchlight', click: () => app.quit() }
@@ -314,7 +315,7 @@ async function boot(): Promise<void> {
   store.start();
   startTray();
   ready = true;
-  logEvent('notchlight', `ready pid ${process.pid} electron ${process.versions.electron} ${DEMO ? 'demo' : 'live'}`);
+  logEvent('notchlight', `ready pid ${process.pid} electron ${process.versions.electron} ${app.getVersion()} ${app.isPackaged ? 'packaged' : 'checkout'} ${DEMO ? 'demo' : 'live'}`);
   if (GALLERY_ONLY || pendingWindow === 'gallery') openGallery();
   if (CUSTOMIZE || pendingWindow === 'customize') openCustomize();
   pendingWindow = null;
