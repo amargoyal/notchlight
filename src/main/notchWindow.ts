@@ -11,6 +11,7 @@ import { BrowserWindow, screen, type Display } from 'electron';
 import path from 'node:path';
 import { config } from './config';
 import { probeNotch, resetProbe } from './notchProbe';
+import { logEvent } from './lifecycle';
 import type { HitRect } from '../shared/types';
 
 export class NotchWindow {
@@ -29,21 +30,30 @@ export class NotchWindow {
     // Bound once for the life of the process. Display events arrive in bursts —
     // waking a screen fires several — and each reposition re-measures the
     // cutout with a blocking subprocess, so settle first and measure once.
-    const settle = () => {
-      if (this.settleTimer) clearTimeout(this.settleTimer);
-      this.settleTimer = setTimeout(() => {
-        this.settleTimer = null;
-        resetProbe();
-        // Reposition first. It is what picks the display and re-runs the probe;
-        // asking for the geometry before it has moved measures the screen the
-        // window is about to leave.
-        if (this.win) this.reposition();
-        this.onDisplaysChanged();
-      }, 250);
-    };
-    screen.on('display-metrics-changed', settle);
-    screen.on('display-added', settle);
-    screen.on('display-removed', settle);
+    screen.on('display-metrics-changed', (_e, d, changed) => this.settle(`metrics ${d.id} ${changed.join(',')}`));
+    screen.on('display-added', (_e, d) => this.settle(`added ${d.id}`));
+    screen.on('display-removed', (_e, d) => this.settle(`removed ${d.id}`));
+  }
+
+  /**
+   * Re-measure once the displays stop moving. Also the right thing after a
+   * wake: the screen that comes back is not always the one that went to sleep,
+   * and macOS does not always send a display event for it.
+   */
+  settle(reason: string): void {
+    logEvent('display', `change: ${reason}`);
+    if (this.settleTimer) clearTimeout(this.settleTimer);
+    this.settleTimer = setTimeout(() => {
+      this.settleTimer = null;
+      resetProbe();
+      // Reposition first. It is what picks the display and re-runs the probe;
+      // asking for the geometry before it has moved measures the screen the
+      // window is about to leave.
+      if (this.win) this.reposition();
+      this.onDisplaysChanged();
+      const d = this.display;
+      logEvent('display', `settled on ${d ? `${d.id} ${d.bounds.width}x${d.bounds.height}@${d.scaleFactor}` : 'no display'}`);
+    }, 250);
   }
 
   /**
@@ -154,13 +164,13 @@ export class NotchWindow {
     });
     // The island has no devtools you can reach, so its console comes here.
     win.webContents.on('console-message', (e) => {
-      if (e.level === 'error' || e.level === 'warning') console.log('[island] ' + e.message);
+      if (e.level === 'error' || e.level === 'warning') logEvent('island', e.message);
     });
     // A dead renderer leaves a transparent window that still swallows the cursor
     // wherever the last hit rect said the island was — an invisible dead zone
     // over the notch, forever. Reload instead of only writing it down.
     win.webContents.on('render-process-gone', (_e, det) => {
-      console.log('[island] gone: ' + det.reason);
+      logEvent('island', `renderer gone: ${det.reason}`);
       this.hit = { x: 0, y: 0, w: 0, h: 0 };
       if (det.reason !== 'clean-exit' && !win.isDestroyed()) setTimeout(() => win.reload(), 1000);
     });
