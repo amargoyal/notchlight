@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { APP_DIR, ensureDir } from './config';
+import { logEvent } from './lifecycle';
 
 const BIN = path.join(APP_DIR, 'bin', 'audiotap');
 const BARS = 5;
@@ -45,6 +46,8 @@ export class AudioLevels extends EventEmitter {
   private retryTimer: NodeJS.Timeout | null = null;
   private generation = 0;
   status: AudioLevelsStatus = 'idle';
+  /** Helper processes spawned so far. The native checks watch this stay flat while nothing changes. */
+  starts = 0;
   constructor(private locate: () => Promise<string | null> = compile) { super(); }
 
   /** Start or stop listening. Safe to call on every state change; it only acts on the edges. */
@@ -60,6 +63,7 @@ export class AudioLevels extends EventEmitter {
 
   private setStatus(status: AudioLevelsStatus) {
     if (this.status === status) return;
+    logEvent('levels', `${this.status} → ${status}`);
     this.status = status;
     this.emit('status', status);
   }
@@ -88,6 +92,8 @@ export class AudioLevels extends EventEmitter {
     try { child = spawn(bin, [], { stdio: ['pipe', 'pipe', 'ignore'] }); }
     catch { this.backOff(60_000); return; }
     this.child = child;
+    this.starts++;
+    logEvent('levels', `helper start #${this.starts} pid ${child.pid ?? '?'}`);
     let first = true;
     const lines = readline.createInterface({ input: child.stdout! });
     lines.on('line', line => {
@@ -98,6 +104,7 @@ export class AudioLevels extends EventEmitter {
         try { head = JSON.parse(line); } catch { /* treated as a refusal below */ }
         if (head.ok) { this.setStatus('listening'); return; }
         // Spotify not open is momentary; anything else is the OS saying no, so wait longer.
+        logEvent('levels', `helper refused: ${head.reason ?? 'no status line'}`);
         this.backOff(head.reason === 'not-running' ? 5_000 : 60_000);
         this.kill();
         return;
@@ -106,9 +113,10 @@ export class AudioLevels extends EventEmitter {
       if (levels.length === BARS && levels.every(Number.isFinite)) this.emit('levels', levels);
     });
     child.on('error', () => { if (this.child === child) { this.child = null; this.backOff(60_000); } });
-    child.on('exit', () => {
+    child.on('exit', (code, signal) => {
       if (this.child !== child) return;
       this.child = null;
+      logEvent('levels', `helper exit ${signal ?? code ?? '?'} while ${this.status}`);
       if (this.status === 'listening') this.setStatus('idle');
       // A clean exit while still wanted is the output device changing under us: come back on the new one.
       if (this.wanted && this.status !== 'unavailable') { this.retryAt = Date.now() + 750; this.scheduleRetry(); }
