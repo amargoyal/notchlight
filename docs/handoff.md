@@ -3,6 +3,31 @@
 Written September 9, 2026 so a fresh session can pick this up without the
 conversation that produced it. Update it when something below lands or changes.
 
+## September 9 session (PRs #8–#21)
+
+Every backlog item below now says "implemented" with what landed and where.
+In order: native reliability and the resource budget (#8), Spotify and
+capture recovery (#9), real bars on the resting face (#10), instant transport
+and the ticking seek bar (#11), Tray multi-select and recovery (#12), keyboard
+access (#13), Jump to terminal (#14), prebuilt helpers and the packaged 0.2.0
+(#15), clipboard history for text (#16) and images (#17), volume from the
+wing (#18), the Bluetooth latency knob (#19), visual polish (#20), Apple Music
+(#21). `npm run check:native -- measure` and `docs/native-checks.md` are the
+way to verify the running service.
+
+What still needs a person:
+
+- Lid sleep/wake, screen lock, AirPods switching and display docking on the
+  owner's Mac — the log lines that prove each are in the native checks.
+- Judging the bars against the beat over AirPods before touching
+  `levelsOffsetMs`.
+- VoiceOver names and focus order in keyboard mode.
+- An end-to-end Apple Music run with a track playing.
+- Signing and notarizing the DMG; `.github/workflows/helpers.yml` builds it
+  on a tag but attaches it unsigned.
+- Spotify's volume reads 92 after this session set it to 93 once to prove the
+  command path (Spotify rounds).
+
 ## Codex integration (branch `codex/codex-integration`)
 
 The integration adds **Agents** (All / Claude / Codex), local Codex
@@ -91,9 +116,8 @@ resting faces: they make the companion useful without opening a panel. Keep
 that direction. Prefer reliability and quick actions before more visual effects
 or another permanent tab.
 
-The owner specified **Spotify only** in this conversation. Apple Music remains
-an optional future expansion, not the next milestone. Existing item numbers
-below are retained for reference; use this priority order:
+Everything in the priority order below landed on September 9; the list is
+kept for the record of why it was ordered this way.
 
 1. Resting-wing capture eligibility (13) and Spotify/capture recovery (14) landed September 9.
 2. Transport feedback (2) and Tray multi-select/recovery (8, 16) landed September 9.
