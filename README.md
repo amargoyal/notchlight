@@ -346,6 +346,16 @@ on its own, so allowing it a minute later takes effect without a reconnect. A
 Spotify read that fails is retried after 5, 10, 20, 40 and then 60 seconds
 rather than stopping; only a permission denial waits for you.
 
+**Customize → Music** also has the finish: bars **rising** bass to treble or
+**mirrored** around the bass as one shape (compare both in the gallery), a
+soft **glow** in the artwork's own colour behind the artwork and the bars
+(the sleeve is fetched once per track and its liveliest pixels averaged in
+the main process; offline there is simply no glow), and the small artwork
+**breathing with the bass** while real levels arrive — off under Reduce
+motion. **Customize → Agents** can add a tokens-per-second line to the
+session panel. None of these run a CSS animation: the glow is static and the
+breath rides on the same frame the bars already draw.
+
 Scroll over the music wing — the artwork or the bars, resting or expanded —
 to turn Spotify's own volume in steps of five; the level shows in place of
 the bars for a second and goes out as one command once the wheel rests.

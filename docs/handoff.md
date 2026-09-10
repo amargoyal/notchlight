@@ -100,7 +100,7 @@ below are retained for reference; use this priority order:
 3. Keyboard access (15) and native lifecycle and energy checks (17) landed September 9.
 4. Identity (18), prebuilt helpers (3) and the packaged app (4) landed September 9; signing and notarization remain.
 5. Clipboard history (12), text and images, landed September 9 as an opt-in face.
-   Extra players and decorative effects can follow actual demand.
+   Decorative effects (5–6, sparkline) landed September 9 behind preferences; extra players can follow actual demand.
 
 Code review also found that display remeasurement already exists (10), and
 transport commands already publish their result immediately (2). Neither should
@@ -160,17 +160,20 @@ command with the running runtime, so a Mac without Node uses Notchlight's
 own binary as Node. Still unsigned and not notarized: first launch needs
 right-click → Open or `xattr -dr com.apple.quarantine`.
 
-### 5. Levels drive more than the bars
-The level stream is cheap to reuse: pulse the mini artwork's scale with the
-bass band, or tint a soft glow behind the equalizer with the artwork's
-dominant color. Both are renderer-only changes in `LiveEqualizer` /
-`LiveArtwork`.
+### 5. Levels drive more than the bars — implemented September 9, 2026
+`LiveEqualizer` writes `--mp-bass` on the surface each frame it paints;
+`LiveArtwork` (mini, `artworkPulse`, not under reduced motion) scales with
+it. `src/main/tint.ts` fetches the artwork once per URL, shrinks it with
+`nativeImage`, averages the liveliest pixels (`tintOf`, pure and tested) and
+`SpotifyPlayer.withTint` attaches `track.tint`; the glow is a static
+box-shadow behind the artwork and the bars (`artworkGlow`). Electron is
+imported lazily in tint.ts so the math is testable outside it.
 
-### 6. Mirrored equalizer
-Bars run bass → treble left to right. Many notch players mirror them
-(treble–bass–treble) so the shape reads as one blob. Change `bandEdges` in
-`audiotap.swift` to three bands and mirror them in the renderer, or mirror the
-five as-is. Worth an A/B in the gallery first.
+### 6. Mirrored equalizer — implemented September 9, 2026
+`equalizerLayout: 'rising' | 'mirrored'`; `src/renderer/equalizer.ts` maps
+the same five bands to five or nine bars (`barBands`, `barFrame`) and the
+quiet shape follows. Gallery has "Music · mirrored bars", "Music · no glow"
+and "Resting · mirrored bars" for the A/B; the default stays rising.
 
 ### 7. Volume from the wing — implemented September 9, 2026
 `native/spotify.js` reports `soundVolume` on every status and takes a
@@ -198,8 +201,11 @@ rounds: setting 93 reads back 92.
   Codex Desktop opens ChatGPT (`com.openai.chat`); Codex CLI is found by pid
   in its directory. Keyboard mode is released first so focus lands in the
   terminal.
-- A tiny tokens-per-second sparkline in the wing, written to the DOM the same
-  way the equalizer is.
+- ~~A tiny tokens-per-second sparkline~~ — done September 9 as an optional
+  line in the session panel (`sparkline` preference, off by default;
+  `src/renderer/sparkline.ts` keeps a minute of rates per session from the
+  snapshot's token totals). It lives in the panel rather than the resting
+  wing, where a 56 px line had no room beside the light and buddy.
 
 ### 10. Display changes
 Already implemented in `src/main/notchWindow.ts`: display metrics, added, and

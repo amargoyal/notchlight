@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { Island, Stubs, Wings } from './IslandView';
 import { Icon, FileThumb, RestingWings, type RestingPart } from './Preview';
 import { Buddy } from './Buddy';
@@ -6,6 +6,7 @@ import { PANEL_W } from './theme';
 import type { AgentFilter, Snapshot } from '../shared/types';
 import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_SPOTIFY, playhead, type CaptureSnapshot, type CompanionSnapshot, type CompanionView, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
 import { useReducedMotion } from './pulse';
+import { barFrame, bassOf, type EqualizerLayout } from './equalizer';
 import './preview.css';
 import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
 
@@ -40,38 +41,51 @@ const visibleViews = (enabled: boolean): CompanionView[] => enabled ? ['agents',
 const ago = (at: number, now: number) => { const s = Math.max(0, Math.round((now - at) / 1000)); return s < 60 ? 'now' : s < 3600 ? `${Math.floor(s / 60)}m` : s < 86400 ? `${Math.floor(s / 3600)}h` : `${Math.floor(s / 86400)}d`; };
 const time = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2,'0')}`;
 
-function LiveArtwork({ live, mini = false }: { live: LiveController; mini?: boolean }) {
-  const source = live.state.preferences.artwork ? live.state.music.track?.artwork : undefined;
-  const [failed, setFailed] = useState<string>();
-  return <div className={`mp-artwork ${mini ? 'mp-artwork-mini' : ''}`}>{source && source !== failed ? <img src={source} alt={mini ? '' : live.state.music.track?.album || 'Album artwork'} draggable={false} onError={() => setFailed(source)}/> : <Icon name="music" size={mini ? 14 : 34}/>}</div>;
-}
-const BARS = [0, 1, 2, 3, 4];
-/** Bars at rest while a track plays but nothing can be heard: a shape, not a rhythm. */
-const QUIET = [0.38, 0.55, 0.46, 0.6, 0.42];
-const scale = (level: number) => (0.18 + 0.82 * Math.min(1, Math.max(0, level))).toFixed(3);
 /**
- * Five bars that follow Spotify's actual output. Levels arrive ~30 times a
- * second and are written straight to the DOM — re-rendering the whole surface
- * at that rate would be silly, and a frame identical to the last one is not
- * written at all, so real silence costs nothing.
+ * The record sleeve. With a glow on, the artwork's own colour sits softly
+ * behind it; with the pulse on, the mini one breathes with the bass while real
+ * levels arrive — one custom property the equalizer writes on the surface.
+ */
+function LiveArtwork({ live, mini = false }: { live: LiveController; mini?: boolean }) {
+  const { preferences, music } = live.state;
+  const source = preferences.artwork ? music.track?.artwork : undefined;
+  const tint = preferences.artworkGlow ? music.track?.tint : undefined;
+  const [failed, setFailed] = useState<string>();
+  const breathe = mini && preferences.artworkPulse && !preferences.reducedMotion;
+  return <div className={`mp-artwork ${mini ? 'mp-artwork-mini' : ''} ${breathe ? 'is-breathing' : ''}`} style={tint ? { boxShadow: `0 0 ${mini ? 10 : 26}px ${tint}66` } : undefined}>{source && source !== failed ? <img src={source} alt={mini ? '' : music.track?.album || 'Album artwork'} draggable={false} onError={() => setFailed(source)}/> : <Icon name="music" size={mini ? 14 : 34}/>}</div>;
+}
+/**
+ * Five band levels as bars that follow Spotify's actual output. Levels arrive
+ * ~24 times a second and are written straight to the DOM — re-rendering the
+ * whole surface at that rate would be silly, and a frame identical to the last
+ * one is not written at all, so real silence costs nothing.
  *
  * There is no canned animation here. A CSS animation on the overlay redraws the
  * whole transparent window at 60 fps (see pulse.ts); the gallery keeps its
  * sample rhythm, the live island does not. When capture is not listening, or
  * has heard nothing for a while because the music is on another speaker, the
  * bars hold a quiet shape until sound comes back. Real silence settles them.
+ *
+ * The layout is a pure index map (equalizer.ts): rising or mirrored. The bass
+ * band is also written to --mp-bass on the surface for anything that wants to
+ * move with it.
  */
-function LiveEqualizer({ active, live, capture }: { active: boolean; live: boolean; capture: CaptureSnapshot['status'] }) {
+function LiveEqualizer({ active, live, capture, layout, tint }: { active: boolean; live: boolean; capture: CaptureSnapshot['status']; layout: EqualizerLayout; tint?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const reduced = useReducedMotion();
   const listening = active && live && !reduced && capture === 'listening';
   const [mode, setMode] = useState<'off' | 'quiet' | 'live'>('off');
+  const bars = barFrame(layout, null).length;
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const bars = Array.from(el.children) as HTMLElement[];
-    if (!active) { setMode('off'); for (const bar of bars) bar.style.transform = ''; return; }
-    if (!listening || !window.notchlight?.onMusicLevels) { setMode('quiet'); bars.forEach((bar, i) => { bar.style.transform = `scaleY(${scale(QUIET[i])})`; }); return; }
+    const items = Array.from(el.children) as HTMLElement[];
+    const surface = el.closest('.mp-surface') as HTMLElement | null;
+    const paint = (frame: string[]) => { items.forEach((bar, i) => { bar.style.transform = `scaleY(${frame[i] ?? frame[0]})`; }); };
+    const quietFrame = barFrame(layout, null);
+    const setBass = (bass: number) => surface?.style.setProperty('--mp-bass', bass.toFixed(3));
+    if (!active) { setMode('off'); for (const bar of items) bar.style.transform = ''; setBass(0); return; }
+    if (!listening || !window.notchlight?.onMusicLevels) { setMode('quiet'); paint(quietFrame); setBass(0); return; }
     let quietTimer: ReturnType<typeof setTimeout> | null = null;
     let lastSound = Date.now();
     let lastFrame = '';
@@ -81,7 +95,7 @@ function LiveEqualizer({ active, live, capture }: { active: boolean; live: boole
       if (current === 'quiet') return;
       current = 'quiet'; lastFrame = '';
       setMode('quiet');
-      bars.forEach((bar, i) => { bar.style.transform = `scaleY(${scale(QUIET[i])})`; });
+      paint(quietFrame); setBass(0);
     };
     quiet();
     const stop = window.notchlight.onMusicLevels(levels => {
@@ -91,19 +105,16 @@ function LiveEqualizer({ active, live, capture }: { active: boolean; live: boole
       // somewhere else — another speaker, another room. Hold the quiet shape.
       if (now - lastSound > 1500) { quiet(); return; }
       if (current !== 'live') { current = 'live'; setMode('live'); }
-      const frame = levels.map(scale).join(' ');
-      if (frame !== lastFrame) {
-        lastFrame = frame;
-        const parts = frame.split(' ');
-        bars.forEach((bar, i) => { bar.style.transform = `scaleY(${parts[i] ?? parts[0]})`; });
-      }
+      const frame = barFrame(layout, levels);
+      const key = frame.join(' ');
+      if (key !== lastFrame) { lastFrame = key; paint(frame); setBass(bassOf(levels)); }
       // Levels stopping altogether — helper gone, device changing — is the quiet shape too, not a freeze.
       if (quietTimer) clearTimeout(quietTimer);
       quietTimer = setTimeout(quiet, 800);
     });
-    return () => { stop(); if (quietTimer) clearTimeout(quietTimer); };
-  }, [active, listening]);
-  return <span ref={ref} className={`mp-equalizer ${mode === 'live' ? 'is-live' : mode === 'quiet' ? 'is-quiet' : ''}`} aria-hidden="true">{BARS.map(i => <i key={i}/>)}</span>;
+    return () => { stop(); if (quietTimer) clearTimeout(quietTimer); setBass(0); };
+  }, [active, listening, layout]);
+  return <span ref={ref} className={`mp-equalizer ${layout === 'mirrored' ? 'is-mirrored' : ''} ${mode === 'live' ? 'is-live' : mode === 'quiet' ? 'is-quiet' : ''}`} style={tint ? { '--mp-tint': tint } as CSSProperties : undefined} aria-hidden="true">{Array.from({ length: bars }, (_, i) => <i key={i}/>)}</span>;
 }
 /**
  * The scroll wheel over the music wing turns Spotify's own volume.
@@ -251,7 +262,7 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const expanded = open || dragging;
   // Reduced motion stills the lights too; the pulse timer never starts for them.
   const motion = !preferences.reducedMotion;
-  const snapshot = { ...live.snapshot, pulse: preferences.pulse && motion };
+  const snapshot = { ...live.snapshot, pulse: preferences.pulse && motion, sparkline: preferences.sparkline };
   useLayoutEffect(() => { if (focus.current && expanded) { document.getElementById(`${id}-${view}`)?.focus(); focus.current = false; } }, [id, view, expanded]);
   // The keyboard arrives: the selected tab takes focus so arrows move between faces and Tab walks into the panel.
   useEffect(() => { if (keyboard) { focus.current = true; requestAnimationFrame(() => { if (focus.current) { document.getElementById(`${id}-${view}`)?.focus(); focus.current = false; } }); } }, [keyboard]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -262,7 +273,7 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const selectProvider = (provider: 'claude' | 'codex') => { setFilter(provider); choose('agents'); };
   const agents = agentRestingParts(snapshot, { ...preferences, pulse: preferences.pulse && motion, codexPulse: preferences.codexPulse && motion }, selectProvider);
   const parts: RestingPart[] = [...agents,
-    ...(preferences.restMusic && music.status === 'ready' && music.track ? [{left:<span className="mp-volume-target" onWheel={volume.onWheel}><LiveArtwork live={live} mini/></span>,right:<span className="mp-volume-target" onWheel={volume.onWheel}>{volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status}/>}</span>}]:[]),
+    ...(preferences.restMusic && music.status === 'ready' && music.track ? [{left:<span className="mp-volume-target" onWheel={volume.onWheel}><LiveArtwork live={live} mini/></span>,right:<span className="mp-volume-target" onWheel={volume.onWheel}>{volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? music.track?.tint : undefined}/>}</span>}]:[]),
     ...(preferences.restTray && files.length || dragging ? [{left:<span className="mp-shelf-wing"><Icon name="tray" size={16}/>{files.length}</span>,right:<Icon name="file" size={16}/>}]:[]),
     ...(preferences.clipboardEnabled && preferences.restClipboard && clipboard.items.length ? [{left:<span className="mp-shelf-wing"><Icon name="clipboard" size={16}/>{clipboard.items.length}</span>,right:<span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : clipboard.items[0].kind === 'url' ? '@' : clipboard.items[0].kind === 'image' ? '▣' : 'T'}</span>}]:[])
   ];
@@ -270,7 +281,7 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const navigation = <>{tabs}{view === 'agents' && <AgentFilters snapshot={snapshot} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{view === 'agents' && <AgentConnection snapshot={snapshot} filter={filter}/>}<AgentAttention sessions={snapshot.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);choose('agents');}}/>{view === 'agents' && live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</>;
   const active = !snapshot.dormant || parts.length > 0 || keyboard;
   const left = <div className="mp-left-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{view === 'music' ? <LiveArtwork live={live} mini/> : view === 'clipboard' ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/>{clipboard.items.length}</span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
-  const right = <div className="mp-right-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status}/> : view === 'clipboard' ? <span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : 'T'}</span> : <Icon name="file" size={16}/>}</div>;
+  const right = <div className="mp-right-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? live.state.music.track?.tint : undefined}/> : view === 'clipboard' ? <span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : 'T'}</span> : <Icon name="file" size={16}/>}</div>;
   const wing = (full: boolean) => <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={full ? PANEL_W : undefined} left={left} right={right}/>;
   const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
   return <div className={`mp-surface ${preferences.density} ${preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!preferences.buddy ? 'mp-hide-buddy' : ''} ${!preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''} ${keyboard ? 'mp-keyboard' : ''}`}

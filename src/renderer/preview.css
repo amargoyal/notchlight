@@ -47,6 +47,17 @@
 .mp-equalizer.is-live i, .mp-equalizer.is-quiet i { height: 14px; animation: none; transform-origin: center; }
 .mp-equalizer.is-live i { will-change: transform; }
 .mp-equalizer.is-quiet i { transition: transform 240ms ease; opacity: .75; }
+/* Mirrored: nine bars folded around the bass; a touch narrower so the wing stays the same width. */
+.mp-equalizer.is-mirrored { gap: 1px; }
+.mp-equalizer.is-mirrored i { width: 2px; }
+/* A soft glow in the artwork's colour behind the bars, when a tint is known. Static: no per-frame cost. */
+.mp-equalizer { border-radius: 6px; padding: 0 3px; }
+.mp-equalizer[style*="--mp-tint"] { box-shadow: 0 0 10px var(--mp-tint, transparent); }
+.mp-equalizer[style*="--mp-tint"] i { background: color-mix(in srgb, var(--mp-tint) 45%, #c9b79d); }
+/* The mini artwork breathes with the bass: --mp-bass is written on the surface by the live equalizer. */
+.mp-artwork.is-breathing { transform: scale(calc(1 + var(--mp-bass, 0) * 0.08)); transform-origin: center; will-change: transform; }
+.agent-sparkline { display: inline-flex; align-items: center; gap: 5px; }
+.agent-sparkline svg { display: block; }
 @keyframes mp-wave { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
 .mp-empty { padding: 28px 24px; text-align: center; display: flex; flex-direction: column; align-items: center; color: #b7a797; min-height: 195px; justify-content: center; }
 .mp-empty p { font-size: 16px; font-weight: 500; color: #f2ede7; margin: 13px 0 5px; }

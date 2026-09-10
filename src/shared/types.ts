@@ -120,6 +120,8 @@ export interface Snapshot {
   hoverDelay: number;
   /** Whether the status light breathes while working. */
   pulse: boolean;
+  /** Draw a tokens-per-second line in the session panel. */
+  sparkline?: boolean;
   /** Server clock, so the island's timers do not drift from the daemon's. */
   now: number;
 }

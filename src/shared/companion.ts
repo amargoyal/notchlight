@@ -24,12 +24,21 @@ export interface CompanionPreferences {
   clipboardEnabled: boolean;
   clipboardHistorySize: '20' | '50' | '100';
   restClipboard: boolean;
+  /** Bars rising bass→treble, or folded around the middle so they read as one shape. */
+  equalizerLayout: 'rising' | 'mirrored';
+  /** A soft glow in the artwork's colour behind the mini artwork and the bars. */
+  artworkGlow: boolean;
+  /** The mini artwork breathes with the bass while real levels arrive. */
+  artworkPulse: boolean;
+  /** A tokens-per-second line in the session panel. */
+  sparkline: boolean;
 }
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false,
   restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true,
-  clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true
+  clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
+  equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false
 };
 export interface ShelfFile {
   id: string;
@@ -39,7 +48,7 @@ export interface ShelfFile {
   unavailable?: boolean;
   thumbnail?: string;
 }
-export interface MusicTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string }
+export interface MusicTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string; /** The artwork's colour as #rrggbb, once known. */ tint?: string }
 export interface SpotifySnapshot {
   status: 'disconnected' | 'not-running' | 'ready' | 'empty' | 'permission' | 'error';
   playing: boolean;
@@ -168,7 +177,7 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid preferences.');
   const result: Record<string, unknown> = {};
   const choices: Record<string, readonly string[]> = {
-    theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100']
+    theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100'], equalizerLayout: ['rising', 'mirrored']
   };
   for (const [key, item] of Object.entries(value)) {
     if (!Object.hasOwn(DEFAULT_COMPANION_PREFERENCES, key)) throw new Error('Unknown preference.');

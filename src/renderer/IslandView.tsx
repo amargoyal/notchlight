@@ -22,6 +22,7 @@ import { Buddy, BuddyStack, faceFor } from './Buddy';
 import { Mark } from './marks';
 import { C, MONO, PANEL_W, SANS, glow, lightColor } from './theme';
 import { pulseStyle, usePulse } from './pulse';
+import { observeTokens, rateLabel, sparklinePath } from './sparkline';
 import { duration, tokens as fmtTokens } from '../shared/fmt';
 import type { Activity, Agent, AgentProvider, ApprovalDecision, Face, HitRect, Session, Snapshot, Status } from '../shared/types';
 
@@ -278,7 +279,15 @@ function PanelHeader({ snap, left, right }: { snap: Snapshot; left: ReactNode; r
   return <Wings notchW={snap.notchW} height={snap.notchH} width={PANEL_W} left={left} right={right} />;
 }
 
-function SessionMeta({ s, now }: { s: Session; now: number }) {
+/** Tokens per second over the last minute, as a small line. Optional; off by default. */
+function Sparkline({ s, now }: { s: Session; now: number }) {
+  const points = observeTokens(s.id, s.tokens, now);
+  const path = sparklinePath(points, 56, 14);
+  if (!path) return null;
+  return <span className="agent-sparkline" title="Tokens per second, last minute" aria-label={`Tokens per second ${rateLabel(points)}`}><svg width="56" height="14" viewBox="0 0 56 14" aria-hidden="true"><path d={path} fill="none" stroke={s.status === 'working' ? C.green : C.dim} strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round"/></svg><Mono color={C.faint} weight={400} size={9}>{rateLabel(points)}</Mono></span>;
+}
+
+function SessionMeta({ s, now, sparkline }: { s: Session; now: number; sparkline?: boolean }) {
   const live = s.agents.filter(a => !a.endedAt).length;
   const n = s.agents.length;
   return <div className="agent-session-meta">
@@ -287,7 +296,10 @@ function SessionMeta({ s, now }: { s: Session; now: number }) {
       <span className="agent-provider-label">{s.provider === 'codex' ? 'Codex' : 'Claude'}{s.source && s.source !== 'unknown' ? ` · ${s.source === 'desktop' ? 'Desktop' : 'CLI'}` : ''} · {s.status}</span>
       <div title={s.cwd} style={{ font: `400 10px/1.5 ${MONO}`, color: C.faint, marginTop: 3, ...CLIP }}>{s.project} · {tilde(s.cwd)}{s.branch ? ' · ' + s.branch : ''}</div>
     </div>
-    <Mono color={C.faint} weight={400}>{n} agent{n === 1 ? '' : 's'}{live > 0 && live !== n ? ` · ${live} live` : ''} · {elapsedOf(s, now)}</Mono>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+      <Mono color={C.faint} weight={400}>{n} agent{n === 1 ? '' : 's'}{live > 0 && live !== n ? ` · ${live} live` : ''} · {elapsedOf(s, now)}</Mono>
+      {sparkline && s.tokensKnown !== false && <Sparkline s={s} now={now}/>}
+    </div>
   </div>;
 }
 
@@ -607,7 +619,7 @@ function SessionPanel({
       {navigation}
       <PanelBody panel={panel}>
       <Divider />
-      <SessionMeta s={s} now={now} />
+      <SessionMeta s={s} now={now} sparkline={snap.sparkline} />
       {s.ask ? <AskCard s={s} onDecide={onDecide} /> : <AgentList s={s} now={now} />}
       </PanelBody>
     </div>
