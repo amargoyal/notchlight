@@ -15,6 +15,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import net from 'node:net';
 import { SOCK, config, ensureDir } from './config';
+import { logEvent } from './lifecycle';
 
 export interface HookEvent {
   event: string;
@@ -56,14 +57,14 @@ export class HookServer extends EventEmitter {
       /* the bind below will report it properly */
     }
     const server = net.createServer((sock) => this.session(sock));
-    server.on('error', (e) => console.log('[hooks] ' + (e as Error).message));
+    server.on('error', (e) => logEvent('hooks', (e as Error).message));
     server.listen(SOCK, () => {
       try {
         fs.chmodSync(SOCK, 0o600);
       } catch {
         /* best effort — the socket is under the user's own home either way */
       }
-      console.log('[hooks] listening on ' + SOCK);
+      logEvent('hooks', 'listening on ' + SOCK);
     });
     this.server = server;
   }
