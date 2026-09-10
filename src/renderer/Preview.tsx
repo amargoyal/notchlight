@@ -1,10 +1,12 @@
-import { useEffect, useId, useLayoutEffect, useReducer, useRef, type Dispatch, type DragEvent, type ReactNode } from 'react';
-import { Island, Stubs, Wings, restingClaude } from './IslandView';
+import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type Dispatch, type DragEvent, type ReactNode } from 'react';
+import { Island, Stubs, Wings } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
-import { initialPreview, previewReducer, previewSnapshot, SAMPLE_FILES, TRACKS,
+import { initialPreview, previewReducer, previewAgents, SAMPLE_FILES, TRACKS,
   type PreviewAction, type PreviewFile, type PreviewState, type PreviewView } from './previewModel';
 import './preview.css';
+import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
+import type { AgentFilter } from '../shared/types';
 
 export function Icon({ name, size = 18 }: { name: string; size?: number }) {
   const paths: Record<string, ReactNode> = {
@@ -45,11 +47,11 @@ export function usePreview(seed?: PreviewState, clock = true) {
 }
 
 type Controls = { state: PreviewState; dispatch: Dispatch<PreviewAction> };
-const viewNames: Record<PreviewView, string> = { claude: 'Claude', music: 'Music', tray: 'Tray' };
-const views: PreviewView[] = ['claude', 'music', 'tray'];
+const viewNames: Record<PreviewView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray' };
+const views: PreviewView[] = ['agents', 'music', 'tray'];
 const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
-function Navigation({ state, onNavigate, onCustomize, id }: { state: PreviewState; onNavigate: (view: PreviewView) => void; onCustomize: () => void; id: string }) {
+function Navigation({ state, onNavigate, onCustomize, id, attention }: { state: PreviewState; onNavigate: (view: PreviewView) => void; onCustomize: () => void; id: string; attention: boolean }) {
   return <nav className="mp-nav" aria-label="Notch views">
     <div role="tablist" aria-label="Preview view">
       {views.map((view, index) => <button key={view} role="tab" id={`${id}-${view}`} aria-controls={`${id}-panel`}
@@ -61,13 +63,13 @@ function Navigation({ state, onNavigate, onCustomize, id }: { state: PreviewStat
           const next = e.key === 'Home' ? 0 : e.key === 'End' ? 2 : (index + (e.key === 'ArrowRight' ? 1 : 2)) % 3;
           onNavigate(views[next]);
         }}>
-        {view === 'claude' ? <span className="mp-mini-buddy"><Buddy size={15} /></span> : <Icon name={view} size={14}/>}
+        {view === 'agents' ? <span className="mp-mini-buddy"><Buddy size={15} /></span> : <Icon name={view} size={14}/>}
         {viewNames[view]}
-        {view === 'claude' && state.claude === 'asking' && <span className="mp-attention-dot" aria-label="Needs your attention"/>}
+        {view === 'agents' && attention && <span className="mp-attention-dot" aria-label="Needs your attention"/>}
         {view === 'tray' && <span className="mp-count">{state.files.length}</span>}
       </button>)}
     </div>
-    <button className="mp-icon-button" aria-label="Open customization" title="Customize Claude Light" onClick={onCustomize}><Icon name="settings" size={16}/></button>
+    <button className="mp-icon-button" aria-label="Open customization" title="Customize Notchlight" onClick={onCustomize}><Icon name="settings" size={16}/></button>
   </nav>;
 }
 
@@ -79,18 +81,27 @@ function Artwork({ state, mini = false }: { state: PreviewState; mini?: boolean 
       : <Icon name="music" size={mini ? 14 : 34}/>}
   </div>;
 }
-export interface RestingPart { left: ReactNode; right: ReactNode }
+export interface RestingPart { left: ReactNode; right: ReactNode; provider?: boolean }
 /**
  * The resting bar, assembled from whichever faces are switched on and have
- * something to say. Mirrored: Claude sits outermost on both sides, the tray
- * nearest the lens, so each face's two halves are the same distance from the
- * cutout. A hairline keeps neighbours from reading as one object.
+ * something to say. Claude sits nearest the camera, followed by Codex. Music and Tray
+ * use the remaining outer space. A hairline keeps neighbours from reading as one object.
  */
 export function RestingWings({ notchW, height, parts, attention }: { notchW: number; height: number; parts: RestingPart[]; attention?: ReactNode }) {
   const join = (items: ReactNode[]) => items.flatMap((item, i) => i ? [<i key={`d${i}`} className="mp-rest-divider" aria-hidden="true"/>, item] : [item]);
-  const right = [...parts].reverse().map(p => p.right);
+  const budget = Math.max(48,(PANEL_W - notchW)/2);
+  const compact = budget < 120;
+  // Keep agent identities nearest the lens. Other faces use the outer space.
+  const providers = parts.filter(p => p.provider);
+  const others = parts.filter(p => !p.provider);
+  const available = Math.max(0,Math.floor((budget - providers.length*43 - 16)/44));
+  const visible = [...others.slice(0,available),...providers];
+  const hidden = others.length - Math.min(available,others.length);
+  if (hidden) visible.unshift({left:<span className="agent-overflow" title="More faces available when expanded">+{hidden}</span>,right:<span className="agent-overflow" aria-hidden="true">···</span>});
+  const right = [...visible].reverse().map(p => p.right);
   if (attention) right.unshift(attention);
-  return <Wings notchW={notchW} height={height} left={<div className="mp-rest-wing">{join(parts.map(p => p.left))}</div>} right={<div className="mp-rest-wing">{join(right)}</div>}/>;
+  return <Wings notchW={notchW} height={height} left={<div className={`mp-rest-wing ${compact ? 'is-tight' : ''}`}>{join(visible.map(p => p.left))}</div>} right={<div className={`mp-rest-wing ${compact ? 'is-tight' : ''}`}>{join(right)}</div>}/>;
+
 }
 function Equalizer({ active }: { active: boolean }) {
   return <span className={`mp-equalizer ${active ? 'is-playing' : ''}`} aria-hidden="true">{[0, 1, 2, 3, 4].map(i => <i key={i} style={{ animationDelay: `${i * -0.19}s` }}/>)}</span>;
@@ -129,7 +140,7 @@ export function FileThumb({ file, small = false, sample = true }: { file: Previe
 }
 function beginDrag(e: DragEvent, dispatch: Dispatch<PreviewAction>, origin: 'finder' | 'tray', file: PreviewFile) {
   // Only our own local sample drag is accepted. Never turn a real OS file into a demo item.
-  e.dataTransfer.setData('application/x-claude-light-sample', file.id);
+  e.dataTransfer.setData('application/x-notchlight-sample', file.id);
   e.dataTransfer.effectAllowed = 'copy';
   dispatch({ type: 'drag-start', origin, id: file.id });
 }
@@ -152,6 +163,8 @@ function TrayFace({ state, dispatch }: Controls) {
 
 export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, notchH = 34 }: Controls & { onCustomize: () => void; notchW?: number; notchH?: number }) {
   const id = useId();
+  const [filter,setFilter] = useState<AgentFilter>(state.codexConnection ? 'codex' : 'all');
+  const [target,setTarget] = useState<string>();
   const pendingFocus = useRef(false);
   useLayoutEffect(() => {
     if (pendingFocus.current) {
@@ -159,33 +172,35 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
       pendingFocus.current = false;
     }
   }, [id, state.view]);
-  const nav = <Navigation state={state} onNavigate={view => { pendingFocus.current = true; dispatch({ type: 'view', view }); }} onCustomize={onCustomize} id={id}/>;
+  const snap = previewAgents(state,notchW,notchH);
+  const tabs = <Navigation state={state} attention={snap.overall === 'asking'} onNavigate={view => { pendingFocus.current = true; dispatch({ type: 'view', view }); }} onCustomize={onCustomize} id={id}/>;
   const playing = state.music.source === 'ready' && state.music.playing && state.preferences.visualizer;
   const music = state.view === 'music';
   const headLeft = music ? <Artwork state={state} mini/> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>;
   const headRight = <div className="mp-right-wing">
-    {state.claude === 'asking' && <button className="mp-attention-button" aria-label="Claude needs attention" title="Claude needs attention" onClick={() => dispatch({ type: 'view', view: 'claude' })}><span className="mp-attention-dot"/></button>}
+    {snap.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" title="Agents need attention" onClick={() => dispatch({ type: 'view', view: 'agents' })}><span className="mp-attention-dot"/></button>}
     {music ? <Equalizer active={playing}/> : <Icon name="file" size={16}/>}
   </div>;
   const wing = (expanded: boolean) => <Wings notchW={notchW} height={notchH} width={expanded ? PANEL_W : undefined} left={<div className="mp-left-wing">{headLeft}</div>} right={headRight}/>;
-  const snap = previewSnapshot(state.claude, state.preferences.pulse, notchW, notchH);
+  const nav = <>{tabs}{state.view === 'agents' && <AgentFilters snapshot={snap} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{state.view === 'agents' && <AgentConnection snapshot={snap} filter={filter}/>}<AgentAttention sessions={snap.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);dispatch({type:'view',view:'agents'});}}/></>;
   const prefs = state.preferences;
-  const claudePart = prefs.restClaude ? restingClaude(snap.sessions, snap) : null;
+  const agentParts = agentRestingParts(snap,prefs,p => {setFilter(p);dispatch({type:'view',view:'agents'});});
   const parts: RestingPart[] = [
-    ...(claudePart ? [claudePart] : []),
+    ...agentParts,
     ...(prefs.restMusic && state.music.source === 'ready' ? [{ left: <Artwork state={state} mini/>, right: <Equalizer active={playing}/> }] : []),
     ...(prefs.restTray && state.files.length > 0 || state.drag?.origin === 'finder' ? [{ left: <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>, right: <Icon name="file" size={16}/> }] : [])
   ];
-  const attention = !claudePart && state.claude === 'asking' ? <button className="mp-attention-button" aria-label="Claude needs attention" title="Claude needs attention" onClick={() => dispatch({ type: 'view', view: 'claude' })}><span className="mp-attention-dot"/></button> : undefined;
+  const attention = undefined;
   const resting = parts.length || attention ? <RestingWings notchW={notchW} height={notchH} parts={parts} attention={attention}/>
     : !prefs.restClaude && snap.sessions.length ? <Stubs snap={snap}/> : undefined;
-  return <div className={`mp-surface ${state.preferences.density} ${state.preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!state.preferences.buddy ? 'mp-hide-buddy' : ''}`}
+  return <div className={`mp-surface ${state.preferences.density} ${state.preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!state.preferences.buddy ? 'mp-hide-buddy' : ''} ${!state.preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''}`}
     onDragOver={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; dispatch({ type: 'drag-enter' }); } }}
     onDrop={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); dispatch({ type: 'add', id: state.drag.id }); } }}>
-    <Island snap={snap} open={state.open} hovering
-      onDismiss={() => dispatch({ type: 'claude', value: 'idle' })}
-      surface={{ navigation: nav, active: true, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${state.view}` },
-        expanded: state.view === 'claude' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{nav}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${state.view}`}>{music ? <MusicFace state={state} dispatch={dispatch}/> : <TrayFace state={state} dispatch={dispatch}/>}</div></div>,
+    <Island snap={filteredSnapshot(snap,filter)} open={state.open} hovering
+      onDismiss={id => dispatch(id.startsWith('codex:') ? {type:'codex',value:'off'} : {type:'claude',value:'idle'})}
+      onDecide={id => dispatch(id.startsWith('codex:') ? {type:'codex',value:'done'} : {type:'claude',value:'done'})}
+      surface={{ selectedSession:target,navigation: nav, active: true, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${state.view}` },
+        expanded: state.view === 'agents' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{nav}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${state.view}`}>{music ? <MusicFace state={state} dispatch={dispatch}/> : <TrayFace state={state} dispatch={dispatch}/>}</div></div>,
         collapsed: resting }}/>
   </div>;
 }
@@ -222,19 +237,28 @@ export function PreviewDesktop({ state, dispatch, onCustomize }: Controls & { on
 }
 
 export function PreviewWalkthrough() {
-  const { state, dispatch } = usePreview();
-  const customize = () => { if (window.claudeLight) window.claudeLight.openCustomize(); else window.open('./customize.html', '_blank'); };
-  return <div className="mp-walkthrough"><div className="mp-walkthrough-intro"><span className="mp-kicker">The next chapter</span><h2>A little space.<br/>For more of your day.</h2><p>Follow Claude. Find your rhythm. Keep a file close. Three faces, one familiar place.</p><button className="mp-primary-button" onClick={customize}>Open customization <Icon name="arrow" size={16}/></button><small>Interactive design preview</small></div><PreviewDesktop state={state} dispatch={dispatch} onCustomize={customize}/></div>;
+  const { state, dispatch } = usePreview({...initialPreview(),codex:'working'});
+  const customize = () => { if (window.notchlight) window.notchlight.openCustomize(); else window.open('./customize.html', '_blank'); };
+  return <div className="mp-walkthrough"><div className="mp-walkthrough-intro"><span className="mp-kicker">The next chapter</span><h2>A little space.<br/>For more of your day.</h2><p>Follow your agents. Find your rhythm. Keep a file close. Three faces, one familiar place.</p><button className="mp-primary-button" onClick={customize}>Open customization <Icon name="arrow" size={16}/></button><small>Interactive design preview</small></div><PreviewDesktop state={state} dispatch={dispatch} onCustomize={customize}/></div>;
 }
 
 const scenarios: { name: string; note: string; patch: (s: PreviewState) => PreviewState; notchW?: number; notchH?: number }[] = [
+  ...(['working','asking','done','failed','idle','interrupted','unknown','many'] as const).map(codex => ({name:`Codex · ${codex}`,note:'Local Codex identity and status, distinct from Claude.',patch:(s:PreviewState):PreviewState=>({...s,view:'agents',claude:'idle',codex})})),
+  {name:'Codex · disconnected',note:'Missing local data leaves other faces available. Select Codex to see setup guidance.',patch:s=>({...s,view:'agents',claude:'idle',codex:'off',codexConnection:{state:'missing',message:'No readable Codex sessions folder. Choose your Codex home in Customize → Agents.',hooksSeen:false}})},
+  {name:'Agents · empty',note:'No local work is running. Choose a provider to inspect its connection.',patch:s=>({...s,view:'agents',claude:'idle',codex:'off'})},
+  {name:'Resting · identities without buddies',note:'Cl and Cx stay distinct when both buddies are hidden.',patch:s=>({...s,open:false,codex:'working',preferences:{...s.preferences,buddy:false,codexBuddy:false}})},
+  {name:'Agents · both working',note:'Different providers, same project. Both remain identifiable.',patch:s=>({...s,view:'agents',codex:'working'})},
+  {name:'Agents · simultaneous requests',note:'Each request belongs to one provider and one session.',patch:s=>({...s,view:'agents',claude:'asking',codex:'asking'})},
+  {name:'Resting · both providers',note:'Claude and Codex have separate lights and buddies.',patch:s=>({...s,open:false,codex:'working'})},
+  {name:'Resting · wide camera, many tasks',note:'Provider identities remain visible under width pressure.',notchW:280,patch:s=>({...s,open:false,codex:'many',claude:'many'})},
+  {name:'Agents · reduced motion',note:'Expressions stay meaningful without animated status lights.',patch:s=>({...s,view:'agents',codex:'working',preferences:{...s.preferences,reducedMotion:true}})},
   { name: 'Music · playing', note: 'Artwork leads. Controls stay one glance away.', patch: s => s },
   { name: 'Music · paused', note: 'A quiet playback indicator; your place is preserved.', patch: s => ({ ...s, music: { ...s.music, playing: false } }) },
   { name: 'Music · nothing playing', note: 'A useful invitation, not an empty black box.', patch: s => ({ ...s, music: { ...s.music, source: 'empty' } }) },
   { name: 'Music · missing artwork', note: 'The music symbol holds the composition together.', patch: s => ({ ...s, music: { ...s.music, missingArtwork: true } }) },
   { name: 'Music · unavailable', note: 'Explain what happened and offer a way back.', patch: s => ({ ...s, music: { ...s.music, source: 'unavailable' } }) },
   { name: 'Music · long title, wider notch', note: 'A two-line title and a 240 × 38pt camera exclusion.', notchW: 240, notchH: 38, patch: s => ({ ...s, music: { ...s.music, index: 2 } }) },
-  { name: 'Resting · everything on', note: 'Claude outermost, tray nearest the lens, music between.', patch: s => ({ ...s, open: false }) },
+  { name: 'Resting · everything on', note: 'Agent identities nearest the lens; Music and Tray use the outer space.', patch: s => ({ ...s, open: false }) },
   { name: 'Resting · music only', note: 'Album on the left. Playback on the right.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
   { name: 'Resting · Claude and music', note: 'Two faces share the bar without crowding it.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restTray: false } }) },
   { name: 'Resting · Claude hidden, needs you', note: 'A hidden face still gets a word in when it must.', patch: s => ({ ...s, open: false, claude: 'asking', preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
@@ -246,12 +270,12 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'Tray · unavailable file', note: 'Keep the filename and a safe removal action.', patch: s => ({ ...s, view: 'tray', files: [{ ...SAMPLE_FILES[1], unavailable: true }], selected: 'brief' }) },
   { name: 'Resting · tray only', note: 'A small stack, a count, and nothing under the lens.', patch: s => ({ ...s, view: 'tray', open: false, preferences: { ...s.preferences, restClaude: false, restMusic: false } }) },
   { name: 'Claude · needs you', note: 'Attention stays visible without changing your tab.', patch: s => ({ ...s, claude: 'asking' }) },
-  ...(['working', 'asking', 'done', 'idle', 'many'] as const).map(claude => ({ name: `Claude · ${claude}`, note: 'The existing Claude face inside shared navigation.', patch: (s: PreviewState): PreviewState => ({ ...s, view: 'claude', claude }) }))
+  ...(['working', 'asking', 'done', 'idle', 'many'] as const).map(claude => ({ name: `Claude · ${claude}`, note: 'The existing Claude face inside shared navigation.', patch: (s: PreviewState): PreviewState => ({ ...s, view: 'agents', claude }) }))
 ];
 function Scenario({ scenario }: { scenario: typeof scenarios[number] }) {
   const { state, dispatch } = usePreview(scenario.patch(initialPreview()), false);
-  return <article className="mp-scenario"><div className="mp-scenario-screen"><PreviewSurface state={state} dispatch={dispatch} notchW={scenario.notchW} notchH={scenario.notchH} onCustomize={() => window.claudeLight ? window.claudeLight.openCustomize() : window.open('./customize.html', '_blank')}/></div><h3>{scenario.name}</h3><p>{scenario.note}</p></article>;
+  return <article className="mp-scenario"><div className="mp-scenario-screen"><PreviewSurface state={state} dispatch={dispatch} notchW={scenario.notchW} notchH={scenario.notchH} onCustomize={() => window.notchlight ? window.notchlight.openCustomize() : window.open('./customize.html', '_blank')}/></div><h3>{scenario.name}</h3><p>{scenario.note}</p></article>;
 }
 export function PreviewGallery() {
-  return <section className="mp-gallery"><PreviewWalkthrough/><div className="mp-gallery-heading"><h2>Every new face.</h2><p>Fixed sample states. Real components. Try the controls.</p></div><div className="mp-scenario-grid">{scenarios.map(s => <Scenario key={s.name} scenario={s}/>)}</div></section>;
+  return <section className="mp-gallery"><PreviewWalkthrough/><div className="agent-buddy-sheet" aria-label="Codex robot expressions">{(['working','thinking','asking','done','failed','idle','approved'] as const).map(face => <figure key={face}><Buddy provider="codex" face={face} size={44}/><figcaption>{face}</figcaption></figure>)}</div><div className="agent-buddy-sheet" aria-label="Both buddies at every supported size">{[18,22,24,44].map(size => <figure key={size}><span style={{display:'flex',gap:10,alignItems:'flex-end'}}><Buddy size={size}/><Buddy provider="codex" size={size}/></span><figcaption>{size}pt</figcaption></figure>)}</div><div className="mp-gallery-heading"><h2>Every new face.</h2><p>Fixed sample states. Real components. Try the controls.</p></div><div className="mp-scenario-grid">{scenarios.map(s => <Scenario key={s.name} scenario={s}/>)}</div></section>;
 }

@@ -1,6 +1,6 @@
 import type { Snapshot, Status } from '../shared/types';
 
-export type PreviewView = 'claude' | 'music' | 'tray';
+export type PreviewView = 'agents' | 'music' | 'tray';
 export interface PreviewPreferences {
   theme: 'system' | 'light' | 'dark';
   density: 'compact' | 'comfortable';
@@ -12,12 +12,16 @@ export interface PreviewPreferences {
   thumbnails: 'small' | 'large';
   removeAfterTransfer: boolean;
   restClaude: boolean;
+  restCodex: boolean;
+  codexBuddy: boolean;
+  codexPulse: boolean;
   restMusic: boolean;
   restTray: boolean;
 }
 export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string }
 export interface PreviewFile { id: string; name: string; kind: 'image' | 'pdf' | 'folder' | 'text'; size: string; unavailable?: boolean }
 export interface PreviewState {
+  codexConnection?: Snapshot['codex'];
   view: PreviewView;
   open: boolean;
   preferences: PreviewPreferences;
@@ -27,12 +31,13 @@ export interface PreviewState {
   received: PreviewFile[];
   drag: { origin: 'finder' | 'tray'; id: string; previousView: PreviewView; previousOpen: boolean } | null;
   notice: string;
+  codex: 'off' | Status | 'many';
   claude: 'working' | 'asking' | 'done' | 'idle' | 'many';
 }
 export const DEFAULT_PREFERENCES: PreviewPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true,
-  restClaude: true, restMusic: true, restTray: true
+  restClaude: true, restCodex: true, codexBuddy: true, codexPulse: true, restMusic: true, restTray: true
 };
 export const TRACKS: PreviewTrack[] = [
   { id: 'late-light', title: 'Late Light', artist: 'The Quiet Hours', album: 'Somewhere, Slowly', duration: 234, artwork: './assets/late-light.svg' },
@@ -48,13 +53,14 @@ export const SAMPLE_FILES: PreviewFile[] = [
 export function initialPreview(): PreviewState {
   return { view: 'music', open: true, preferences: { ...DEFAULT_PREFERENCES },
     music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false },
-    files: SAMPLE_FILES.slice(0, 2), selected: null, received: [], drag: null, notice: '', claude: 'working' };
+    files: SAMPLE_FILES.slice(0, 2), selected: null, received: [], drag: null, notice: '', codex: 'off', claude: 'working' };
 }
 export type PreviewAction =
   | { type: 'view'; view: PreviewView } | { type: 'open'; value: boolean }
   | { type: 'preferences'; patch: Partial<PreviewPreferences> } | { type: 'reset' }
   | { type: 'start-playlist' } | { type: 'play' } | { type: 'skip'; delta: number } | { type: 'seek'; position: number } | { type: 'tick' }
   | { type: 'music-state'; source: PreviewState['music']['source']; missingArtwork?: boolean }
+  | { type: 'codex'; value: PreviewState['codex'] }
   | { type: 'claude'; value: PreviewState['claude'] }
   | { type: 'add'; id: string } | { type: 'remove'; id: string } | { type: 'select'; id: string }
   | { type: 'take'; id: string } | { type: 'files'; files: PreviewFile[] }
@@ -66,6 +72,7 @@ export function previewReducer(s: PreviewState, a: PreviewAction): PreviewState 
     case 'view': return { ...s, view: a.view, open: true };
     case 'open': return { ...s, open: a.value };
     case 'preferences': return { ...s, preferences: { ...s.preferences, ...a.patch } };
+    case 'codex': return { ...s, codex: a.value };
     case 'claude': return { ...s, claude: a.value };
     case 'music-state': return { ...s, music: { ...s.music, source: a.source, missingArtwork: !!a.missingArtwork } };
     case 'start-playlist': return { ...s, music: { ...s.music, source: 'ready', playing: true } };
@@ -103,7 +110,7 @@ export function previewSnapshot(state: PreviewState['claude'], pulse: boolean, n
   const now = Date.now();
   const status: Status = state === 'many' ? 'working' : state;
   const base = {
-    id: 'sample-claude', title: 'A quieter place to work', project: 'claude-light', cwd: '/Users/you/dev/claude-light', branch: 'faces',
+    id: 'sample-claude', title: 'A quieter place to work', project: 'notchlight', cwd: '/Users/you/dev/notchlight', branch: 'faces',
     status, tokens: 24100, startedAt: now - 124000, lastAt: now, endedAt: status === 'done' ? now : undefined,
     agents: [{ id: 'main', kind: 'main' as const, title: status === 'asking' ? 'Waiting for your answer' : status === 'done' ? 'Finished the new faces' : 'Shaping the music view', activity: 'code' as const, status, tokens: 24100, startedAt: now - 124000 }],
     ask: status === 'asking' ? { id: 'preview-ask', tool: 'Write', command: '', message: 'Claude needs your permission to use Write', at: now, answerable: false } : null,
@@ -111,4 +118,24 @@ export function previewSnapshot(state: PreviewState['claude'], pulse: boolean, n
   };
   return { sessions: state === 'idle' ? [] : state === 'many' ? [base, { ...base, id: 'sample-2', project: 'notes-api', cwd: '/Users/you/dev/notes-api' }] : [base],
     overall: status, tokens: 24100, elapsed: 124000, dormant: state === 'idle', notchW, notchH, hoverDelay: 550, pulse, now };
+}
+
+export function previewAgents(state: PreviewState, notchW = 190, notchH = 34): Snapshot {
+  const base = previewSnapshot(state.claude,state.preferences.pulse,notchW,notchH);
+  base.claude = {state:'demo',message:'Sample Claude activity.'};
+  base.codex = state.codexConnection ?? {state:state.codex === 'off' ? 'disabled' : 'ready',message:state.codex === 'off' ? 'Codex monitoring is off. Enable it in Customize → Agents.' : 'Sample local Codex activity.',hooksSeen:false};
+  base.sessions = base.sessions.map(s => ({...s,provider:'claude',source:'cli',originalId:s.id,id:`claude:${s.id}`}));
+  if (state.codex !== 'off') {
+    const status: Status = state.codex === 'many' ? 'working' : state.codex;
+    const sample = previewSnapshot('working',true,notchW,notchH).sessions[0];
+    const codex = {...sample,id:'codex:sample-1',originalId:'sample-1',provider:'codex' as const,source:'desktop' as const,status,
+      title:'Bring the Codex companion to life',tokensKnown:false,
+      agents:sample.agents.map(a => ({...a,status,tokensKnown:false,title:'Designing the shared Agents view'})),
+      ask:status === 'asking' ? {id:'codex:sample-approval',tool:'Bash',command:'npm run test:codex',message:'Allow Codex to run the test suite?',at:Date.now(),answerable:true} : null};
+    base.sessions.push(codex);
+    if (state.codex === 'many') base.sessions.push({...codex,id:'codex:sample-2',source:'cli',title:'A long task title that stays readable while another agent works in exactly the same project'});
+  }
+  const rank: Record<Status,number> = {asking:0,working:1,failed:2,done:3,interrupted:4,unknown:5,idle:6};
+  base.sessions.sort((a,b) => rank[a.status]-rank[b.status]);
+  return {...base,overall:base.sessions[0]?.status || 'idle',dormant:!base.sessions.length,tokensKnown:state.codex === 'off',tokens:base.sessions.reduce((n,s)=>n+s.tokens,0)};
 }

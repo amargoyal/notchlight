@@ -90,8 +90,8 @@ function snap(sessions: Session[], over: Partial<Snapshot> = {}): Snapshot {
 
 const working = session({
   id: 'f1',
-  project: 'claude-light',
-  cwd: '/Users/you/dev/claude-light',
+  project: 'notchlight',
+  cwd: '/Users/you/dev/notchlight',
   branch: 'main',
   status: 'working',
   tokens: 61_300,
@@ -324,7 +324,7 @@ function Sheet() {
 function Live() {
   const [live, setLive] = useState<Snapshot | null>(null);
   useEffect(() => {
-    return window.claudeLight?.onSnapshot?.(setLive);
+    return window.notchlight?.onSnapshot?.(setLive);
   }, []);
   const s = live ?? BASE;
   return (
@@ -350,7 +350,7 @@ function App() {
     <div style={{ padding: '52px 64px 110px', font: `400 13px/1.5 ${SANS}`, background: '#EFEBE4', minHeight: '100vh' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 56, width: 'max-content' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 20 }}>
-          <div style={{ font: `600 27px/1 ${SANS}`, color: '#1E1B18', letterSpacing: '-.02em' }}>Claude Light</div>
+          <div style={{ font: `600 27px/1 ${SANS}`, color: '#1E1B18', letterSpacing: '-.02em' }}>Notchlight</div>
           <div style={{ font: `400 13.5px/1.55 ${SANS}`, color: '#6E6660', maxWidth: 560 }}>
             Status light on the left wing, buddy on the right, nothing behind the lens. Invisible until something is
             running — or until you hold the cursor on the notch.
