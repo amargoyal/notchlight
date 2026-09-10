@@ -1,4 +1,4 @@
-export type CompanionView = 'agents' | 'music' | 'tray';
+export type CompanionView = 'agents' | 'music' | 'tray' | 'clipboard';
 export interface CompanionPreferences {
   theme: 'system' | 'light' | 'dark';
   density: 'compact' | 'comfortable';
@@ -20,11 +20,16 @@ export interface CompanionPreferences {
   codexHome: string;
   restMusic: boolean;
   restTray: boolean;
+  /** Clipboard history is a privacy choice: off until switched on. */
+  clipboardEnabled: boolean;
+  clipboardHistorySize: '20' | '50' | '100';
+  restClipboard: boolean;
 }
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false,
-  restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true
+  restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true,
+  clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true
 };
 export interface ShelfFile {
   id: string;
@@ -84,6 +89,26 @@ export function describeCapture(capture: CaptureSnapshot, music: SpotifySnapshot
     default: return music.status === 'ready' && music.playing ? 'Capture starts when the bars are on screen.' : 'Capture runs only while Spotify plays and the bars are showing.';
   }
 }
+/** One thing that was copied. Text only for now; images come later. */
+export interface ClipboardItem {
+  id: string;
+  kind: 'text' | 'url';
+  text: string;
+  /** First line, whitespace folded, for the list. */
+  preview: string;
+  host?: string;
+  lines: number;
+  bytes: number;
+  at: number;
+  pinned: boolean;
+}
+export interface ClipboardSnapshot {
+  enabled: boolean;
+  paused: boolean;
+  items: ClipboardItem[];
+  limit: number;
+}
+export const EMPTY_CLIPBOARD: ClipboardSnapshot = { enabled: false, paused: false, items: [], limit: 50 };
 /** A Save copy in flight: bytes so far, and which item of how many. */
 export interface TransferProgress { name: string; done: number; total: number; item: number; items: number }
 export interface CompanionSnapshot {
@@ -92,6 +117,7 @@ export interface CompanionSnapshot {
   files: ShelfFile[];
   music: SpotifySnapshot;
   capture: CaptureSnapshot;
+  clipboard: ClipboardSnapshot;
   transfer: TransferProgress | null;
   /** How many references the last Remove took; Undo puts them back. */
   undoable: number;
@@ -120,6 +146,13 @@ export interface CompanionBridge {
   controlSpotify(command: SpotifyCommand, position?: number): Promise<OperationResult>;
   /** Five band levels, bass first, each 0…1, while Spotify plays and the bars are on screen. */
   onMusicLevels(cb: (levels: number[]) => void): () => void;
+  /** Put a history item back on the clipboard. */
+  copyClipboardItem(id: string): Promise<OperationResult>;
+  pinClipboardItem(id: string, pinned: boolean): Promise<OperationResult>;
+  removeClipboardItem(id: string): Promise<OperationResult>;
+  /** Forget the history; pins too when asked. */
+  clearClipboard(includePinned: boolean): Promise<OperationResult>;
+  pauseClipboard(paused: boolean): Promise<OperationResult>;
 }
 
 /** Only known, correctly typed preferences may cross the renderer boundary. */
@@ -127,7 +160,7 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid preferences.');
   const result: Record<string, unknown> = {};
   const choices: Record<string, readonly string[]> = {
-    theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large']
+    theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100']
   };
   for (const [key, item] of Object.entries(value)) {
     if (!Object.hasOwn(DEFAULT_COMPANION_PREFERENCES, key)) throw new Error('Unknown preference.');

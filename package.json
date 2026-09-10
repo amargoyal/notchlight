@@ -29,6 +29,7 @@
     "test:rename": "node scripts/test-rename.mjs",
     "test:liveness": "node scripts/test-liveness.mjs",
     "test:codex": "node scripts/test-codex.mjs",
+    "test:clipboard": "node scripts/test-clipboard.mjs",
     "smoke:codex": "node scripts/smoke-codex.mjs",
     "dist": "npm run build && electron-builder --mac dmg --arm64"
   },

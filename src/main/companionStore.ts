@@ -4,7 +4,7 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_SPOTIFY, validatePreferences, type CaptureSnapshot, type CompanionSnapshot, type CompanionView, type ShelfFile, type SpotifySnapshot, type TransferProgress } from '../shared/companion';
+import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_SPOTIFY, validatePreferences, type CaptureSnapshot, type ClipboardSnapshot, type CompanionSnapshot, type CompanionView, type ShelfFile, type SpotifySnapshot, type TransferProgress } from '../shared/companion';
 
 type Entry = { id: string; path: string };
 /** What Remove took away, so Undo can put it back where it was. */
@@ -29,7 +29,7 @@ export class CompanionStore extends EventEmitter {
   private removed: Removed | null = null;
   constructor(private file: string, private icon: (file: string) => Promise<string>, pulse = true) {
     super();
-    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, transfer: null, undoable: 0, notice: '' };
+    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, clipboard: { ...EMPTY_CLIPBOARD }, transfer: null, undoable: 0, notice: '' };
   }
   current(): CompanionSnapshot { return this.state; }
   private emitState() { this.emit('change', this.state); }
@@ -75,7 +75,7 @@ export class CompanionStore extends EventEmitter {
   }
   setView(view: unknown): void {
     if (view === 'claude') view = 'agents';
-    if (view !== 'agents' && view !== 'music' && view !== 'tray') throw new Error('Unknown view.');
+    if (view !== 'agents' && view !== 'music' && view !== 'tray' && view !== 'clipboard') throw new Error('Unknown view.');
     this.state = { ...this.state, view: view as CompanionView }; this.emitState();
   }
   setMusic(music: SpotifySnapshot): void { this.state = { ...this.state, music }; this.emitState(); }
@@ -84,6 +84,7 @@ export class CompanionStore extends EventEmitter {
     if (current.status === capture.status && current.reason === capture.reason && current.retryAt === capture.retryAt) return;
     this.state = { ...this.state, capture }; this.emitState();
   }
+  setClipboard(clipboard: ClipboardSnapshot): void { this.state = { ...this.state, clipboard }; this.emitState(); }
   notice(notice: string): void { this.state = { ...this.state, notice }; this.emitState(); }
   add(paths: unknown): Promise<void> {
     if (!Array.isArray(paths) || paths.length > 100 || paths.some(p => typeof p !== 'string' || !path.isAbsolute(p))) return Promise.reject(new Error('Choose files from Finder.'));

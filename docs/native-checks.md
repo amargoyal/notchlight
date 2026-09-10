@@ -37,6 +37,7 @@ record row `measure` prints into the table at the end.
 | Reduced motion | System Settings → Accessibility → Display → Reduce motion, on then off | nothing new | lights stop breathing at once, resume at once; no restart |
 | Finder drag | drag a file onto the notch and drop; drag another and press Escape | nothing new | dropped file in Tray; cancelled drag adds nothing and the island closes |
 | Jump to terminal | with two Claude sessions in different terminal tabs, open the island on the one that is not frontmost and press Jump ↗ | `island jump to pid N: terminal Terminal tty ttysNNN` (or the host app's name) | that tab comes to the front |
+| Clipboard | switch the history on in Customize → Clipboard, copy two lines of text, then copy a password from a password manager | `notchlight clipboard capture on` | the two lines appear in the Clipboard face within a second; the password never does; `~/.notchlight/clipboard.json` is mode 0600 |
 | Keyboard | in a terminal, press ⌥⇧N, Tab a few times, press Escape | `island keyboard taken`, `island keyboard released: escape` | panel opens with a focus ring on the selected tab; Escape returns you to the terminal with the cursor where it was |
 
 ## Resource budget
