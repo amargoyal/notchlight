@@ -80,7 +80,8 @@ function Navigation({ state, onNavigate, onCustomize, id, attention }: { state: 
 
 function Artwork({ state, mini = false }: { state: PreviewState; mini?: boolean }) {
   const track = TRACKS[state.music.index];
-  return <div className={`mp-artwork ${mini ? 'mp-artwork-mini' : ''}`}>
+  const glow = state.preferences.artworkGlow && state.music.source === 'ready' && !state.music.missingArtwork;
+  return <div className={`mp-artwork ${mini ? 'mp-artwork-mini' : ''}`} style={glow ? { boxShadow: `0 0 ${mini ? 10 : 26}px ${SAMPLE_TINT}66` } : undefined}>
     {state.preferences.artwork && !state.music.missingArtwork && track.artwork
       ? <img src={track.artwork} alt={mini ? '' : `${track.album} — sample artwork`} draggable={false}/>
       : <Icon name="music" size={mini ? 14 : 34}/>}
@@ -108,8 +109,10 @@ export function RestingWings({ notchW, height, parts, attention }: { notchW: num
   return <Wings notchW={notchW} height={height} left={<div className={`mp-rest-wing ${compact ? 'is-tight' : ''}`}>{join(visible.map(p => p.left))}</div>} right={<div className={`mp-rest-wing ${compact ? 'is-tight' : ''}`}>{join(right)}</div>}/>;
 
 }
-function Equalizer({ active }: { active: boolean }) {
-  return <span className={`mp-equalizer ${active ? 'is-playing' : ''}`} aria-hidden="true">{[0, 1, 2, 3, 4].map(i => <i key={i} style={{ animationDelay: `${i * -0.19}s` }}/>)}</span>;
+const SAMPLE_TINT = '#c47a4a';
+function Equalizer({ active, layout = 'rising', tint }: { active: boolean; layout?: 'rising' | 'mirrored'; tint?: string }) {
+  const bars = layout === 'mirrored' ? [4, 3, 2, 1, 0, 1, 2, 3, 4] : [0, 1, 2, 3, 4];
+  return <span className={`mp-equalizer ${active ? 'is-playing' : ''} ${layout === 'mirrored' ? 'is-mirrored' : ''}`} style={tint ? { '--mp-tint': tint } as React.CSSProperties : undefined} aria-hidden="true">{bars.map((band, i) => <i key={i} style={{ animationDelay: `${band * -0.19}s` }}/>)}</span>;
 }
 
 function MusicFace({ state, dispatch }: Controls) {
@@ -191,20 +194,20 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
   const snap = previewAgents(state,notchW,notchH);
   const tabs = <Navigation state={state} attention={snap.overall === 'asking'} onNavigate={view => { pendingFocus.current = true; dispatch({ type: 'view', view }); }} onCustomize={onCustomize} id={id}/>;
   const playing = state.music.source === 'ready' && state.music.playing && state.preferences.visualizer;
+  const prefs = state.preferences;
   const music = state.view === 'music';
   const clips = state.view === 'clipboard';
   const headLeft = music ? <Artwork state={state} mini/> : clips ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>;
   const headRight = <div className="mp-right-wing">
     {snap.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" title="Agents need attention" onClick={() => dispatch({ type: 'view', view: 'agents' })}><span className="mp-attention-dot"/></button>}
-    {music ? <Equalizer active={playing}/> : clips ? <span className="mp-clip-kind" aria-hidden="true">T</span> : <Icon name="file" size={16}/>}
+    {music ? <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow && state.music.source === 'ready' ? SAMPLE_TINT : undefined}/> : clips ? <span className="mp-clip-kind" aria-hidden="true">T</span> : <Icon name="file" size={16}/>}
   </div>;
   const wing = (expanded: boolean) => <Wings notchW={notchW} height={notchH} width={expanded ? PANEL_W : undefined} left={<div className="mp-left-wing">{headLeft}</div>} right={headRight}/>;
   const nav = <>{tabs}{state.view === 'agents' && <AgentFilters snapshot={snap} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{state.view === 'agents' && <AgentConnection snapshot={snap} filter={filter}/>}<AgentAttention sessions={snap.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);dispatch({type:'view',view:'agents'});}}/></>;
-  const prefs = state.preferences;
   const agentParts = agentRestingParts(snap,prefs,p => {setFilter(p);dispatch({type:'view',view:'agents'});});
   const parts: RestingPart[] = [
     ...agentParts,
-    ...(prefs.restMusic && state.music.source === 'ready' ? [{ left: <Artwork state={state} mini/>, right: <Equalizer active={playing}/> }] : []),
+    ...(prefs.restMusic && state.music.source === 'ready' ? [{ left: <Artwork state={state} mini/>, right: <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow ? SAMPLE_TINT : undefined}/> }] : []),
     ...(prefs.restTray && state.files.length > 0 || state.drag?.origin === 'finder' ? [{ left: <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>, right: <Icon name="file" size={16}/> }] : []),
     ...(prefs.clipboardEnabled && prefs.restClipboard && state.clips.length > 0 ? [{ left: <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span>, right: <span className="mp-clip-kind" aria-hidden="true">{state.clips[0].kind === 'url' ? '@' : state.clips[0].kind === 'image' ? '▣' : 'T'}</span> }] : [])
   ];
@@ -214,7 +217,7 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
   return <div className={`mp-surface ${state.preferences.density} ${state.preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!state.preferences.buddy ? 'mp-hide-buddy' : ''} ${!state.preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''}`}
     onDragOver={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; dispatch({ type: 'drag-enter' }); } }}
     onDrop={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); dispatch({ type: 'add', id: state.drag.id }); } }}>
-    <Island snap={filteredSnapshot(snap,filter)} open={state.open} hovering
+    <Island snap={{ ...filteredSnapshot(snap,filter), sparkline: prefs.sparkline }} open={state.open} hovering
       onDismiss={id => dispatch(id.startsWith('codex:') ? {type:'codex',value:'off'} : {type:'claude',value:'idle'})}
       onDecide={id => dispatch(id.startsWith('codex:') ? {type:'codex',value:'done'} : {type:'claude',value:'done'})}
       surface={{ selectedSession:target,navigation: nav, active: true, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${state.view}` },
@@ -271,6 +274,9 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   {name:'Resting · wide camera, many tasks',note:'Provider identities remain visible under width pressure.',notchW:280,patch:s=>({...s,open:false,codex:'many',claude:'many'})},
   {name:'Agents · reduced motion',note:'Expressions stay meaningful without animated status lights.',patch:s=>({...s,view:'agents',codex:'working',preferences:{...s.preferences,reducedMotion:true}})},
   { name: 'Music · playing', note: 'Artwork leads. Controls stay one glance away.', patch: s => s },
+  { name: 'Music · mirrored bars', note: 'A/B: nine bars folded around the bass read as one shape.', patch: s => ({ ...s, preferences: { ...s.preferences, equalizerLayout: 'mirrored' } }) },
+  { name: 'Music · no glow', note: 'A/B: plain black behind the artwork and bars.', patch: s => ({ ...s, preferences: { ...s.preferences, artworkGlow: false } }) },
+  { name: 'Resting · mirrored bars', note: 'A/B: the folded shape on the collapsed bar.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, equalizerLayout: 'mirrored', restClaude: false, restTray: false } }) },
   { name: 'Music · paused', note: 'A quiet playback indicator; your place is preserved.', patch: s => ({ ...s, music: { ...s.music, playing: false } }) },
   { name: 'Music · nothing playing', note: 'A useful invitation, not an empty black box.', patch: s => ({ ...s, music: { ...s.music, source: 'empty' } }) },
   { name: 'Music · missing artwork', note: 'The music symbol holds the composition together.', patch: s => ({ ...s, music: { ...s.music, missingArtwork: true } }) },
