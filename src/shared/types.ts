@@ -77,6 +77,8 @@ export interface Session {
   /** Directory basename — what the row is called. */
   project: string;
   cwd: string;
+  /** The session's own process, when known; what Jump to terminal follows. */
+  pid?: number;
   branch?: string;
   status: Status;
   /** Input + output + cache-creation tokens. Cache reads are excluded. */
@@ -145,6 +147,8 @@ export interface IslandBridge extends CompanionBridge {
   onKeyboard(cb: (taken: boolean) => void): () => void;
   /** Escape: hand the keyboard back to the app you were in. */
   keyboardDone(): void;
+  /** Bring the terminal (or app) hosting this session to the front. */
+  focusSession(sessionId: string): Promise<{ ok: boolean; error?: string }>;
   /** Answer a held permission request. */
   decide(sessionId: string, askId: string, decision: ApprovalDecision): Promise<import('./companion').OperationResult>;
   /** Drop a finished session's red light. */

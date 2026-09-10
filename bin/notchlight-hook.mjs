@@ -68,6 +68,9 @@ try {
 }
 
 const event = payload.hook_event_name || '';
+// The hook runs as a child of the `claude` that fired it, so its parent is the
+// session's own process — which is what lets the island jump back to its terminal.
+if (payload && typeof payload === 'object') payload.notchlight = { pid: process.ppid };
 const cfg = readConfig();
 const gateTools = Array.isArray(cfg.gateTools) ? cfg.gateTools : [];
 // Only a PreToolUse for a gated tool can produce an answer worth waiting for.

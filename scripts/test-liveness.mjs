@@ -29,6 +29,11 @@ try {
   assert.equal(live.countFor(renamed), 1);
   assert.equal(live.countFor(old), 1, 'cached transcript path must match renamed process cwd');
   assert.equal(live.countFor(path.join(root, 'unrelated')), 0);
+  live.names.set(String(process.pid), 'claude');
+  live.readCwds([String(process.pid)]);
+  await new Promise(r => setTimeout(r, 300));
+  assert.deepEqual(live.pidsFor(old, 'claude'), [process.pid], 'the process in a directory can be found by pid for jumping back');
+  assert.deepEqual(live.pidsFor(old, 'codex'), [], 'names are kept apart');
 
   const store = new Store();
   store.liveness = live;
@@ -50,7 +55,11 @@ try {
   store.live.get('cached-session').deadSince = now - 60_000;
   store.sweepClosed();
   assert.ok(store.closed.has('cached-session'), 'a truly closed session is still removed');
-  console.log('Liveness checks passed: renamed cwd, cached alias, shared process budget, snapshot visibility, closed-session removal.');
+  store.onHook({ event: 'UserPromptSubmit', sessionId: 'cached-session', cwd: old, pid: 4242 });
+  store.closed.delete('cached-session');
+  assert.equal(store.snapshot().sessions.find(s => s.id === 'cached-session')?.pid, 4242, 'a hook names the session process for Jump to terminal');
+  assert.deepEqual(store.processesIn(old), [process.pid]);
+  console.log('Liveness checks passed: renamed cwd, cached alias, pids for jumping back, shared process budget, snapshot visibility, closed-session removal.');
 } finally {
   process.chdir(originalCwd);
   fs.rmSync(root, { recursive: true, force: true });

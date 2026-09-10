@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 
 const root = await mkdtemp(path.join(os.tmpdir(), 'notchlight-companion-'));
 try {
-  await build({ entryPoints: ['src/main/companionStore.ts','src/main/spotify.ts','src/main/audioLevels.ts','src/main/spotifyWatch.ts','src/main/hover.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
+  await build({ entryPoints: ['src/main/companionStore.ts','src/main/spotify.ts','src/main/audioLevels.ts','src/main/spotifyWatch.ts','src/main/hover.ts','src/main/terminal.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   await build({ entryPoints: ['src/shared/companion.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   const { CompanionStore } = await import(pathToFileURL(path.join(root,'companionStore.js')).href);
   const { SpotifyPlayer, normalizeSpotify, validArtwork, artistsFromPage } = await import(pathToFileURL(path.join(root,'spotify.js')).href);
@@ -15,6 +15,19 @@ try {
   const { SpotifyWatcher, parsePlaybackChange } = await import(pathToFileURL(path.join(root,'spotifyWatch.js')).href);
   const { playhead } = await import(pathToFileURL(path.join(root,'companion.js')).href);
   const { Hover } = await import(pathToFileURL(path.join(root,'hover.js')).href);
+  const { classifyHost, selectTabScript, parentChain } = await import(pathToFileURL(path.join(root,'terminal.js')).href);
+  // Jump to terminal: the first .app ancestor is the host; only Terminal and iTerm2 can pick a tab by tty.
+  assert.deepEqual(classifyHost(['/usr/local/bin/claude','/bin/zsh','/Applications/Ghostty.app/Contents/MacOS/ghostty','/sbin/launchd']),{kind:'app',app:'/Applications/Ghostty.app',name:'Ghostty'});
+  assert.deepEqual(classifyHost(['claude','/bin/zsh','/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal']).kind,'terminal');
+  assert.deepEqual(classifyHost(['claude','/bin/zsh','/Applications/iTerm.app/Contents/MacOS/iTerm2']),{kind:'iterm',app:'/Applications/iTerm.app',name:'iTerm2'});
+  assert.deepEqual(classifyHost(['claude','/bin/zsh','/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin)']),{kind:'app',app:'/Applications/Visual Studio Code.app',name:'Visual Studio Code'},'a helper inside an app bundle is the app, not the helper');
+  assert.deepEqual(classifyHost(['claude','/bin/zsh','/sbin/launchd']),{kind:'none',app:null,name:''});
+  assert.match(selectTabScript('terminal','ttys003'),/tty of t is "\/dev\/ttys003"/);
+  assert.match(selectTabScript('iterm','ttys012'),/sessions of t/);
+  assert.equal(selectTabScript('app','ttys003'),null,'other apps are only brought forward');
+  assert.equal(selectTabScript('terminal','../evil'),null,'a tty is a tty name, nothing else');
+  const chain = await parentChain(process.pid);
+  assert.ok(chain.length >= 1 && /node|Electron|claude/i.test(chain[0]),'the chain starts with this process');
   // Hover intent: dwell opens, grace closes; a keyboard hold keeps it open and lets go politely.
   const opened = [];
   const hover = new Hover(o => opened.push(o), () => ({ hoverDelay: 20, leaveGrace: 20 }));
@@ -386,5 +399,5 @@ try {
   await new Promise(r=>setTimeout(r,50));
   assert.equal(missing.retryTimer,null,'a missing compiler never schedules a retry');
   missing.stop();
-  console.log('Companion checks passed: hover intent and keyboard hold, real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
+  console.log('Companion checks passed: hover intent and keyboard hold, terminal host detection, real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
 } finally { await rm(root,{recursive:true,force:true}); }

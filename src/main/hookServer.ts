@@ -27,6 +27,8 @@ export interface HookEvent {
   message?: string;
   prompt?: string;
   reason?: string;
+  /** The `claude` process the hook ran under, reported by the hook client. */
+  pid?: number;
 }
 
 export type Decision = 'allow' | 'deny';
@@ -113,7 +115,8 @@ export class HookServer extends EventEmitter {
       toolInput: p?.tool_input && typeof p.tool_input === 'object' ? p.tool_input : undefined,
       message: typeof p?.message === 'string' ? p.message : undefined,
       prompt: typeof p?.prompt === 'string' ? p.prompt : undefined,
-      reason: typeof p?.reason === 'string' ? p.reason : undefined
+      reason: typeof p?.reason === 'string' ? p.reason : undefined,
+      pid: Number.isInteger(p?.notchlight?.pid) && p.notchlight.pid > 1 ? p.notchlight.pid : undefined
     };
     if (!e.event || !e.sessionId) return void sock.end();
 
