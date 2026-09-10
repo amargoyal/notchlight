@@ -66,6 +66,66 @@ try {
   await loaded.refresh();
   assert.equal(loaded.current().files[0].unavailable,true,'removed original remains identifiable');
   await assert.rejects(loaded.existingPath(loaded.current().files[0].id));
+  // Locate: a renamed source is found again through its reference, not re-added.
+  const renamedTo = path.join(source,'notes-renamed.txt'); await writeFile(renamedTo,'Renamed original');
+  const staleId = loaded.current().files[0].id;
+  await assert.rejects(loaded.relocate(staleId, path.join(source,'nope.txt')),'locating a path that does not exist fails');
+  await loaded.relocate(staleId, renamedTo);
+  assert.equal(loaded.current().files[0].id,staleId,'the reference keeps its id');
+  assert.equal(loaded.current().files[0].name,'notes-renamed.txt');
+  assert.equal(loaded.current().files[0].unavailable,false);
+  await loaded.add([renamedTo]);
+  assert.equal(loaded.current().files.length,1,'locating does not create a duplicate');
+  // Multi-select: remove several, undo restores them in their places.
+  const many = ['one.txt','two.txt','three.txt','four.txt'].map(n => path.join(source,n));
+  for (const [i,f] of many.entries()) await writeFile(f,`file ${i}`);
+  await loaded.add(many);
+  const order = () => loaded.current().files.map(f => f.name);
+  assert.deepEqual(order(),['notes-renamed.txt','one.txt','two.txt','three.txt','four.txt']);
+  const [twoId, fourId] = [loaded.current().files[2].id, loaded.current().files[4].id];
+  await loaded.remove([twoId, fourId]);
+  assert.deepEqual(order(),['notes-renamed.txt','one.txt','three.txt']);
+  assert.equal(loaded.current().undoable,2);
+  await assert.rejects(loaded.remove(['not-an-id']),'unknown ids remove nothing');
+  await loaded.undoRemove();
+  assert.deepEqual(order(),['notes-renamed.txt','one.txt','two.txt','three.txt','four.txt'],'undo puts them back where they were');
+  assert.equal(loaded.current().undoable,0);
+  await assert.rejects(loaded.undoRemove(),'nothing to undo twice');
+  assert.equal(loaded.current().files[2].id,twoId,'restored references keep their ids');
+  // Multi copy with progress: duplicate basenames fail one and save the other; nothing is overwritten.
+  await loaded.updatePreferences({removeAfterTransfer:true});
+  const dupDir = path.join(source,'dup'); await mkdir(dupDir); await writeFile(path.join(dupDir,'one.txt'),'the other one');
+  await loaded.add([path.join(dupDir,'one.txt')]);
+  const oneIds = loaded.current().files.filter(f => f.name === 'one.txt').map(f => f.id);
+  assert.equal(oneIds.length,2);
+  const copies = path.join(root,'copies'); await mkdir(copies);
+  const progress = [];
+  loaded.on('change', s => { if (s.transfer) progress.push({...s.transfer}); });
+  await loaded.copyTo([oneIds[0], oneIds[1], loaded.current().files.find(f => f.name === 'three.txt').id], copies);
+  assert.equal(await readFile(path.join(copies,'one.txt'),'utf8'),'file 0','the first one lands');
+  assert.deepEqual((await import('node:fs')).readdirSync(copies).sort(),['one.txt','three.txt']);
+  assert.match(loaded.current().notice,/Saved copies of 2 items/);
+  assert.match(loaded.current().notice,/one\.txt: already at the destination/,'the duplicate is reported, not silently dropped');
+  assert.equal(loaded.current().files.filter(f => f.name === 'one.txt').length,1,'only the saved item leaves Tray');
+  assert.ok(progress.length >= 1,'progress was published');
+  assert.ok(progress.every(p => p.done <= p.total && p.items === 3),'progress never exceeds the total');
+  assert.equal(loaded.current().transfer,null,'progress clears when the copy ends');
+  // A folder copy that fails part way leaves a partial copy and says so; it never claims success.
+  const deep = path.join(source,'deep'); await mkdir(path.join(deep,'inner'),{recursive:true});
+  await writeFile(path.join(deep,'a.txt'),'a'); await writeFile(path.join(deep,'inner','b.txt'),'b');
+  const { chmod } = await import('node:fs/promises');
+  await chmod(path.join(deep,'inner','b.txt'),0o000);
+  await loaded.add([deep]);
+  const deepId = loaded.current().files.find(f => f.name === 'deep').id;
+  if (process.getuid?.() !== 0) {
+    await assert.rejects(loaded.copyTo(deepId, copies));
+    assert.match(loaded.current().notice,/A partial copy is at/,'a half-copied folder is reported as partial');
+    assert.equal(await readFile(path.join(copies,'deep','a.txt'),'utf8'),'a','what did copy stays for the user to see');
+    assert.ok(loaded.current().files.some(f => f.id === deepId),'a failed copy keeps the reference');
+  }
+  await chmod(path.join(deep,'inner','b.txt'),0o644);
+  const { present, missing: missingCount } = await loaded.existingPaths([deepId,'ghost']);
+  assert.deepEqual([present.length, missingCount],[1,0],'unknown ids are not counted as missing files');
 
   const music = normalizeSpotify({status:'ready',playing:true,position:72,track:{id:'spotify:track:test',title:'Example',artist:'Artist',album:'Album',durationMs:234000,artwork:'https://i.scdn.co/image/example'}});
   assert.equal(music.track.duration,234); assert.equal(music.position,72);
@@ -305,5 +365,5 @@ try {
   await new Promise(r=>setTimeout(r,50));
   assert.equal(missing.retryTimer,null,'a missing compiler never schedules a retry');
   missing.stop();
-  console.log('Companion checks passed: real filesystem persistence/copy/conflicts, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
+  console.log('Companion checks passed: real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
 } finally { await rm(root,{recursive:true,force:true}); }

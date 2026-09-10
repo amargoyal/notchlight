@@ -176,11 +176,13 @@ export class CompanionStore extends EventEmitter {
     try { await fs.access(entry.path); return entry.path; }
     catch { throw new Error('This file was moved or removed. Use Locate to find it, or add it again.'); }
   }
-  /** The paths of the given ids that still exist, in order. Missing ones are skipped, not fatal. */
+  /** The paths of the given ids that still exist, in order. Missing files are counted; ids no longer in Tray are stale clicks and are skipped. */
   async existingPaths(ids: unknown): Promise<{ present: string[]; missing: number }> {
     const present: string[] = []; let missing = 0;
     for (const id of idList(ids)) {
-      try { present.push(await this.existingPath(id)); } catch { missing++; }
+      const entry = this.entries.find(e => e.id === id);
+      if (!entry) continue;
+      try { await fs.access(entry.path); present.push(entry.path); } catch { missing++; }
     }
     return { present, missing };
   }
