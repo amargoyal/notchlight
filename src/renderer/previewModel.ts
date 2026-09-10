@@ -20,6 +20,7 @@ export interface PreviewPreferences {
   clipboardEnabled: boolean;
   clipboardHistorySize: '20' | '50' | '100';
   restClipboard: boolean;
+  musicPlayer: 'spotify' | 'apple' | 'auto';
   equalizerLayout: 'rising' | 'mirrored';
   artworkGlow: boolean;
   artworkPulse: boolean;
@@ -48,7 +49,7 @@ export const DEFAULT_PREFERENCES: PreviewPreferences = {
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true,
   restClaude: true, restCodex: true, codexBuddy: true, codexPulse: true, restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
-  equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false
+  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false
 };
 export const SAMPLE_CLIPS: PreviewClip[] = [
   { id: 'clip-url', kind: 'url', preview: 'https://developer.apple.com/documentation/coreaudio', meta: 'developer.apple.com · 2m', pinned: false },
