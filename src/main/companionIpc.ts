@@ -6,11 +6,12 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { CompanionStore } from './companionStore';
 import { SpotifyPlayer } from './spotify';
+import { ClipboardStore } from './clipboardStore';
 import { trayIcon } from './png';
 import type { OperationResult } from '../shared/companion';
 
 type Event = IpcMainInvokeEvent | IpcMainEvent;
-export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlayer, trusted: (win: BrowserWindow | null) => boolean, dialogWindow: () => BrowserWindow) {
+export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlayer, clips: ClipboardStore, trusted: (win: BrowserWindow | null) => boolean, dialogWindow: () => BrowserWindow) {
   function check(event: Event) {
     if (event.senderFrame !== event.sender.mainFrame || !trusted(BrowserWindow.fromWebContents(event.sender))) throw new Error('This window cannot change the companion.');
   }
@@ -76,6 +77,11 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
     if (alreadyEnabled) spotify.setEnabled(true);
   });
   handle('spotify:open', () => shell.openExternal('spotify:'));
+  handle('clipboard:copy', async (_e, id) => { await clips.copy(id); store.notice('Copied. Paste it wherever you like.'); });
+  handle('clipboard:pin', (_e, id, pinned) => clips.pin(id, pinned));
+  handle('clipboard:remove', (_e, id) => clips.remove(id));
+  handle('clipboard:clear', async (_e, includePinned) => { await clips.clear(includePinned); store.notice(includePinned ? 'Clipboard history and pins cleared.' : 'Clipboard history cleared. Pinned items were kept.'); });
+  handle('clipboard:pause', (_e, paused) => { if (typeof paused !== 'boolean') throw new Error('Invalid pause.'); clips.setPaused(paused); });
   handle('spotify:control', (_e, command, position) => spotify.command(command, position));
   return async () => {
     const result = await dialog.showOpenDialog(dialogWindow(), { title: 'Add to Tray', properties: ['openFile', 'openDirectory', 'multiSelections'] });

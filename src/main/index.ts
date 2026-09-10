@@ -4,7 +4,7 @@
  * Hooks and transcripts feed one live store and one notch overlay. The gallery
  * and customization preview are ordinary windows with a shared Dock lifecycle.
  */
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, powerMonitor, shell, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, powerMonitor, shell, Tray } from 'electron';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { APP_DIR, config, ensureDir } from './config';
 import { CompanionStore } from './companionStore';
+import { ClipboardStore, SKIPPED_FORMATS, type Pasteboard } from './clipboardStore';
 import { SpotifyPlayer } from './spotify';
 import { SpotifyWatcher } from './spotifyWatch';
 import { installCompanionIpc } from './companionIpc';
@@ -55,6 +56,7 @@ let tray: Tray | null = null;
 let gallery: BrowserWindow | null = null;
 let customize: BrowserWindow | null = null;
 let companion: CompanionStore;
+let clips: ClipboardStore;
 let spotify: SpotifyPlayer;
 let watcher: SpotifyWatcher;
 let levels: AudioLevels;
@@ -225,6 +227,22 @@ async function boot(): Promise<void> {
   });
   levels.on('status', () => companion.setCapture({ status: levels.status, reason: levels.reason, retryAt: levels.nextRetry() }));
   await companion.load();
+  // Electron's clipboard is asynchronous and W3C-shaped; the raw macOS markers
+  // that mean "do not remember this" are asked for by name through its
+  // os-clipboard format so a password manager's paste is never read.
+  const pasteboard: Pasteboard = {
+    async availableFormats() {
+      const [text, ...raw] = await Promise.all([clipboard.has('text/plain'), ...SKIPPED_FORMATS.map(f => clipboard.has(`electron application/osclipboard;format="${f}"`).catch(() => false))]);
+      return [...(text ? ['text/plain'] : []), ...SKIPPED_FORMATS.filter((_, i) => raw[i])];
+    },
+    readText: () => clipboard.readText(),
+    writeText: text => clipboard.writeText(text)
+  };
+  clips = new ClipboardStore(path.join(APP_DIR, 'clipboard.json'), pasteboard);
+  clips.on('change', state => companion.setClipboard(state));
+  await clips.load();
+  const syncClipboard = () => { const p = companion.current().preferences; clips.configure(!DEMO && p.clipboardEnabled, Number(p.clipboardHistorySize)); };
+  syncClipboard();
   codex = new CodexAdapter();
   codexApprovals = new CodexApprovals(path.join(APP_DIR,'codex.sock'), () => companion.current().preferences.codexEnabled, () => companion.current().preferences.codexApprovals);
   codexApprovals.on('hook', p => codex.onHook(p));
@@ -247,6 +265,7 @@ async function boot(): Promise<void> {
   const syncLevels = () => levels.setActive(!dark && wantsLevels(companion.current()));
   companion.on('change', state => {
     syncCodex();
+    syncClipboard();
     send(notch?.win ?? null, 'companion', state);
     send(customize, 'companion', state);
     syncLevels();
@@ -261,7 +280,7 @@ async function boot(): Promise<void> {
     if (event.senderFrame !== event.sender.mainFrame || !win || win !== customize && win !== notch?.win) throw new Error('Unknown snapshot consumer.');
     return store.current();
   });
-  pickFiles = installCompanionIpc(companion, spotify,
+  pickFiles = installCompanionIpc(companion, spotify, clips,
     win => !!win && (win === customize || win === notch?.win),
     () => { openCustomize(); return customize!; });
   if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
@@ -515,6 +534,7 @@ app.on('before-quit', () => {
   globalShortcut.unregisterAll();
   if (shelfTimer) clearInterval(shelfTimer);
   spotify?.stop();
+  clips?.stop();
   watcher?.stop();
   levels?.stop();
   store?.stop();

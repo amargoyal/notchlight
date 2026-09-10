@@ -39,5 +39,10 @@ contextBridge.exposeInMainWorld('notchlight', {
   connectSpotify: () => ipcRenderer.invoke('spotify:connect'),
   openSpotify: () => ipcRenderer.invoke('spotify:open'),
   controlSpotify: (command: SpotifyCommand, position?: number) => ipcRenderer.invoke('spotify:control', command, position),
-  onMusicLevels: (cb: (levels: number[]) => void) => subscribe('music:levels', cb)
+  onMusicLevels: (cb: (levels: number[]) => void) => subscribe('music:levels', cb),
+  copyClipboardItem: (id: string) => ipcRenderer.invoke('clipboard:copy', id),
+  pinClipboardItem: (id: string, pinned: boolean) => ipcRenderer.invoke('clipboard:pin', id, pinned),
+  removeClipboardItem: (id: string) => ipcRenderer.invoke('clipboard:remove', id),
+  clearClipboard: (includePinned: boolean) => ipcRenderer.invoke('clipboard:clear', includePinned),
+  pauseClipboard: (paused: boolean) => ipcRenderer.invoke('clipboard:pause', paused)
 });
