@@ -38,6 +38,9 @@ const SCAN_TIMEOUT_MS = 4000;
 export class Liveness {
   /** Directory → number of live `claude` processes in it. */
   private counts = new Map<string, number>();
+  /** Directory → the agent processes in it, by name, for jumping back to one. */
+  private pids = new Map<string, { pid: number; name: string }[]>();
+  private names = new Map<string, string>();
   private known = false;
   private timer: NodeJS.Timeout | null = null;
   private scanning = false;
@@ -56,6 +59,11 @@ export class Liveness {
   /** How many sessions can still be open in this directory. */
   countFor(cwd: string): number {
     return this.counts.get(directoryKey(cwd)) ?? 0;
+  }
+
+  /** The pids of `name` processes in this directory, highest (newest) first. */
+  pidsFor(cwd: string, name: 'claude' | 'codex'): number[] {
+    return (this.pids.get(directoryKey(cwd)) ?? []).filter(p => p.name === name).map(p => p.pid).sort((a, b) => b - a);
   }
 
   /** Total live processes seen. Zero with `reliable()` means everything closed. */
@@ -84,18 +92,24 @@ export class Liveness {
       }
       const uid = process.getuid?.() ?? -1;
       const pids: string[] = [];
+      const names = new Map<string, string>();
       for (const line of out.split('\n')) {
         const m = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
         if (!m) continue;
         if (Number(m[2]) !== uid) continue;
         const comm = m[3].trim();
         // `comm` is the executable, not the command line — a `claude` launched
-        // through a shim still reports its own name here.
-        if (comm !== 'claude' && !comm.endsWith('/claude')) continue;
+        // through a shim still reports its own name here. `codex` is only
+        // remembered for jumping back to it; it never counts as a session.
+        const name = comm === 'claude' || comm.endsWith('/claude') ? 'claude' : comm === 'codex' || comm.endsWith('/codex') ? 'codex' : null;
+        if (!name) continue;
         pids.push(m[1]);
+        names.set(m[1], name);
       }
+      this.names = names;
       if (!pids.length) {
         this.counts.clear();
+        this.pids.clear();
         this.known = true;
         this.scanning = false;
         return;
@@ -120,16 +134,22 @@ export class Liveness {
           return;
         }
         const next = new Map<string, number>();
+        const located = new Map<string, { pid: number; name: string }[]>();
+        let current = 0;
         for (const line of out.split('\n')) {
+          if (line.startsWith('p')) { current = Number(line.slice(1)); continue; }
           if (line.startsWith('n')) {
             const dir = line.slice(1).trim();
             if (dir) {
               const key = directoryKey(dir);
-              next.set(key, (next.get(key) ?? 0) + 1);
+              const name = this.names.get(String(current)) ?? 'claude';
+              if (name === 'claude') next.set(key, (next.get(key) ?? 0) + 1);
+              located.set(key, [...(located.get(key) ?? []), { pid: current, name }]);
             }
           }
         }
         this.counts = next;
+        this.pids = located;
         this.known = true;
       }
     );

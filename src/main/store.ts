@@ -51,6 +51,8 @@ interface Live {
   /** First moment the process table stopped accounting for this session. */
   deadSince: number;
   cwd?: string;
+  /** The session's own `claude` process, when a hook has said. */
+  pid?: number;
 }
 
 /**
@@ -98,6 +100,9 @@ export class Store extends EventEmitter {
   private last: Snapshot | null = null;
   private notchW = config().notchW;
   private notchH = config().notchH;
+
+  /** Live agent processes working in this directory, newest first, for when no hook has named one. */
+  processesIn(cwd: string, name: 'claude' | 'codex' = 'claude'): number[] { return this.liveness.pidsFor(cwd, name); }
 
   /** Cutout geometry comes from the probe once the window has measured it. */
   setNotch(w: number, h: number): void {
@@ -148,6 +153,7 @@ export class Store extends EventEmitter {
   onHook(e: HookEvent): void {
     const s = this.ensure(e.sessionId, e.cwd);
     s.lastHookAt = Date.now();
+    if (e.pid) s.pid = e.pid;
     switch (e.event) {
       case 'SessionStart':
         if (s.phase === null) s.phase = 'idle';
@@ -467,6 +473,7 @@ export class Store extends EventEmitter {
         title: f.title || f.project,
         project: f.project || (s.cwd ? path.basename(s.cwd) : 'session'),
         cwd: f.cwd || s.cwd || '',
+        pid: s.pid,
         branch: f.branch,
         status,
         tokens: f.tokens,
