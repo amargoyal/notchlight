@@ -21,7 +21,7 @@ export interface PreviewPreferences {
   clipboardHistorySize: '20' | '50' | '100';
   restClipboard: boolean;
 }
-export interface PreviewClip { id: string; kind: 'text' | 'url'; preview: string; meta: string; pinned: boolean }
+export interface PreviewClip { id: string; kind: 'text' | 'url' | 'image'; preview: string; meta: string; pinned: boolean; thumb?: string }
 export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string }
 export interface PreviewFile { id: string; name: string; kind: 'image' | 'pdf' | 'folder' | 'text'; size: string; unavailable?: boolean }
 export interface PreviewState {
@@ -48,6 +48,7 @@ export const DEFAULT_PREFERENCES: PreviewPreferences = {
 export const SAMPLE_CLIPS: PreviewClip[] = [
   { id: 'clip-url', kind: 'url', preview: 'https://developer.apple.com/documentation/coreaudio', meta: 'developer.apple.com · 2m', pinned: false },
   { id: 'clip-cmd', kind: 'text', preview: 'npm run service:restart', meta: '23 chars · 9m', pinned: true },
+  { id: 'clip-shot', kind: 'image', preview: '1512×982 image', meta: '312 KB · 18m', pinned: false, thumb: './assets/landscape.svg' },
   { id: 'clip-note', kind: 'text', preview: 'Bars follow the resting face; capture stays with what is showing.', meta: '2 lines · 41m', pinned: false },
   { id: 'clip-hex', kind: 'text', preview: '#d9c4a6', meta: '7 chars · 1h', pinned: false },
   { id: 'clip-path', kind: 'text', preview: '~/.notchlight/island.log', meta: '24 chars · 3h', pinned: false }
