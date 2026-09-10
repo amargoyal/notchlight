@@ -29,7 +29,8 @@ record row `measure` prints into the table at the end.
 | Lock / unlock | Control-Command-Q, unlock | `power lock-screen` … `power unlock-screen`; `levels listening → idle` on lock if the helper was running, a new `helper start` after unlock only if bars are wanted | bars resume only while Music is showing and playing |
 | Spotify quit / relaunch | quit Spotify, wait, open it again | `spotify status ready → not-running`, then `not-running → ready` on relaunch without a reconnect | music wing disappears and returns |
 | Output switch | put AirPods on, take them off | `levels helper exit 0 while listening`, `helper start #n` about a second later, once per switch | bars pause briefly and continue in time with the new output |
-| Display change | plug in or unplug an external display; change the built-in scaling | a burst of `display change:` lines, one `display settled on <id> WxH@scale` | island on the notched display, wings anchored to the cutout |
+| Display change | plug in or unplug an external display; change the built-in scaling | one `display change:` line, then `display settled on <id> WxH@scale after N events` | island on the notched display, wings anchored to the cutout |
+| Not a display change | start and pause Spotify with the bars showing | `display change:` then `display unchanged after N events; kept` — no `settled` line, no probe | nothing moves |
 | Fullscreen / Spaces | enter fullscreen in another app, switch Spaces | nothing new | island stays above the menu bar on every Space |
 | Customize | open Customize Notchlight…, change a toggle, close it | nothing new | Dock icon appears while open, goes on close; the change is on the island |
 | Reduced motion | System Settings → Accessibility → Display → Reduce motion, on then off | nothing new | lights stop breathing at once, resume at once; no restart |
@@ -50,6 +51,9 @@ working Claude session on the resting bar):
 | 2026-09-09 | idle, pulse off | 15s | 2.6% | 494 MB | 0 / 0 | 0 | ok |
 | 2026-09-09 | idle, pulse from the 12 fps timer | 20s | 13.9% | 487 MB | 0 / 0 | 0 | ok |
 | 2026-09-09 | playing on the resting bar, canned bars | 22s | 38.2% | 440 MB | 0 / 0 | 0 | ok |
+| 2026-09-09 | playing, real bars on the resting bar, Agents selected, 70 ms transition per write | 22s | 45.0% | 484 MB | 1 / 0 | 0 | ok |
+| 2026-09-09 | playing, real bars, no transition, 30 fps helper | 20s | 23.6% | 472 MB | 1 / 0 | 0 | ok |
+| 2026-09-09 | playing, real bars, 24 fps helper | 20s | 23.1% | 423 MB | 1 / 0 | 0 | ok |
 
 What the numbers say:
 
@@ -59,11 +63,20 @@ What the numbers say:
   window at 60 fps. The pulse now comes from one shared 12 fps timer
   (`src/renderer/pulse.ts`) and idle dropped from 34.5 % to 13.9 %. With
   nothing pulsing the whole tree is under 3 %.
-- **The canned equalizer has the same problem.** With Spotify playing and the
-  Music face resting, `mp-wave` runs as a 60 fps animation on five bars and
-  costs 25 % in the GPU process — more than real levels would, since the
-  helper writes at 30 fps. Item 13 in the handoff (real bars on the resting
-  face) is also the fix for this.
+- **The canned equalizer had the same problem.** With Spotify playing and the
+  Music face resting, `mp-wave` ran as a 60 fps animation on five bars and
+  cost 25 % in the GPU process. The live island no longer uses it: real
+  levels are written to the DOM with unchanged frames skipped, and a quiet
+  static shape stands in when nothing can be heard. A CSS `transition` on
+  each write was worse still (45 %) because every write became a compositor
+  animation; without it, playing costs about 23 % across the tree, of which
+  the helper itself is under 1 %.
+- **"Screen parameters changed" is not always a screen.** Starting or
+  stopping the audio helper, and play/pause in Spotify, each produced a
+  burst of 7–14 `display-metrics-changed` events with nothing changed.
+  `NotchWindow.settle` now compares a signature of every display's bounds,
+  scale and menu bar height and skips the blocking probe when it matches,
+  logging `unchanged after N events; kept`. A wake always re-measures.
 - **The helper does not respawn on its own.** Zero starts over every idle
   interval; a start appears only when the bars become wanted or the output
   device changes.

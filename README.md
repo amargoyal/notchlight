@@ -297,10 +297,13 @@ playing. A second Swift helper (`native/audiotap.swift`, compiled the same way
 into `~/.notchlight/bin`) opens a Core Audio process tap on Spotify's output
 and streams five band levels while a track plays and the wing is showing.
 Nothing is recorded; samples become five numbers and are dropped. macOS 14.2+
-asks once to allow audio capture. Say no, run without `swiftc`, or send the
-music to another speaker, and the bars keep their canned rhythm instead. The
-levels are held back by the output device's reported latency, so over AirPods
-the bars land with the sound rather than a beat ahead of it.
+asks once to allow audio capture. The bars run wherever they are showing:
+on the Music face, and on the resting bar whichever face is selected. Say no,
+run without `swiftc`, or send the music to another speaker, and the bars hold
+a quiet shape instead — never a fake rhythm, which on a transparent overlay
+costs a quarter of a core. Real silence settles them. The levels are held back
+by the output device's reported latency, so over AirPods the bars land with
+the sound rather than a beat ahead of it.
 
 Capture is separate from the Spotify connection. Track details and the
 transport come over Apple Events; the bars come from the tap, which has its
