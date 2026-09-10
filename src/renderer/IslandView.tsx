@@ -37,6 +37,8 @@ export interface IslandProps {
   open: boolean;
   onDecide?: (sessionId: string, askId: string, decision: ApprovalDecision) => void | Promise<unknown>;
   onDismiss?: (sessionId: string) => void;
+  /** Bring the session's terminal to the front. Absent in the design preview. */
+  onJump?: (sessionId: string) => void;
   /** The island measured itself. The daemon aims the cursor test with this. */
   onBox?: (r: HitRect) => void;
 }
@@ -549,6 +551,7 @@ function SessionPanel({
   onBack,
   onDecide,
   onDismiss,
+  onJump,
   navigation,
   panel
 }: {
@@ -558,6 +561,7 @@ function SessionPanel({
   snap: Snapshot;
   now: number;
   onBack?: () => void;
+  onJump?: (sessionId: string) => void;
   onDecide?: (sessionId: string, askId: string, decision: ApprovalDecision) => void | Promise<unknown>;
   onDismiss?: (sessionId: string) => void;
 }) {
@@ -584,6 +588,17 @@ function SessionPanel({
         }
         right={
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, paddingRight: 13 }}>
+            {onJump && (
+              <button
+                className="cl-jump"
+                aria-label={s.provider === 'codex' && s.source === 'desktop' ? 'Open in ChatGPT' : 'Jump to terminal'}
+                title={s.provider === 'codex' && s.source === 'desktop' ? 'Open in ChatGPT' : 'Jump to terminal'}
+                onClick={(e) => { e.stopPropagation(); onJump(s.id); }}
+                style={{ font: `500 11px/1 ${SANS}`, color: s.status === 'asking' ? C.yellow : C.muted, background: 'transparent', border: `1px solid ${s.status === 'asking' ? C.yellow : C.dead}`, borderRadius: 7, padding: '5px 8px', cursor: 'pointer' }}
+              >
+                {s.status === 'asking' ? 'Answer there ↗' : 'Jump ↗'}
+              </button>
+            )}
             <Mark activity={markOf(s)} color={s.status === 'asking' ? C.yellow : C.dim} />
             <Buddy provider={s.provider} face={faceOf(s)} size={26} />
           </div>
@@ -615,7 +630,7 @@ function useNow(active: boolean): number {
   return now;
 }
 
-export function Island({ snap, hovering, open, onDecide, onDismiss, onBox, surface }: IslandProps) {
+export function Island({ snap, hovering, open, onDecide, onDismiss, onJump, onBox, surface }: IslandProps) {
   const [drill, setDrill] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0, dx: 0 });
@@ -698,7 +713,7 @@ export function Island({ snap, hovering, open, onDecide, onDismiss, onBox, surfa
       content = surface ? <div style={{ width: PANEL_W }}><div style={{ display: 'flex', justifyContent: 'center' }}><IdleFace snap={snap} /></div>{surface.navigation}<div role="tabpanel" {...surface.panel} className="mp-empty"><p>All quiet here.</p><span>Local Claude and Codex sessions appear here when work begins.</span></div></div> : <IdleFace snap={snap} />;
       key = 'idle';
     } else if (single) {
-      content = <SessionPanel s={single} snap={snap} now={now} onDecide={onDecide} onDismiss={onDismiss} navigation={surface?.navigation} panel={surface?.panel} />;
+      content = <SessionPanel s={single} snap={snap} now={now} onDecide={onDecide} onDismiss={onDismiss} onJump={onJump} navigation={surface?.navigation} panel={surface?.panel} />;
       key = 'single-' + single.id;
     } else if (drilled) {
       content = (
@@ -710,6 +725,7 @@ export function Island({ snap, hovering, open, onDecide, onDismiss, onBox, surfa
           onBack={() => setDrill(null)}
           onDecide={onDecide}
           onDismiss={onDismiss}
+          onJump={onJump}
         />
       );
       key = 'drill-' + drilled.id;

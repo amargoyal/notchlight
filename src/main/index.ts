@@ -6,6 +6,7 @@
  */
 import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, powerMonitor, shell, Tray } from 'electron';
 import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -26,6 +27,7 @@ import { CodexApprovals } from './codexApprovals';
 import { AgentCoordinator } from './agentCoordinator';
 import { logEvent } from './lifecycle';
 import { Hover } from './hover';
+import { jumpToProcess } from './terminal';
 import type { HitRect, Snapshot } from '../shared/types';
 
 const DEMO = process.argv.includes('--demo');
@@ -59,6 +61,7 @@ let levels: AudioLevels;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
 let hover: Hover | null = null;
+let claudeStore: Store | null = null;
 /** Asleep or locked: nobody is looking, so no helper should be running. */
 let dark = false;
 /** The island has the keyboard; Escape or a click elsewhere gives it back. */
@@ -207,6 +210,7 @@ function startTray(): void {
 async function boot(): Promise<void> {
   ensureDir();
   const claude = DEMO ? new DemoStore() : new Store();
+  claudeStore = DEMO ? null : claude as Store;
   companion = new CompanionStore(path.join(APP_DIR, 'companion.json'), async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(), config().pulse);
   spotify = new SpotifyPlayer();
   watcher = new SpotifyWatcher();
@@ -403,6 +407,41 @@ function registerShortcut(): void {
     logEvent('island', `shortcut ${accelerator} rejected: ${(error as Error).message}`);
   }
 }
+
+/**
+ * Jump back to a session's terminal.
+ *
+ * Claude sessions know their process from the hook client, or the process
+ * table gives the `claude` working in their directory. Codex Desktop is the
+ * ChatGPT app; Codex CLI is found the same way as Claude when it is running
+ * in the session's directory.
+ */
+async function focusSession(sessionId: string): Promise<string> {
+  const session = store.current().sessions.find(s => s.id === sessionId);
+  if (!session) throw new Error('That session is no longer shown.');
+  if (keyboard) releaseKeyboard('jump');
+  if (session.provider === 'codex' && session.source === 'desktop') {
+    await promisify(execFile)('open', ['-b', 'com.openai.chat'], { timeout: 4000 }).catch(() => { throw new Error('The ChatGPT app could not be opened.'); });
+    return 'Opened ChatGPT.';
+  }
+  const candidates = session.pid ? [session.pid] : session.provider !== 'codex' && session.cwd && claudeStore ? claudeStore.processesIn(session.cwd) : [];
+  if (session.provider === 'codex' && !session.pid && session.cwd && claudeStore) candidates.push(...claudeStore.processesIn(session.cwd, 'codex'));
+  if (!candidates.length) throw new Error(session.provider === 'codex' ? 'That Codex session’s terminal could not be found.' : hooksInstalled() ? 'That session’s terminal could not be found. It may have closed.' : 'Install the Claude Code hooks so sessions can name their terminal.');
+  let last: Error | null = null;
+  for (const pid of candidates) {
+    try { return await jumpToProcess(pid); } catch (error) { last = error as Error; }
+  }
+  throw last ?? new Error('That session’s terminal could not be found.');
+}
+
+ipcMain.handle('session:focus', async (event, sessionId) => {
+  try {
+    if (!trustedAgentWindow(event) || typeof sessionId !== 'string') throw new Error('Invalid request.');
+    const notice = await focusSession(sessionId);
+    companion.notice(notice);
+    return { ok: true };
+  } catch (error) { return { ok: false, error: (error as Error).message }; }
+});
 
 ipcMain.on('keyboard:done', (event) => {
   if (BrowserWindow.fromWebContents(event.sender) === notch?.win) releaseKeyboard('escape');

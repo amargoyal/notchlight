@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('notchlight', {
   onOpen: (cb: (open: boolean) => void) => subscribe('open', cb),
   onKeyboard: (cb: (taken: boolean) => void) => subscribe('keyboard', cb),
   keyboardDone: () => ipcRenderer.send('keyboard:done'),
+  focusSession: (sessionId: string) => ipcRenderer.invoke('session:focus', sessionId),
   setHitRect: (r: HitRect) => ipcRenderer.send('hit-rect', r),
   decide: (sessionId: string, askId: string, decision: ApprovalDecision) => ipcRenderer.invoke('decide', { sessionId, askId, decision }),
   dismiss: (sessionId: string) => ipcRenderer.send('dismiss', sessionId),
