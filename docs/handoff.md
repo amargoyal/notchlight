@@ -173,9 +173,16 @@ command to `native/spotify.js` and `SpotifyPlayer.command`.
 - Optional expiry per item (an hour, a day) so the shelf stays temporary.
 
 ### 9. Claude face extras
-- Click the notch while a session is asking → focus that session's terminal.
-  The store knows the cwd and pid via `watchProcesses`; use AppleScript or
-  `open -a` on the terminal app.
+- ~~Focus that session's terminal~~ — done September 9. The hook client
+  reports `process.ppid` as `notchlight.pid`; `Store` keeps it per session and
+  the snapshot carries `pid`. `Liveness` remembers `claude` and `codex` pids
+  per directory (`pidsFor`) for sessions without hooks. `src/main/terminal.ts`
+  walks the parent chain to the hosting `.app`, selects the tab by tty in
+  Terminal or iTerm2 through AppleScript, and `open`s any other host. IPC
+  `session:focus`; the session panel shows **Jump ↗** / **Answer there ↗**.
+  Codex Desktop opens ChatGPT (`com.openai.chat`); Codex CLI is found by pid
+  in its directory. Keyboard mode is released first so focus lands in the
+  terminal.
 - A tiny tokens-per-second sparkline in the wing, written to the DOM the same
   way the equalizer is.
 

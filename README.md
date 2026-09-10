@@ -59,7 +59,12 @@ which of Claude, Music, and Tray also keep a presence on the resting bar.
 Detailed session information and controls are one hover away.
 
 Hovering unfolds it. One session drops you straight onto its agents, however
-many there are. Several sessions give you a list you click into.
+many there are. Several sessions give you a list you click into. Every session
+panel has **Jump ↗** — **Answer there ↗** while it is asking — which brings the
+terminal that session lives in to the front: Terminal and iTerm2 on the right
+tab, Ghostty, VS Code and the rest as an app. Claude sessions name their
+process through the hooks; without hooks the process table finds the `claude`
+working in the session's directory. Codex Desktop sessions open ChatGPT.
 
 ```
    ┌──────────────────────────────────────────┐
