@@ -4,7 +4,7 @@
  * Hooks and transcripts feed one live store and one notch overlay. The gallery
  * and customization preview are ordinary windows with a shared Dock lifecycle.
  */
-import { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, powerMonitor, shell, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, ClipboardItem as ElectronClipboardItem, globalShortcut, ipcMain, Menu, nativeImage, powerMonitor, shell, Tray } from 'electron';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
@@ -13,6 +13,7 @@ import path from 'node:path';
 import { APP_DIR, config, ensureDir } from './config';
 import { CompanionStore } from './companionStore';
 import { ClipboardStore, SKIPPED_FORMATS, type Pasteboard } from './clipboardStore';
+import { LineHelper, parsePasteboardChange, type PasteboardChange } from './helperProcess';
 import { SpotifyPlayer } from './spotify';
 import { SpotifyWatcher } from './spotifyWatch';
 import { installCompanionIpc } from './companionIpc';
@@ -57,6 +58,7 @@ let gallery: BrowserWindow | null = null;
 let customize: BrowserWindow | null = null;
 let companion: CompanionStore;
 let clips: ClipboardStore;
+let pasteboardWatch: LineHelper<PasteboardChange>;
 let spotify: SpotifyPlayer;
 let watcher: SpotifyWatcher;
 let levels: AudioLevels;
@@ -232,16 +234,31 @@ async function boot(): Promise<void> {
   // os-clipboard format so a password manager's paste is never read.
   const pasteboard: Pasteboard = {
     async availableFormats() {
-      const [text, ...raw] = await Promise.all([clipboard.has('text/plain'), ...SKIPPED_FORMATS.map(f => clipboard.has(`electron application/osclipboard;format="${f}"`).catch(() => false))]);
-      return [...(text ? ['text/plain'] : []), ...SKIPPED_FORMATS.filter((_, i) => raw[i])];
+      const [text, image, ...raw] = await Promise.all([clipboard.has('text/plain'), clipboard.has('image/png'), ...SKIPPED_FORMATS.map(f => clipboard.has(`electron application/osclipboard;format="${f}"`).catch(() => false))]);
+      return [...(text ? ['text/plain'] : []), ...(image ? ['image/png'] : []), ...SKIPPED_FORMATS.filter((_, i) => raw[i])];
     },
     readText: () => clipboard.readText(),
-    writeText: text => clipboard.writeText(text)
+    writeText: text => clipboard.writeText(text),
+    async readImage() {
+      const item = (await clipboard.read()).find(i => i.types.includes('image/png'));
+      if (!item) return null;
+      const blob = await item.getType('image/png') as Blob;
+      const png = Buffer.from(await blob.arrayBuffer());
+      const image = nativeImage.createFromBuffer(png);
+      if (image.isEmpty()) return null;
+      const { width, height } = image.getSize();
+      return { png, width, height, thumb: image.resize({ height: 44 }).toDataURL() };
+    },
+    writeImage: png => clipboard.write([new ElectronClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })])
   };
   clips = new ClipboardStore(path.join(APP_DIR, 'clipboard.json'), pasteboard);
   clips.on('change', state => companion.setClipboard(state));
   await clips.load();
-  const syncClipboard = () => { const p = companion.current().preferences; clips.configure(!DEMO && p.clipboardEnabled, Number(p.clipboardHistorySize)); };
+  // The change-count helper says when the pasteboard moved; without it the store looks every half second.
+  pasteboardWatch = new LineHelper('pasteboardwatch', parsePasteboardChange);
+  pasteboardWatch.on('listening', (listening: boolean) => clips.setWatched(listening));
+  pasteboardWatch.on('event', (change: PasteboardChange) => clips.notifyChange(change));
+  const syncClipboard = () => { const p = companion.current().preferences; const on = !DEMO && p.clipboardEnabled; clips.configure(on, Number(p.clipboardHistorySize)); pasteboardWatch.setActive(on); };
   syncClipboard();
   codex = new CodexAdapter();
   codexApprovals = new CodexApprovals(path.join(APP_DIR,'codex.sock'), () => companion.current().preferences.codexEnabled, () => companion.current().preferences.codexApprovals);
@@ -535,6 +552,7 @@ app.on('before-quit', () => {
   if (shelfTimer) clearInterval(shelfTimer);
   spotify?.stop();
   clips?.stop();
+  pasteboardWatch?.stop();
   watcher?.stop();
   levels?.stop();
   store?.stop();

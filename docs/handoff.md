@@ -99,7 +99,7 @@ below are retained for reference; use this priority order:
 2. Transport feedback (2) and Tray multi-select/recovery (8, 16) landed September 9.
 3. Keyboard access (15) and native lifecycle and energy checks (17) landed September 9.
 4. Identity (18), prebuilt helpers (3) and the packaged app (4) landed September 9; signing and notarization remain.
-5. Clipboard text history (12) landed September 9 as an opt-in face; images remain.
+5. Clipboard history (12), text and images, landed September 9 as an opt-in face.
    Extra players and decorative effects can follow actual demand.
 
 Code review also found that display remeasurement already exists (10), and
@@ -209,7 +209,7 @@ CoreAudio's latency figure for AirPods is an estimate. If the bars still feel
 early or late, add a `levelsOffsetMs` config key in `src/main/config.ts` and
 pass it to `audiotap` as an argument to add to `delayFrames`.
 
-### 12. Clipboard manager (a fourth face) — text history implemented September 9, 2026
+### 12. Clipboard manager (a fourth face) — implemented September 9, 2026
 `src/main/clipboardStore.ts` polls every 500 ms while `clipboardEnabled`
 (off by default), through a `Pasteboard` adapter over Electron 44's
 asynchronous clipboard: `has('electron application/osclipboard;format="…"')`
@@ -227,9 +227,17 @@ is on. Gallery scenarios and `scripts/test-clipboard.mjs` cover the store and
 the skip rules. Verified natively: two `pbcopy`s appeared in the file within
 two seconds, and disabling stopped the poller.
 
-Not yet: images. Plan: `has('image/png')` → `read()` → PNG blob under 2 MB
-as a data URL, compared by a cheap hash of the bytes, never re-encoded on
-every tick; a thumbnail in the list and an `image` kind on the resting bar.
+Images landed the same day: `native/pasteboardwatch.swift` watches
+`NSPasteboard.general.changeCount` four times a second and prints the types
+and a `concealed` flag on change; `LineHelper` in `src/main/helperProcess.ts`
+supervises it (the shape `SpotifyWatcher` could adopt later) and the store
+reads only on its word (`notifyChange`), falling back to the 500 ms look when
+the helper is gone (`setWatched`). An image wins over the text beside it, is
+read once through `clipboard.read()` → `getType('image/png')`, kept as a PNG
+data URL with a 44 px thumbnail from `nativeImage.resize`, deduped by a hash
+of its bytes, capped at 2 MB with the total at 8 MB, and copied back through
+`clipboard.write`. Verified natively: text, a `screencapture -c` image and
+text again all appeared through the watcher.
 
 ### 13. Make real audio levels follow visible resting faces — implemented September 9, 2026
 `wantsLevels()` now bases capture on the surfaces that show bars: the Music

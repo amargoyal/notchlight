@@ -357,18 +357,21 @@ artist stands.
 ## Clipboard history
 
 Off until you switch it on in **Customize → Clipboard**, because it is a
-privacy choice. Once on, a fourth face lists the text you copy, newest first
-with pins on top; click an item to copy it again, pin what you want to keep,
-filter when the list grows, pause capture, and clear the history with or
-without its pins. The resting bar shows a count and the kind of the latest
-item. Text only for now.
+privacy choice. Once on, a fourth face lists what you copy — text, links and
+images — newest first with pins on top; click an item to copy it again, pin
+what you want to keep, filter when the list grows, pause capture, and clear
+the history with or without its pins. Images show a thumbnail and their size.
+The resting bar shows a count and the kind of the latest item.
 
 What it will not do: read anything a password manager or autofill marks as
-concealed or transient, keep items over 20 KB, let the history pass 2 MB, or
-let pins pass 20. Nothing leaves the Mac — the history is
-`~/.notchlight/clipboard.json`, readable by you alone. macOS has no clipboard
-change event, so while the history is on the app looks at the pasteboard's
-types every half second and reads text only when they changed.
+concealed or transient, keep text over 20 KB or an image over 2 MB, let the
+history pass 8 MB, or let pins pass 20. Nothing leaves the Mac — the history
+is `~/.notchlight/clipboard.json`, readable by you alone. macOS has no
+clipboard change event, so a fourth helper (`native/pasteboardwatch.swift`)
+watches the pasteboard's change count four times a second and says when it
+moved and which types it holds; the app reads only then, and an image is never
+re-read while the pasteboard has not changed. Without the helper it falls back
+to looking at the types every half second.
 
 ## Live companion and design preview
 

@@ -8,16 +8,19 @@ import { pathToFileURL } from 'node:url';
 const root = await mkdtemp(path.join(os.tmpdir(), 'notchlight-clipboard-'));
 try {
   await build({ entryPoints: ['src/main/clipboardStore.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
-  const { ClipboardStore, toItem, MAX_PINNED, MAX_TEXT_BYTES, SKIPPED_FORMATS } = await import(pathToFileURL(path.join(root, 'clipboardStore.js')).href);
+  const { ClipboardStore, toItem, MAX_PINNED, MAX_TEXT_BYTES, MAX_IMAGE_BYTES, SKIPPED_FORMATS } = await import(pathToFileURL(path.join(root, 'clipboardStore.js')).href);
 
   /** A pasteboard the test controls: what is on it, and what marks it carries. */
-  const board = { text: '', formats: [], writes: [] };
+  const board = { text: '', image: null, formats: [], writes: [], imageReads: 0 };
   const pasteboard = {
-    availableFormats: async () => [...board.formats, ...(board.text ? ['text/plain'] : [])],
+    availableFormats: async () => [...board.formats, ...(board.text ? ['text/plain'] : []), ...(board.image ? ['image/png'] : [])],
     readText: async () => board.text,
-    writeText: async text => { board.writes.push(text); board.text = text; board.formats = []; }
+    writeText: async text => { board.writes.push(text); board.text = text; board.image = null; board.formats = []; },
+    readImage: async () => { board.imageReads++; return board.image; },
+    writeImage: async png => { board.writes.push(png); board.image = { png, width: 1, height: 1, thumb: 'data:,thumb' }; board.text = ''; board.formats = []; }
   };
-  const put = (text, ...formats) => { board.text = text; board.formats = formats; };
+  const put = (text, ...formats) => { board.text = text; board.image = null; board.formats = formats; };
+  const putImage = (bytes, width = 640, height = 480) => { board.image = { png: Buffer.alloc(bytes, bytes % 251), width, height, thumb: 'data:image/png;base64,thumb' }; board.text = 'alt text that comes with the picture'; board.formats = []; };
   const file = path.join(root, 'state', 'clipboard.json');
   const store = new ClipboardStore(file, pasteboard, 5);
   const changes = [];
@@ -103,6 +106,46 @@ try {
   assert.deepEqual(again.current().items.map(i => i.text), ['kept on disk'], 'history survives a restart');
   assert.equal(JSON.parse(await readFile(file, 'utf8')).items.length, 1);
 
+  // Images: preferred over the text that rides along, kept as PNG with a thumbnail, deduped by bytes, capped, and never re-read while unchanged.
+  const pics = new ClipboardStore(path.join(root, 'state', 'pics.json'), pasteboard, 5);
+  await pics.load();
+  pics.setWatched(true);
+  pics.configure(true, 20);
+  await new Promise(r => setTimeout(r, 10));
+  putImage(1000);
+  pics.notifyChange({ types: ['public.png'], concealed: false });
+  await new Promise(r => setTimeout(r, 10));
+  assert.equal(pics.current().items[0]?.kind, 'image', 'an image wins over the text beside it');
+  assert.equal(pics.current().items[0].preview, '640×480 image');
+  assert.equal(pics.current().items[0].thumb, 'data:image/png;base64,thumb');
+  assert.ok(pics.current().items[0].data.startsWith('data:image/png;base64,'));
+  const reads = board.imageReads;
+  await pics.poll(); await pics.poll();
+  assert.equal(board.imageReads, reads + 2, 'a poll looks again…');
+  assert.equal(pics.current().items.length, 1, '…but the same bytes are not remembered twice');
+  putImage(MAX_IMAGE_BYTES + 1);
+  pics.notifyChange({ types: ['public.png'], concealed: false });
+  await new Promise(r => setTimeout(r, 10));
+  assert.equal(pics.current().items.length, 1, 'an oversized image is skipped');
+  pics.notifyChange({ types: ['public.png'], concealed: true });
+  await new Promise(r => setTimeout(r, 10));
+  assert.equal(board.imageReads, reads + 3, 'a concealed change is never read');
+  const picture = pics.current().items[0];
+  await pics.copy(picture.id);
+  assert.ok(Buffer.isBuffer(board.writes.at(-1)) && board.writes.at(-1).length === 1000, 'copying an image back writes its PNG');
+  await pics.poll();
+  assert.equal(pics.current().items.length, 1, 'the write-back is ignored');
+  put('text after picture');
+  pics.notifyChange({ types: ['public.utf8-plain-text'], concealed: false });
+  await new Promise(r => setTimeout(r, 10));
+  assert.deepEqual(pics.current().items.map(i => i.kind), ['text', 'image']);
+  const reopened = new ClipboardStore(path.join(root, 'state', 'pics.json'), pasteboard, 5);
+  await reopened.load();
+  assert.equal(reopened.current().items.find(i => i.kind === 'image')?.bytes, 1000, 'images survive a restart with their size known');
+  assert.equal(pics.timer, null, 'no interval while the change-count helper is listening');
+  pics.setWatched(false);
+  assert.notEqual(pics.timer, null, 'the interval returns when the helper is gone');
+  pics.stop();
   const url = toItem('https://example.com/path?q=1');
   assert.equal(url.kind, 'url'); assert.equal(url.host, 'example.com');
   assert.equal(toItem('not a url').kind, 'text');
@@ -110,5 +153,5 @@ try {
   assert.equal(long.lines, 3);
   assert.ok(long.preview.length <= 140 && long.preview.startsWith('line one line two'));
   assert.ok(changes.length > 5, 'changes are published');
-  console.log('Clipboard checks passed: capture from enable, dedupe, concealed/transient/blank/oversized skipped, copy back ignored, pause, caps, pins, clear, permissions, persistence.');
+  console.log('Clipboard checks passed: images with thumbnails, change-count driven reads, capture from enable, dedupe, concealed/transient/blank/oversized skipped, copy back ignored, pause, caps, pins, clear, permissions, persistence.');
 } finally { await rm(root, { recursive: true, force: true }); }
