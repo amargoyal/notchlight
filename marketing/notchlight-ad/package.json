@@ -1,0 +1,19 @@
+{
+  "name": "notchlight-film",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "preview": "python3 -m http.server 4177 --bind 127.0.0.1",
+    "review": "node render.mjs --review",
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "playwright": "^1.58.0"
+  }
+}

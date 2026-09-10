@@ -1,0 +1,78 @@
+[
+  {
+    "seconds": 0.32,
+    "effect": "Three quiet keyboard ticks"
+  },
+  {
+    "seconds": 1.05,
+    "effect": "Notch wakes: muted tap"
+  },
+  {
+    "seconds": 2.15,
+    "effect": "Hero unfold: soft air movement"
+  },
+  {
+    "seconds": 4.8,
+    "effect": "Attention: gentle two-part signal"
+  },
+  {
+    "seconds": 6.1,
+    "effect": "Open approval: tactile click"
+  },
+  {
+    "seconds": 8.75,
+    "effect": "Allow once: click and warm confirmation"
+  },
+  {
+    "seconds": 11.25,
+    "effect": "Music tab"
+  },
+  {
+    "seconds": 13.5,
+    "effect": "Pause"
+  },
+  {
+    "seconds": 14.6,
+    "effect": "Play"
+  },
+  {
+    "seconds": 15.65,
+    "effect": "Volume: three ascending wheel ticks"
+  },
+  {
+    "seconds": 17.8,
+    "effect": "Fold to resting notch"
+  },
+  {
+    "seconds": 18.85,
+    "effect": "File lifted"
+  },
+  {
+    "seconds": 19.6,
+    "effect": "File carry: subtle air"
+  },
+  {
+    "seconds": 20.3,
+    "effect": "Tray unfolds"
+  },
+  {
+    "seconds": 21.6,
+    "effect": "File lands: soft felt thud"
+  },
+  {
+    "seconds": 24.1,
+    "effect": "Clipboard tab"
+  },
+  {
+    "seconds": 26.65,
+    "effect": "Copied: light pop"
+  },
+  {
+    "seconds": 29.2,
+    "effect": "Everything folds away"
+  },
+  {
+    "seconds": 31.2,
+    "effect": "Wordmark: soft resonant settle"
+  }
+]
