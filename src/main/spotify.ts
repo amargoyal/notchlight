@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import { EMPTY_SPOTIFY, type SpotifySnapshot, type SpotifyCommand } from '../shared/companion';
+import { logEvent } from './lifecycle';
 
 const execute = promisify(execFile);
 export type SpotifyRunner = (command: string, position?: number) => Promise<unknown>;
@@ -77,9 +78,13 @@ export class SpotifyPlayer extends EventEmitter {
   private generation = 0;
   private artists = new Map<string, string | undefined>();
   private pendingArtists = new Set<string>();
+  private suspended = false;
   constructor(private run: SpotifyRunner = runSpotify, private lookup: ArtistLookup = fetchArtists) { super(); }
   current() { return this.state; }
-  private publish(state: SpotifySnapshot) { this.state = state; this.emit('change', state); }
+  private publish(state: SpotifySnapshot) {
+    if (state.status !== this.state.status) logEvent('spotify', `status ${this.state.status} → ${state.status}`);
+    this.state = state; this.emit('change', state);
+  }
   setEnabled(enabled: boolean): void {
     this.enabled = enabled; this.generation++;
     if (this.timer) clearInterval(this.timer);
@@ -87,7 +92,29 @@ export class SpotifyPlayer extends EventEmitter {
     if (!enabled) { this.publish({ ...EMPTY_SPOTIFY }); return; }
     this.publish({ ...EMPTY_SPOTIFY, status: 'empty', busy: true, message: 'Connecting to Spotify…' });
     void this.poll();
-    this.timer = setInterval(() => { if (!['permission', 'error'].includes(this.state.status)) void this.poll(); }, 2500);
+    this.timer = setInterval(() => { if (!this.suspended && !['permission', 'error'].includes(this.state.status)) void this.poll(); }, 2500);
+  }
+  /**
+   * The Mac is going to sleep. Every poll spawns osascript, and a poll that
+   * starts as the lid closes tends to time out and read as an error, which
+   * would stop the timer for good. Hold the polls instead and pick up on wake.
+   */
+  suspend(): void {
+    if (this.suspended) return;
+    this.suspended = true;
+    logEvent('spotify', 'polling suspended');
+  }
+  /** Back from sleep: read immediately rather than waiting out the interval. */
+  resume(): void {
+    if (!this.suspended) return;
+    this.suspended = false;
+    logEvent('spotify', 'polling resumed');
+    this.refresh();
+  }
+  /** One status read now, outside the interval. A no-op while disabled or asleep. */
+  refresh(): void {
+    if (!this.enabled || this.suspended) return;
+    void this.poll();
   }
   private async poll(): Promise<void> {
     if (!this.enabled || this.polling) return;
