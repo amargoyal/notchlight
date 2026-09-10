@@ -96,7 +96,7 @@ an optional future expansion, not the next milestone. Existing item numbers
 below are retained for reference; use this priority order:
 
 1. Resting-wing capture eligibility (13) and Spotify/capture recovery (14) landed September 9.
-2. Improve transport feedback (2) and Tray multi-select/recovery (8, 16).
+2. Tray multi-select/recovery (8, 16). Transport feedback (2) landed September 9.
 3. Add keyboard access (15). Native lifecycle and energy checks (17) landed September 9.
 4. Apply the selected Notchlight identity and prepare distribution (18, 3–4).
 5. Consider clipboard history (12) as an opt-in feature after those foundations.
@@ -124,17 +124,18 @@ Revisit for a wider audience. Options, in order of preference:
 - The customize window's Music section needs a player picker or auto-detect
   (whichever app is playing).
 
-### 2. Faster play/pause feedback
-`SpotifyPlayer.enqueue()` already publishes the snapshot returned by a transport
-command immediately. The 2.5 s interval affects passive updates, including
-actions taken inside Spotify; it does not by itself explain slow in-app clicks.
-Measure command queue wait and JXA response time before choosing a fix.
-If optimistic feedback is needed, reconcile or roll it back on failure. Another
-candidate is Spotify's distributed notification
-`com.spotify.client.PlaybackStateChanged` from a small helper (or from
-`audiotap` itself, which already runs a run loop) and poll immediately on it.
-Also interpolate `position` between polls while playing so the seek bar and
-times tick instead of jumping every 2.5 s.
+### 2. Faster play/pause feedback — implemented September 9, 2026
+Measured: one JXA status read takes about 220 ms. `native/spotifywatch.swift`
+listens for `com.spotify.client.PlaybackStateChanged` (state, track id,
+position, duration, name, artist, album — not artwork) and prints one JSON
+line per change; `SpotifyWatcher` in `src/main/spotifyWatch.ts` supervises it
+with the helpers' shared builder (`src/main/helpers.ts`). `SpotifyPlayer.
+onExternalChange` applies the change at once and refreshes for artwork;
+`setPollInterval` drops the polls to 10 s while the watcher listens.
+Snapshots carry `at`, and `playhead()` in `src/shared/companion.ts` lets the
+renderer advance the seek bar four times a second between reads. Play/pause
+shows its expected state on click and the following read confirms it.
+Helper transport commands were already published immediately.
 
 ### 3. Prebuilt helpers
 `audiotap` and `notchprobe` compile at runtime and need Xcode command line

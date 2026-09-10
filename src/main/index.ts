@@ -12,6 +12,7 @@ import path from 'node:path';
 import { APP_DIR, config, ensureDir } from './config';
 import { CompanionStore } from './companionStore';
 import { SpotifyPlayer } from './spotify';
+import { SpotifyWatcher } from './spotifyWatch';
 import { installCompanionIpc } from './companionIpc';
 import { AudioLevels, wantsLevels } from './audioLevels';
 import { DemoStore } from './demo';
@@ -52,6 +53,7 @@ let gallery: BrowserWindow | null = null;
 let customize: BrowserWindow | null = null;
 let companion: CompanionStore;
 let spotify: SpotifyPlayer;
+let watcher: SpotifyWatcher;
 let levels: AudioLevels;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
@@ -244,6 +246,10 @@ async function boot(): Promise<void> {
   const claude = DEMO ? new DemoStore() : new Store();
   companion = new CompanionStore(path.join(APP_DIR, 'companion.json'), async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(), config().pulse);
   spotify = new SpotifyPlayer();
+  watcher = new SpotifyWatcher();
+  watcher.on('change', change => spotify.onExternalChange(change));
+  // With instant word of every change, the polls are only a safety net.
+  watcher.on('listening', (listening: boolean) => spotify.setPollInterval(listening ? 10_000 : 2_500));
   levels = new AudioLevels();
   levels.on('levels', (bands: number[]) => {
     send(notch?.win ?? null, 'music:levels', bands);
@@ -279,6 +285,7 @@ async function boot(): Promise<void> {
     if (state.preferences.spotifyEnabled !== spotifyEnabled) {
       spotifyEnabled = state.preferences.spotifyEnabled;
       spotify.setEnabled(spotifyEnabled);
+      watcher.setActive(spotifyEnabled && !DEMO);
     }
   });
   ipcMain.handle('snapshot:get', event => {
@@ -289,7 +296,7 @@ async function boot(): Promise<void> {
   pickFiles = installCompanionIpc(companion, spotify,
     win => !!win && (win === customize || win === notch?.win),
     () => { openCustomize(); return customize!; });
-  if (spotifyEnabled) spotify.setEnabled(true);
+  if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);
 
   const hover = new Hover((open) => send(notch?.win ?? null, 'open', open));
@@ -444,6 +451,7 @@ app.on('before-quit', () => {
   logEvent('notchlight', 'quitting');
   if (shelfTimer) clearInterval(shelfTimer);
   spotify?.stop();
+  watcher?.stop();
   levels?.stop();
   store?.stop();
   hooks?.stop();

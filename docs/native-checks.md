@@ -28,6 +28,7 @@ record row `measure` prints into the table at the end.
 | Sleep / wake | close the lid for a minute, open it | `power suspend`, `spotify polling suspended`, then `power resume`, `display change: resume`, `display settled on …`, `spotify polling resumed`, `spotify status` unchanged or `not-running → ready` | island on the cutout, Spotify state current within three seconds, no second island |
 | Lock / unlock | Control-Command-Q, unlock | `power lock-screen` … `power unlock-screen`; `levels listening → idle` on lock if the helper was running, a new `helper start` after unlock only if bars are wanted | bars resume only while Music is showing and playing |
 | Spotify quit / relaunch | quit Spotify, wait, open it again | `spotify status ready → not-running`, then `not-running → ready` on relaunch without a reconnect | music wing disappears and returns |
+| Change inside Spotify | press play/pause and skip in Spotify's own window | nothing new (`spotify watcher listening` should already be there from startup) | the notch follows within a frame, not after the next poll |
 | Output switch | put AirPods on, take them off | `levels helper exit 0 while listening`, `helper start #n` about a second later, once per switch | bars pause briefly and continue in time with the new output |
 | Display change | plug in or unplug an external display; change the built-in scaling | one `display change:` line, then `display settled on <id> WxH@scale after N events` | island on the notched display, wings anchored to the cutout |
 | Not a display change | start and pause Spotify with the bars showing | `display change:` then `display unchanged after N events; kept` — no `settled` line, no probe | nothing moves |
@@ -54,6 +55,7 @@ working Claude session on the resting bar):
 | 2026-09-09 | playing, real bars on the resting bar, Agents selected, 70 ms transition per write | 22s | 45.0% | 484 MB | 1 / 0 | 0 | ok |
 | 2026-09-09 | playing, real bars, no transition, 30 fps helper | 20s | 23.6% | 472 MB | 1 / 0 | 0 | ok |
 | 2026-09-09 | playing, real bars, 24 fps helper | 20s | 23.1% | 423 MB | 1 / 0 | 0 | ok |
+| 2026-09-09 | idle, Spotify watcher listening, polls every 10 s | 20s | 10.1% | 413 MB | 0 / 0 | 0 | ok |
 
 What the numbers say:
 

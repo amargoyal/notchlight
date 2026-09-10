@@ -314,6 +314,14 @@ on its own, so allowing it a minute later takes effect without a reconnect. A
 Spotify read that fails is retried after 5, 10, 20, 40 and then 60 seconds
 rather than stopping; only a permission denial waits for you.
 
+A click inside Spotify shows on the notch at once. A third helper,
+`native/spotifywatch.swift`, listens for Spotify's own playback notification
+and hands the app the new state, position and track name the moment they
+change; the full read that follows fills in artwork. While it listens, the
+scripting polls relax to one every ten seconds. The seek bar and times tick
+between reads rather than jumping, and play/pause shows its new state the
+moment you click it.
+
 Spotify's scripting dictionary names only the lead artist. Notchlight asks
 the track's public page once per track for the full credit, so a collaboration
 reads "Internet Money, Lil Tecca" rather than a solo record. Offline, the lead

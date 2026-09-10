@@ -39,11 +39,19 @@ export interface SpotifySnapshot {
   status: 'disconnected' | 'not-running' | 'ready' | 'empty' | 'permission' | 'error';
   playing: boolean;
   position: number;
+  /** When `position` was read (ms since epoch), so the renderer can let it advance between reads. */
+  at: number;
   track: MusicTrack | null;
   busy: boolean;
   message?: string;
 }
-export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', playing: false, position: 0, track: null, busy: false };
+export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', playing: false, position: 0, at: 0, track: null, busy: false };
+/** Where playback is now, given the last read and the clock. Paused stays put; nothing runs past the end. */
+export function playhead(music: SpotifySnapshot, now: number): number {
+  if (!music.track) return 0;
+  const elapsed = music.playing && music.at ? Math.max(0, now - music.at) / 1000 : 0;
+  return Math.min(music.track.duration, music.position + elapsed);
+}
 /**
  * Audio capture, separately from the Spotify connection. Track metadata and
  * transport come over Apple Events; the bars come from a Core Audio tap that

@@ -201,7 +201,7 @@ switch (cmd) {
       const tree = spawnSync('ps', ['-Ao', 'pid=,ppid=,%cpu=,rss=,comm='], { encoding: 'utf8' }).stdout.split('\n')
         .map(line => /^\s*(\d+)\s+(\d+)\s+([\d.]+)\s+(\d+)\s+(.*)$/.exec(line)).filter(Boolean)
         .filter(m => m[2] === pid).map(m => ({ pid: m[1], cpu: Number(m[3]), rss: Math.round(Number(m[4]) / 1024), comm: m[5].trim() }));
-      for (const child of tree) console.log(`  ${child.comm.endsWith('audiotap') ? 'audiotap' : /Renderer/.test(child.comm) ? 'renderer' : /osascript/.test(child.comm) ? 'osascript' : 'helper'} pid ${child.pid} · ${child.cpu.toFixed(1)}% · ${child.rss} MB`);
+      for (const child of tree) console.log(`  ${child.comm.endsWith('audiotap') ? 'audiotap' : child.comm.endsWith('spotifywatch') ? 'spotifywatch' : /Renderer/.test(child.comm) ? 'renderer' : /osascript/.test(child.comm) ? 'osascript' : 'helper'} pid ${child.pid} · ${child.cpu.toFixed(1)}% · ${child.rss} MB`);
     }
     console.log('log ' + LOG);
     console.log('`node scripts/native-check.mjs measure` samples CPU over an interval.');
