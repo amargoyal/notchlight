@@ -110,19 +110,21 @@ This review adds work to the backlog; it does not implement the proposed fixes.
 
 ## Backlog (stable item numbers)
 
-### 1. Apple Music and other players (deferred)
-Only Spotify is supported, matching the owner's current player preference.
-Revisit for a wider audience. Options, in order of preference:
-- Apple Music has a scripting dictionary like Spotify's (`Application('Music')`,
-  `currentTrack`, `playerState`, `playerPosition`, `artwork`). Add a second
-  runner beside `native/spotify.js` and a `player` field on the snapshot.
-  Artwork comes as raw image data, not a URL; convert to a data URL in main.
-- The audio tap already works per process. Pass the bundle id into
-  `audiotap` as an argument instead of hard-coding `com.spotify.client`.
-- MediaRemote (system Now Playing) would cover every player at once but is
-  a private framework and broke for third parties in macOS 15.4. Avoid.
-- The customize window's Music section needs a player picker or auto-detect
-  (whichever app is playing).
+### 1. Apple Music and other players — Apple Music implemented September 9, 2026
+`musicPlayer: 'spotify' | 'apple' | 'auto'` (default Spotify). `native/music.js`
+mirrors `spotify.js` over `Application('com.apple.Music')` with durations in
+ms and `music:<persistentID>` ids; `native/music-artwork.applescript` writes
+the current sleeve to `~/.notchlight/cache/apple-artwork`, and
+`src/main/appleArtwork.ts` shrinks it to a 176 px PNG data URL
+(`validArtwork` accepts the app's own PNG data URLs). `SpotifyPlayer.setPlayer`
+picks the runner; auto tries the other app on a `not-running` status and
+stays with whichever answers. `audiotap --bundle` taps the chosen app and the
+tap restarts on a player change; `spotifywatch` also hears
+`com.apple.Music.playerInfo`. The full-credit lookup applies to Spotify only.
+Exercised natively only as far as the scripts (Music opened with an empty
+library: `empty`, then `not-running` after quit); the owner uses Spotify, so
+an end-to-end Apple Music run with a playing track is still to be done.
+MediaRemote remains avoided. Other players would follow the same shape.
 
 ### 2. Faster play/pause feedback — implemented September 9, 2026
 Measured: one JXA status read takes about 220 ms. `native/spotifywatch.swift`
