@@ -16,6 +16,7 @@ import { ClipboardStore, SKIPPED_FORMATS, type Pasteboard } from './clipboardSto
 import { LineHelper, parsePasteboardChange, type PasteboardChange } from './helperProcess';
 import { SpotifyPlayer } from './spotify';
 import { SpotifyWatcher } from './spotifyWatch';
+import { fetchTint } from './tint';
 import { installCompanionIpc } from './companionIpc';
 import { AudioLevels, wantsLevels } from './audioLevels';
 import { DemoStore } from './demo';
@@ -217,7 +218,7 @@ async function boot(): Promise<void> {
   const claude = DEMO ? new DemoStore() : new Store();
   claudeStore = DEMO ? null : claude as Store;
   companion = new CompanionStore(path.join(APP_DIR, 'companion.json'), async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(), config().pulse);
-  spotify = new SpotifyPlayer();
+  spotify = new SpotifyPlayer(undefined, undefined, undefined, fetchTint);
   watcher = new SpotifyWatcher();
   watcher.on('change', change => spotify.onExternalChange(change));
   // With instant word of every change, the polls are only a safety net.

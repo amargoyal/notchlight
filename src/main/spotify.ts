@@ -39,6 +39,8 @@ export function validArtwork(value: string): string | undefined {
  * Best effort — offline, throttled, or oddly shaped, the lead artist stands.
  */
 export type ArtistLookup = (trackId: string) => Promise<string | undefined>;
+/** The artwork's colour, for a glow behind the bars. Best effort, cached per artwork URL. */
+export type TintLookup = (artworkUrl: string) => Promise<string | null>;
 const decode = (v: string) => v.replace(/&amp;/g, '&').replace(/&#39;/g, '\'').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#x27;/g, '\'');
 export function artistsFromPage(html: string): string | undefined {
   const meta = /<meta\s+(?:name|property)="music:musician_description"\s+content="([^"]*)"/.exec(html)?.[1]
@@ -84,7 +86,9 @@ export class SpotifyPlayer extends EventEmitter {
   /** Consecutive failed reads. Drives the retry delay and resets on the first good one. */
   private failures = 0;
   private retryAt = 0;
-  constructor(private run: SpotifyRunner = runSpotify, private lookup: ArtistLookup = fetchArtists, private interval = 2500) { super(); }
+  private tints = new Map<string, string | null>();
+  private pendingTints = new Set<string>();
+  constructor(private run: SpotifyRunner = runSpotify, private lookup: ArtistLookup = fetchArtists, private interval = 2500, private tint: TintLookup = async () => null) { super(); }
   /**
    * How often to read while nothing else says a change happened. With the
    * watcher listening a slow heartbeat is enough — every read spawns osascript
@@ -108,7 +112,7 @@ export class SpotifyPlayer extends EventEmitter {
     const current = this.state;
     if (current.status === 'ready' && current.track) {
       const sameTrack = !change.trackId || change.trackId === current.track.id;
-      const track = sameTrack ? current.track : { ...current.track, id: change.trackId!, title: change.title || 'Untitled track', artist: change.artist ?? '', album: change.album ?? '', duration: change.durationMs !== undefined ? change.durationMs / 1000 : current.track.duration, artwork: undefined };
+      const track = sameTrack ? current.track : { ...current.track, id: change.trackId!, title: change.title || 'Untitled track', artist: change.artist ?? '', album: change.album ?? '', duration: change.durationMs !== undefined ? change.durationMs / 1000 : current.track.duration, artwork: undefined, tint: undefined };
       const position = change.position !== undefined ? Math.min(change.position, track.duration) : sameTrack ? current.position : 0;
       this.publish({ ...current, playing: change.playing, position, at: Date.now(), track, busy: false });
     }
@@ -198,10 +202,31 @@ export class SpotifyPlayer extends EventEmitter {
       }
       if (this.failures) logEvent('spotify', `recovered after ${this.failures} failed read${this.failures === 1 ? '' : 's'}`);
       this.failures = 0;
-      this.publish(this.withArtists(next));
+      this.publish(this.withTint(this.withArtists(next)));
     });
     this.queue = work.catch(() => {});
     return work;
+  }
+  /** Attach the artwork's colour when known; otherwise start finding it. Missing artwork means no tint. */
+  private withTint(state: SpotifySnapshot): SpotifySnapshot {
+    const artwork = state.track?.artwork;
+    if (!state.track || !artwork) return state;
+    if (this.tints.has(artwork)) {
+      const tint = this.tints.get(artwork);
+      return tint ? { ...state, track: { ...state.track, tint } } : state;
+    }
+    if (!this.pendingTints.has(artwork)) {
+      this.pendingTints.add(artwork);
+      const generation = this.generation;
+      void this.tint(artwork).catch(() => null).then(tint => {
+        this.pendingTints.delete(artwork);
+        const usable = typeof tint === 'string' && /^#[0-9a-f]{6}$/i.test(tint) ? tint : null;
+        this.tints.set(artwork, usable);
+        if (this.tints.size > 60) this.tints.delete(this.tints.keys().next().value!);
+        if (usable && this.enabled && generation === this.generation && this.state.track?.artwork === artwork) this.publish({ ...this.state, track: { ...this.state.track, tint: usable } });
+      });
+    }
+    return state;
   }
   /** Swap in the full credit when known; otherwise start finding it and keep the lead for now. */
   private withArtists(state: SpotifySnapshot): SpotifySnapshot {
