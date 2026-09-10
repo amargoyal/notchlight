@@ -2,26 +2,21 @@
  * Real levels for the music wing.
  *
  * A Swift helper taps Spotify's own audio output through Core Audio and streams
- * five band levels a few dozen times a second. It is compiled on first use into
- * ~/.notchlight/bin, the same way the notch probe is, and runs only while
- * something is actually playing and the bars are on screen.
+ * five band levels a couple of dozen times a second. It is compiled on first
+ * use into ~/.notchlight/bin (see helpers.ts) and runs only while something is
+ * actually playing and the bars are on screen.
  *
  * Everything here degrades quietly. No swiftc, an older macOS, a refused audio
  * capture prompt, Spotify playing to another room — the bars fall back to their
  * gentle canned rhythm and nothing else changes.
  */
 import { EventEmitter } from 'node:events';
-import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
+import { spawn, type ChildProcess } from 'node:child_process';
 import readline from 'node:readline';
-import { APP_DIR, ensureDir } from './config';
+import { ensureHelper } from './helpers';
 import { logEvent } from './lifecycle';
 
-const BIN = path.join(APP_DIR, 'bin', 'audiotap');
 const BARS = 5;
-/** dist/main/index.js → ../../native/audiotap.swift */
-const source = () => path.join(__dirname, '..', '..', 'native', 'audiotap.swift');
 
 export type AudioLevelsStatus = 'idle' | 'starting' | 'listening' | 'unavailable';
 /**
@@ -42,19 +37,6 @@ export function captureReason(head: string | undefined): AudioLevelsReason {
   return 'failed';
 }
 
-function compile(): Promise<string | null> {
-  return new Promise(resolve => {
-    const SOURCE = source();
-    try {
-      if (!fs.existsSync(SOURCE)) return resolve(null);
-      if (fs.existsSync(BIN) && fs.statSync(BIN).mtimeMs > fs.statSync(SOURCE).mtimeMs) return resolve(BIN);
-      ensureDir();
-      fs.mkdirSync(path.dirname(BIN), { recursive: true });
-    } catch { return resolve(null); }
-    execFile('swiftc', ['-O', '-o', BIN, SOURCE], { timeout: 120_000 }, error => resolve(error ? null : BIN));
-  });
-}
-
 export class AudioLevels extends EventEmitter {
   private child: ChildProcess | null = null;
   private wanted = false;
@@ -67,7 +49,7 @@ export class AudioLevels extends EventEmitter {
   reason: AudioLevelsReason | null = null;
   /** Helper processes spawned so far. The native checks watch this stay flat while nothing changes. */
   starts = 0;
-  constructor(private locate: () => Promise<string | null> = compile) { super(); }
+  constructor(private locate: () => Promise<string | null> = () => ensureHelper('audiotap')) { super(); }
 
   /** Start or stop listening. Safe to call on every state change; it only acts on the edges. */
   setActive(active: boolean): void {
