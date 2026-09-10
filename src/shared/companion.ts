@@ -89,18 +89,24 @@ export function describeCapture(capture: CaptureSnapshot, music: SpotifySnapshot
     default: return music.status === 'ready' && music.playing ? 'Capture starts when the bars are on screen.' : 'Capture runs only while Spotify plays and the bars are showing.';
   }
 }
-/** One thing that was copied. Text only for now; images come later. */
+/** One thing that was copied: text, a URL, or an image. */
 export interface ClipboardItem {
   id: string;
-  kind: 'text' | 'url';
+  kind: 'text' | 'url' | 'image';
+  /** The text itself; empty for an image. */
   text: string;
-  /** First line, whitespace folded, for the list. */
+  /** First line, whitespace folded, for the list; "W×H image" for an image. */
   preview: string;
   host?: string;
   lines: number;
   bytes: number;
   at: number;
   pinned: boolean;
+  /** Image only: the PNG as a data URL, a small thumbnail, and its size. */
+  data?: string;
+  thumb?: string;
+  width?: number;
+  height?: number;
 }
 export interface ClipboardSnapshot {
   enabled: boolean;
