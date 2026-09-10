@@ -354,6 +354,22 @@ reads "Internet Money, Lil Tecca" rather than a solo record. Offline, the lead
 artist stands.
 
 
+## Clipboard history
+
+Off until you switch it on in **Customize → Clipboard**, because it is a
+privacy choice. Once on, a fourth face lists the text you copy, newest first
+with pins on top; click an item to copy it again, pin what you want to keep,
+filter when the list grows, pause capture, and clear the history with or
+without its pins. The resting bar shows a count and the kind of the latest
+item. Text only for now.
+
+What it will not do: read anything a password manager or autofill marks as
+concealed or transient, keep items over 20 KB, let the history pass 2 MB, or
+let pins pass 20. Nothing leaves the Mac — the history is
+`~/.notchlight/clipboard.json`, readable by you alone. macOS has no clipboard
+change event, so while the history is on the app looks at the pasteboard's
+types every half second and reads text only when they changed.
+
 ## Live companion and design preview
 
 Run `npm run customize` or choose **Customize Notchlight…** from the menu bar
