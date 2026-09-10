@@ -66,13 +66,15 @@ function seconds(cputime) {
   return cputime.split(':').reduce((total, part) => total * 60 + Number(part), 0);
 }
 
-function role(row) {
-  const args = spawnSync('ps', ['-o', 'args=', '-p', String(row.pid)], { encoding: 'utf8' }).stdout;
-  const type = /--type=([a-z-]+)/.exec(args)?.[1];
+function role(row, root) {
   if (row.comm.endsWith('/audiotap')) return 'audiotap';
   if (row.comm.endsWith('/notchprobe')) return 'notchprobe';
   if (/osascript$/.test(row.comm)) return 'osascript';
-  if (!type) return 'main';
+  if (row.pid === root) return 'main';
+  const args = spawnSync('ps', ['-o', 'args=', '-p', String(row.pid)], { encoding: 'utf8' }).stdout;
+  const type = /--type=([a-z-]+)/.exec(args)?.[1];
+  // Gone before we could ask: a short-lived child such as ps, lsof or swiftc.
+  if (!type) return path.basename(row.comm) || 'transient';
   if (type === 'utility') return /utility-sub-type=([a-z.]+)/.exec(args)?.[1]?.split('.')[0] ?? 'utility';
   return type;
 }
@@ -126,7 +128,7 @@ async function measure() {
     let rss = 0;
     for (const row of tree.values()) {
       rss += row.rss;
-      if (!seen.has(row.pid)) seen.set(row.pid, { ...row, role: role(row), first: row.cpu });
+      if (!seen.has(row.pid)) seen.set(row.pid, { ...row, role: role(row, pid), first: row.cpu });
       seen.get(row.pid).last = row.cpu;
       if (row.comm.endsWith('/audiotap')) helpers.add(row.pid);
     }
