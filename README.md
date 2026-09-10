@@ -340,6 +340,11 @@ on its own, so allowing it a minute later takes effect without a reconnect. A
 Spotify read that fails is retried after 5, 10, 20, 40 and then 60 seconds
 rather than stopping; only a permission denial waits for you.
 
+Scroll over the music wing — the artwork or the bars, resting or expanded —
+to turn Spotify's own volume in steps of five; the level shows in place of
+the bars for a second and goes out as one command once the wheel rests.
+Spotify rounds what it is given, so 93 may read back as 92.
+
 A click inside Spotify shows on the notch at once. A third helper,
 `native/spotifywatch.swift`, listens for Spotify's own playback notification
 and hands the app the new state, position and track name the moment they

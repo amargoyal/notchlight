@@ -172,10 +172,14 @@ Bars run bass → treble left to right. Many notch players mirror them
 `audiotap.swift` to three bands and mirror them in the renderer, or mirror the
 five as-is. Worth an A/B in the gallery first.
 
-### 7. Volume from the wing
-Spotify exposes `soundVolume` in its dictionary. Scroll wheel over the music
-wing adjusts it; show a brief level in place of the equalizer. Add a `volume`
-command to `native/spotify.js` and `SpotifyPlayer.command`.
+### 7. Volume from the wing — implemented September 9, 2026
+`native/spotify.js` reports `soundVolume` on every status and takes a
+`volume` command; `SpotifyPlayer.command('volume', n)` clamps to 0–100 and
+does not raise `busy`. `useVolumeWheel` in `LiveCompanion.tsx` accumulates
+wheel ticks into steps of five, shows a `VolumeReadout` in place of the bars
+for about a second, and sends one command 160 ms after the wheel rests.
+Works on the resting music part and on the Music face's wings. Spotify
+rounds: setting 93 reads back 92.
 
 ### 8. Tray improvements
 - ~~Multi-select and drag several files out at once~~ — done September 9
