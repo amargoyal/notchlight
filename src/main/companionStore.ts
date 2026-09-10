@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_COMPANION_PREFERENCES, EMPTY_SPOTIFY, validatePreferences, type CompanionSnapshot, type CompanionView, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
+import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_SPOTIFY, validatePreferences, type CaptureSnapshot, type CompanionSnapshot, type CompanionView, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
 
 type Entry = { id: string; path: string };
 export class CompanionStore extends EventEmitter {
@@ -12,7 +12,7 @@ export class CompanionStore extends EventEmitter {
   private icons = new Map<string, string>();
   constructor(private file: string, private icon: (file: string) => Promise<string>, pulse = true) {
     super();
-    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, notice: '' };
+    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, notice: '' };
   }
   current(): CompanionSnapshot { return this.state; }
   private emitState() { this.emit('change', this.state); }
@@ -62,6 +62,11 @@ export class CompanionStore extends EventEmitter {
     this.state = { ...this.state, view: view as CompanionView }; this.emitState();
   }
   setMusic(music: SpotifySnapshot): void { this.state = { ...this.state, music }; this.emitState(); }
+  setCapture(capture: CaptureSnapshot): void {
+    const current = this.state.capture;
+    if (current.status === capture.status && current.reason === capture.reason && current.retryAt === capture.retryAt) return;
+    this.state = { ...this.state, capture }; this.emitState();
+  }
   notice(notice: string): void { this.state = { ...this.state, notice }; this.emitState(); }
   add(paths: unknown): Promise<void> {
     if (!Array.isArray(paths) || paths.length > 100 || paths.some(p => typeof p !== 'string' || !path.isAbsolute(p))) return Promise.reject(new Error('Choose files from Finder.'));

@@ -44,11 +44,44 @@ export interface SpotifySnapshot {
   message?: string;
 }
 export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', playing: false, position: 0, track: null, busy: false };
+/**
+ * Audio capture, separately from the Spotify connection. Track metadata and
+ * transport come over Apple Events; the bars come from a Core Audio tap that
+ * has its own permission prompt and its own ways to be unavailable. One can
+ * work while the other does not, and the settings pane says which.
+ */
+export interface CaptureSnapshot {
+  status: 'idle' | 'starting' | 'listening' | 'unavailable';
+  reason: 'permission' | 'not-running' | 'unsupported' | 'no-output' | 'no-helper' | 'crashed' | 'failed' | null;
+  /** When the next automatic attempt is due, while unavailable. */
+  retryAt: number | null;
+}
+export const EMPTY_CAPTURE: CaptureSnapshot = { status: 'idle', reason: null, retryAt: null };
+/** What the settings pane says about capture. Spotify's own state is described elsewhere. */
+export function describeCapture(capture: CaptureSnapshot, music: SpotifySnapshot, preferences: { visualizer: boolean; reducedMotion: boolean }): string {
+  if (!preferences.visualizer) return 'The bars are off. Turn on Move with the music to capture Spotify’s output.';
+  if (preferences.reducedMotion) return 'Reduce motion is on, so the bars stay still and nothing is captured.';
+  switch (capture.status) {
+    case 'listening': return 'Listening to Spotify’s output. The bars follow the music.';
+    case 'starting': return 'Starting audio capture…';
+    case 'unavailable': switch (capture.reason) {
+      case 'permission': return 'macOS did not allow audio capture. Allow Notchlight under System Settings → Privacy & Security → Screen & System Audio Recording; the bars try again on their own.';
+      case 'not-running': return 'Spotify is not open, so there is nothing to capture yet.';
+      case 'unsupported': return 'Audio capture needs macOS 14.2 or later. Playback and track details still work.';
+      case 'no-output': return 'No output device is selected, so there is nothing to listen to.';
+      case 'no-helper': return 'The capture helper could not be built. Install the Xcode command line tools, or use a packaged build.';
+      case 'crashed': return 'The capture helper stopped unexpectedly. It will try again shortly.';
+      default: return 'Audio capture is unavailable right now. It will try again shortly.';
+    }
+    default: return music.status === 'ready' && music.playing ? 'Capture starts when the bars are on screen.' : 'Capture runs only while Spotify plays and the bars are showing.';
+  }
+}
 export interface CompanionSnapshot {
   preferences: CompanionPreferences;
   view: CompanionView;
   files: ShelfFile[];
   music: SpotifySnapshot;
+  capture: CaptureSnapshot;
   notice: string;
 }
 export interface OperationResult { ok: boolean; error?: string }

@@ -249,6 +249,7 @@ async function boot(): Promise<void> {
     send(notch?.win ?? null, 'music:levels', bands);
     send(customize, 'music:levels', bands);
   });
+  levels.on('status', () => companion.setCapture({ status: levels.status, reason: levels.reason, retryAt: levels.nextRetry() }));
   await companion.load();
   codex = new CodexAdapter();
   codexApprovals = new CodexApprovals(path.join(APP_DIR,'codex.sock'), () => companion.current().preferences.codexEnabled, () => companion.current().preferences.codexApprovals);
