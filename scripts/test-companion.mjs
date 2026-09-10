@@ -11,7 +11,9 @@ try {
   await build({ entryPoints: ['src/shared/companion.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   const { CompanionStore } = await import(pathToFileURL(path.join(root,'companionStore.js')).href);
   const { SpotifyPlayer, normalizeSpotify, validArtwork, artistsFromPage } = await import(pathToFileURL(path.join(root,'spotify.js')).href);
-  const { AudioLevels, wantsLevels, captureReason } = await import(pathToFileURL(path.join(root,'audioLevels.js')).href);
+  const { AudioLevels, wantsLevels, captureReason, helperArguments } = await import(pathToFileURL(path.join(root,'audioLevels.js')).href);
+  assert.deepEqual(helperArguments({levelsOffsetMs:0}),['--fps','24'],'no correction by default');
+  assert.deepEqual(helperArguments({levelsOffsetMs:-80}),['--fps','24','--offset-ms','-80'],'a latency correction reaches the helper');
   const { SpotifyWatcher, parsePlaybackChange } = await import(pathToFileURL(path.join(root,'spotifyWatch.js')).href);
   const { playhead } = await import(pathToFileURL(path.join(root,'companion.js')).href);
   const { Hover } = await import(pathToFileURL(path.join(root,'hover.js')).href);
@@ -356,13 +358,16 @@ try {
   await writeFile(fakeTap,`process.stdout.write(JSON.stringify({ok:true,rate:48000})+'\\n');const t=setInterval(()=>process.stdout.write('0.10 0.20 0.30 0.40 0.50\\n'),20);process.stdin.on('end',()=>{clearInterval(t);process.exit(0)});process.stdin.resume();`);
   const script = path.join(root,'fake-tap.sh');
   await writeFile(script,`#!/bin/sh\nexec "${process.execPath}" "${fakeTap}"\n`,{mode:0o755});
-  const tap = new AudioLevels(async()=>script);
+  const argsFile = path.join(root,'tap-args.txt');
+  await writeFile(script,`#!/bin/sh\necho "$@" > "${argsFile}"\nexec "${process.execPath}" "${fakeTap}"\n`,{mode:0o755});
+  const tap = new AudioLevels(async()=>script, () => ['--fps','24','--offset-ms','120']);
   const received = [];
   tap.on('levels',l=>received.push(l));
   tap.setActive(true);
   const until = async (test, ms) => { const end = Date.now()+ms; while (!test() && Date.now()<end) await new Promise(r=>setTimeout(r,25)); };
   await until(()=>received.length>3, 5000);
   assert.equal(tap.status,'listening');
+  assert.equal((await readFile(argsFile,'utf8')).trim(),'--fps 24 --offset-ms 120','the helper is started with the configured arguments');
   assert.ok(received.length>3,'levels stream while active');
   assert.deepEqual(received[0],[0.1,0.2,0.3,0.4,0.5]);
   assert.equal(tap.starts,1,'one helper start so far');
