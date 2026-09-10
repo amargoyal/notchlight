@@ -52,12 +52,12 @@ function session(over: Partial<Session> & { id: string }): Session {
   };
 }
 
-const claudeLight = () =>
+const notchlight = () =>
   session({
     id: 'demo-1',
     title: 'Island geometry',
-    project: 'claude-light',
-    cwd: '/Users/demo/dev/claude-light',
+    project: 'notchlight',
+    cwd: '/Users/demo/dev/notchlight',
     branch: 'main',
     status: 'working',
     tokens: 61_300,
@@ -125,15 +125,15 @@ const solo = () =>
 
 /** Each stage holds for its own number of seconds, then the reel advances. */
 const REEL: { hold: number; sessions: () => Session[] }[] = [
-  { hold: 14, sessions: () => [claudeLight()] },
+  { hold: 14, sessions: () => [notchlight()] },
   { hold: 10, sessions: () => [solo()] },
   { hold: 12, sessions: () => [archive()] },
-  { hold: 14, sessions: () => [archive(), claudeLight(), notes()] },
+  { hold: 14, sessions: () => [archive(), notchlight(), notes()] },
   { hold: 10, sessions: () => [notes()] },
   { hold: 8, sessions: () => [] }
 ];
 
-const RANK: Record<Status, number> = { asking: 0, working: 1, failed: 2, done: 3, idle: 4 };
+const RANK: Record<Status, number> = { asking: 0, working: 1, failed: 2, done: 3, interrupted: 4, unknown: 5, idle: 6 };
 
 export class DemoStore extends EventEmitter {
   private at = 0;
