@@ -16,7 +16,7 @@ import path from 'node:path';
 import { APP_DIR, ensureDir } from './config';
 import { logEvent } from './lifecycle';
 
-export type HelperName = 'audiotap' | 'notchprobe' | 'spotifywatch';
+export type HelperName = 'audiotap' | 'notchprobe' | 'spotifywatch' | 'pasteboardwatch';
 
 export interface HelperPaths {
   /** Directory holding <name>.swift. */
