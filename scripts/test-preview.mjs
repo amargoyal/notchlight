@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const dir = await mkdtemp(path.join(os.tmpdir(), 'claude-light-preview-'));
+const dir = await mkdtemp(path.join(os.tmpdir(), 'notchlight-preview-'));
 try {
   const outfile = path.join(dir, 'preview.mjs');
   await build({ entryPoints: ['src/renderer/previewModel.ts'], bundle: true, platform: 'node', format: 'esm', outfile });

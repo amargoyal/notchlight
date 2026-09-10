@@ -85,7 +85,7 @@ guard #available(macOS 14.2, *) else { bail("needs-macos-14.2") }
 
 let description = CATapDescription(stereoMixdownOfProcesses: [processObject])
 description.uuid = UUID()
-description.name = "Claude Light levels"
+description.name = "Notchlight levels"
 description.muteBehavior = .unmuted
 description.isPrivate = true
 
@@ -131,8 +131,8 @@ let latencySeconds = Double(latencyFrames) / outputRate
 let delayFrames = Int((latencySeconds * framesPerSecond).rounded())
 
 let aggregateDescription: [String: Any] = [
-    kAudioAggregateDeviceNameKey: "Claude Light levels",
-    kAudioAggregateDeviceUIDKey: "com.claude-light.levels.\(UUID().uuidString)",
+    kAudioAggregateDeviceNameKey: "Notchlight levels",
+    kAudioAggregateDeviceUIDKey: "com.notchlight.levels.\(UUID().uuidString)",
     kAudioAggregateDeviceMainSubDeviceKey: outputUID,
     kAudioAggregateDeviceIsPrivateKey: true,
     kAudioAggregateDeviceIsStackedKey: false,

@@ -22,19 +22,19 @@ import { Buddy, BuddyStack, faceFor } from './Buddy';
 import { Mark } from './marks';
 import { C, MONO, PANEL_W, SANS, glow, lightColor } from './theme';
 import { duration, tokens as fmtTokens } from '../shared/fmt';
-import type { Activity, Agent, Face, HitRect, Session, Snapshot, Status } from '../shared/types';
+import type { Activity, Agent, AgentProvider, ApprovalDecision, Face, HitRect, Session, Snapshot, Status } from '../shared/types';
 
 const STUB_W = 26;
 
 export interface IslandProps {
   snap: Snapshot;
   /** Optional presentation supplied only by the multipurpose design preview. */
-  surface?: { navigation: ReactNode; expanded?: ReactNode; collapsed?: ReactNode; active: boolean; panel?: { id: string; 'aria-labelledby': string } };
+  surface?: { selectedSession?: string; navigation: ReactNode; expanded?: ReactNode; collapsed?: ReactNode; active: boolean; panel?: { id: string; 'aria-labelledby': string } };
   /** The cursor is on the island right now. */
   hovering: boolean;
   /** The dwell has been satisfied. */
   open: boolean;
-  onDecide?: (sessionId: string, askId: string, decision: 'allow' | 'deny') => void;
+  onDecide?: (sessionId: string, askId: string, decision: ApprovalDecision) => void | Promise<unknown>;
   onDismiss?: (sessionId: string) => void;
   /** The island measured itself. The daemon aims the cursor test with this. */
   onBox?: (r: HitRect) => void;
@@ -158,6 +158,7 @@ function mainAgent(s: Session): Agent {
 }
 
 function faceOf(s: Session): Face {
+  if (Date.now() - (s.approvedAt ?? 0) < 1800) return 'approved';
   const m = mainAgent(s);
   return faceFor(s.status, !!m && m.activity !== 'think');
 }
@@ -191,7 +192,7 @@ export function restingClaude(sessions: Session[], snap: Snapshot): { left: Reac
       right: (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Mark activity={markOf(s)} color={s.status === 'asking' ? C.yellow : C.dim} />
-          <Buddy face={faceOf(s)} size={24} />
+          <Buddy provider={s.provider} face={faceOf(s)} size={24} />
         </div>
       )
     };
@@ -207,7 +208,7 @@ export function restingClaude(sessions: Session[], snap: Snapshot): { left: Reac
         <Mono>{sessions.length}</Mono>
       </div>
     ),
-    right: <BuddyStack faces={sessions.map(faceOf)} size={22} />
+    right: <BuddyStack faces={sessions.map(faceOf)} providers={sessions.map(s => s.provider)} size={22} />
   };
 }
 
@@ -274,34 +275,19 @@ function PanelHeader({ snap, left, right }: { snap: Snapshot; left: ReactNode; r
 }
 
 function SessionMeta({ s, now }: { s: Session; now: number }) {
-  const live = s.agents.filter((a) => !a.endedAt).length;
+  const live = s.agents.filter(a => !a.endedAt).length;
   const n = s.agents.length;
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'baseline',
-        justifyContent: 'space-between',
-        padding: '12px 16px 8px',
-        gap: 12
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 9, minWidth: 0 }}>
-        <div style={{ font: `500 13px/1 ${SANS}`, color: C.text, whiteSpace: 'nowrap' }}>{s.project}</div>
-        <div style={{ font: `400 11px/1 ${MONO}`, color: C.faint, ...CLIP }}>
-          {tilde(s.cwd)}
-          {s.branch ? ' · ' + s.branch : ''}
-        </div>
-      </div>
-      <Mono color={C.faint} weight={400}>
-        {n} agent{n === 1 ? '' : 's'}
-        {live > 0 && live !== n ? ` · ${live} live` : ''} · {elapsedOf(s, now)}
-      </Mono>
+  return <div className="agent-session-meta">
+    <div style={{ minWidth: 0, flex: 1 }}>
+      <div title={s.title || s.project} style={{ font: `500 13px/1.3 ${SANS}`, color: C.text, ...CLIP }}>{s.title || s.project}</div>
+      <span className="agent-provider-label">{s.provider === 'codex' ? 'Codex' : 'Claude'}{s.source && s.source !== 'unknown' ? ` · ${s.source === 'desktop' ? 'Desktop' : 'CLI'}` : ''} · {s.status}</span>
+      <div title={s.cwd} style={{ font: `400 10px/1.5 ${MONO}`, color: C.faint, marginTop: 3, ...CLIP }}>{s.project} · {tilde(s.cwd)}{s.branch ? ' · ' + s.branch : ''}</div>
     </div>
-  );
+    <Mono color={C.faint} weight={400}>{n} agent{n === 1 ? '' : 's'}{live > 0 && live !== n ? ` · ${live} live` : ''} · {elapsedOf(s, now)}</Mono>
+  </div>;
 }
 
-function AgentRow({ a, now, highlight }: { a: Agent; now: number; highlight?: boolean }) {
+function AgentRow({ a, now, highlight, provider }: { a: Agent; now: number; highlight?: boolean; provider?: AgentProvider }) {
   const finished = !!a.endedAt;
   const asking = a.status === 'asking';
   return (
@@ -316,7 +302,7 @@ function AgentRow({ a, now, highlight }: { a: Agent; now: number; highlight?: bo
       }}
     >
       <Light status={a.status} size={6} />
-      <Buddy face={faceFor(a.status, a.activity !== 'think')} size={22} />
+      <Buddy provider={provider} face={faceFor(a.status, a.activity !== 'think')} size={22} />
       <Mark activity={a.activity} color={asking ? C.yellow : C.faint} />
       <div
         title={a.title}
@@ -331,7 +317,7 @@ function AgentRow({ a, now, highlight }: { a: Agent; now: number; highlight?: bo
         {a.title}
       </div>
       <div style={{ font: `500 11px/1 ${MONO}`, color: finished ? C.ghost : C.muted, width: 46, textAlign: 'right' }}>
-        {fmtTokens(a.tokens)}
+        {a.tokensKnown === false ? '—' : fmtTokens(a.tokens)}
       </div>
       <div style={{ font: `400 11px/1 ${MONO}`, color: C.faint, width: 52, textAlign: 'right' }}>
         {duration((a.endedAt ?? now) - a.startedAt)}
@@ -364,7 +350,7 @@ function AgentList({ s, now }: { s: Session; now: number }) {
   return (
     <div style={{ padding: '0 8px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
       {shown.map((a, i) => (
-        <AgentRow key={a.id} a={a} now={now} highlight={i === 0 && a.status === 'working'} />
+        <AgentRow provider={s.provider} key={a.id} a={a} now={now} highlight={i === 0 && a.status === 'working'} />
       ))}
       {hidden > 0 && (
         <div style={{ padding: '6px 8px 2px', font: `400 11px/1 ${MONO}`, color: C.faint }}>
@@ -380,9 +366,12 @@ function AskCard({
   onDecide
 }: {
   s: Session;
-  onDecide?: (sessionId: string, askId: string, decision: 'allow' | 'deny') => void;
+  onDecide?: (sessionId: string, askId: string, decision: ApprovalDecision) => void | Promise<unknown>;
 }) {
   const ask = s.ask;
+  const [pending,setPending] = useState(false);
+  useEffect(() => setPending(false),[ask?.id]);
+  const answer = async (decision: ApprovalDecision) => { if (!ask || pending || !onDecide) return; setPending(true); try { await onDecide(s.id,ask.id,decision); } finally { setPending(false); } };
   if (!ask) return null;
   return (
     <div
@@ -395,10 +384,10 @@ function AskCard({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Buddy face="asking" size={22} />
+        <Buddy provider={s.provider} face="asking" size={22} />
         <div style={{ flex: 1, minWidth: 0, font: `500 12.5px/1.3 ${SANS}`, color: C.text }}>{ask.message}</div>
         <Mono color={C.faint} weight={400}>
-          {fmtTokens(s.tokens)}
+          {s.tokensKnown === false ? '—' : fmtTokens(s.tokens)}
         </Mono>
       </div>
       {ask.command && (
@@ -418,42 +407,45 @@ function AskCard({
       )}
       {ask.answerable ? (
         <div style={{ display: 'flex', gap: 8, marginTop: ask.command ? 0 : 12 }}>
-          <div
+          <button
+            type="button" disabled={pending}
             className="cl-btn"
-            onClick={() => onDecide?.(s.id, ask.id, 'allow')}
+            onClick={() => answer('allow')}
             style={{
               flex: 1,
               textAlign: 'center',
               padding: '8px 0',
               borderRadius: 9,
-              background: C.yellow,
+              background: C.yellow, border: 0,
               font: `600 12px/1 ${SANS}`,
               color: '#1A1408'
             }}
           >
             Allow once
-          </div>
-          <div
+          </button>
+          <button
+            type="button" disabled={pending}
             className="cl-btn"
-            onClick={() => onDecide?.(s.id, ask.id, 'deny')}
+            onClick={() => answer('deny')}
             style={{
               flex: 1,
               textAlign: 'center',
               padding: '8px 0',
               borderRadius: 9,
-              boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.14)',
+              boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.14)', background: 'transparent', border: 0,
               font: `600 12px/1 ${SANS}`,
               color: '#D8D0C8'
             }}
           >
             Deny
-          </div>
+          </button>
+          {s.provider === 'codex' && <button className="cl-btn agent-defer" disabled={pending} onClick={() => answer('defer')}>Answer in Codex</button>}
         </div>
       ) : (
         // Claude Code is asking in the terminal and this is only a readout of
         // it. Buttons that did nothing would be worse than no buttons.
         <div style={{ marginTop: ask.command ? 2 : 11, font: `400 11px/1.4 ${MONO}`, color: C.faint }}>
-          waiting for your answer in the terminal
+          {s.provider === 'codex' ? 'Continue in Codex' : 'waiting for your answer in the terminal'}
         </div>
       )}
     </div>
@@ -472,14 +464,15 @@ function SessionRow({ s, now, onOpen }: { s: Session; now: number; onOpen: () =>
         : `${live} agent${live === 1 ? '' : 's'} · ${m.title}`;
   return (
     <div
-      className="cl-row cl-click"
+      className="cl-row cl-click" role="button" tabIndex={0}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
       onClick={onOpen}
       style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 8px' }}
     >
       <Light status={s.status} size={7} />
-      <Buddy face={faceOf(s)} size={24} />
+      <Buddy provider={s.provider} face={faceOf(s)} size={24} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ font: `500 13px/1.25 ${SANS}`, color: C.text, ...CLIP }}>{s.project}</div>
+        <div style={{ font: `500 13px/1.25 ${SANS}`, color: C.text, ...CLIP }}>{s.title || s.project}</div><span className="agent-provider-label">{s.provider === 'codex' ? 'Codex' : 'Claude'}{s.source && s.source !== 'unknown' ? ` · ${s.source === 'desktop' ? 'Desktop' : 'CLI'}` : ''} · {s.project} · {s.status}</span>
         <div
           style={{
             font: `400 11px/1.35 ${MONO}`,
@@ -492,7 +485,7 @@ function SessionRow({ s, now, onOpen }: { s: Session; now: number; onOpen: () =>
         </div>
       </div>
       <div style={{ textAlign: 'right', flex: 'none' }}>
-        <div style={{ font: `500 11px/1.35 ${MONO}`, color: C.muted }}>{fmtTokens(s.tokens)}</div>
+        <div style={{ font: `500 11px/1.35 ${MONO}`, color: C.muted }}>{s.tokensKnown === false ? '—' : fmtTokens(s.tokens)}</div>
         <div style={{ font: `400 11px/1.35 ${MONO}`, color: C.faint, marginTop: 2 }}>{elapsedOf(s, now)}</div>
       </div>
       <div style={{ font: `400 14px/1 ${MONO}`, color: C.faint, flex: 'none', width: 9 }}>›</div>
@@ -529,7 +522,7 @@ function SessionList({
         right={
           <div style={{ display: 'flex', alignItems: 'center', paddingRight: 14 }}>
             <Mono color={C.dim} size={10}>
-              {fmtTokens(snap.tokens)} · {duration(snap.elapsed)}
+              {snap.tokensKnown === false ? '—' : fmtTokens(snap.tokens)} · {duration(snap.elapsed)}
             </Mono>
           </div>
         }
@@ -563,7 +556,7 @@ function SessionPanel({
   snap: Snapshot;
   now: number;
   onBack?: () => void;
-  onDecide?: (sessionId: string, askId: string, decision: 'allow' | 'deny') => void;
+  onDecide?: (sessionId: string, askId: string, decision: ApprovalDecision) => void | Promise<unknown>;
   onDismiss?: (sessionId: string) => void;
 }) {
   const finished = s.status === 'done' || s.status === 'failed';
@@ -574,7 +567,7 @@ function SessionPanel({
         left={
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, paddingLeft: 14 }}>
             {onBack && (
-              <div className="cl-back" onClick={onBack} style={{ font: `400 15px/1 ${MONO}`, color: C.faint }}>
+              <div className="cl-back" role="button" tabIndex={0} aria-label="Back to sessions" onKeyDown={e => { if (e.key === 'Enter') onBack(); }} onClick={onBack} style={{ font: `400 15px/1 ${MONO}`, color: C.faint }}>
                 ‹
               </div>
             )}
@@ -590,7 +583,7 @@ function SessionPanel({
         right={
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, paddingRight: 13 }}>
             <Mark activity={markOf(s)} color={s.status === 'asking' ? C.yellow : C.dim} />
-            <Buddy face={faceOf(s)} size={26} />
+            <Buddy provider={s.provider} face={faceOf(s)} size={26} />
           </div>
         }
       />
@@ -631,6 +624,8 @@ export function Island({ snap, hovering, open, onDecide, onDismiss, onBox, surfa
   useEffect(() => {
     if (!open) setDrill(null);
   }, [open]);
+
+  useEffect(() => { if (surface?.selectedSession) setDrill(surface.selectedSession); },[surface?.selectedSession]);
 
   // A session that disappears while you are inside it drops you back to the list.
   useEffect(() => {
@@ -698,7 +693,7 @@ export function Island({ snap, hovering, open, onDecide, onDismiss, onBox, surfa
 
   if (open) {
     if (snap.dormant) {
-      content = surface ? <div style={{ width: PANEL_W }}><div style={{ display: 'flex', justifyContent: 'center' }}><IdleFace snap={snap} /></div>{surface.navigation}<div role="tabpanel" {...surface.panel} className="mp-empty"><p>All quiet here.</p><span>Your Claude sessions will appear when work begins.</span></div></div> : <IdleFace snap={snap} />;
+      content = surface ? <div style={{ width: PANEL_W }}><div style={{ display: 'flex', justifyContent: 'center' }}><IdleFace snap={snap} /></div>{surface.navigation}<div role="tabpanel" {...surface.panel} className="mp-empty"><p>All quiet here.</p><span>Local Claude and Codex sessions appear here when work begins.</span></div></div> : <IdleFace snap={snap} />;
       key = 'idle';
     } else if (single) {
       content = <SessionPanel s={single} snap={snap} now={now} onDecide={onDecide} onDismiss={onDismiss} navigation={surface?.navigation} panel={surface?.panel} />;

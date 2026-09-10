@@ -23,6 +23,14 @@
  * the caller hides nothing.
  */
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+
+/** Transcripts retain shell aliases; lsof reports the physical directory. */
+export function directoryKey(cwd: string): string {
+  try { return fs.realpathSync.native(cwd); }
+  catch { return path.resolve(cwd); }
+}
 
 /** Belt and braces: the probe must never become the reason the app stalls. */
 const SCAN_TIMEOUT_MS = 4000;
@@ -47,7 +55,7 @@ export class Liveness {
 
   /** How many sessions can still be open in this directory. */
   countFor(cwd: string): number {
-    return this.counts.get(cwd) ?? 0;
+    return this.counts.get(directoryKey(cwd)) ?? 0;
   }
 
   /** Total live processes seen. Zero with `reliable()` means everything closed. */
@@ -115,7 +123,10 @@ export class Liveness {
         for (const line of out.split('\n')) {
           if (line.startsWith('n')) {
             const dir = line.slice(1).trim();
-            if (dir) next.set(dir, (next.get(dir) ?? 0) + 1);
+            if (dir) {
+              const key = directoryKey(dir);
+              next.set(key, (next.get(key) ?? 0) + 1);
+            }
           }
         }
         this.counts = next;

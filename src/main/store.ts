@@ -16,13 +16,13 @@ import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { config } from './config';
 import { ellipsis } from './format';
-import { Liveness } from './liveness';
+import { directoryKey, Liveness } from './liveness';
 import type { HookEvent } from './hookServer';
 import { TranscriptWatcher, phraseFor, type SessionFacts } from './transcripts';
 import type { Agent, Ask, Session, Snapshot, Status } from '../shared/types';
 
 /** Worst first: a question outranks work, which outranks a finished session. */
-const RANK: Record<Status, number> = { asking: 0, working: 1, failed: 2, done: 3, idle: 4 };
+const RANK: Record<Status, number> = { asking: 0, working: 1, failed: 2, done: 3, interrupted: 4, unknown: 5, idle: 6 };
 
 type Phase = 'idle' | 'working' | 'asking' | 'done';
 
@@ -330,21 +330,19 @@ export class Store extends EventEmitter {
       return;
     }
 
-    // Case-insensitively: the transcript records the path as the shell spelled
-    // it and lsof reports the one on disk, which on a case-insensitive volume
-    // are allowed to differ by capitals alone.
+    // Shell aliases and renamed checkout paths must share the same process
+    // budget. Resolve both sides using the filesystem rather than spelling.
     const byDir = new Map<string, SessionFacts[]>();
     for (const f of this.facts.values()) {
       if (!f.cwd) continue;
-      const key = f.cwd.toLowerCase();
+      const key = directoryKey(f.cwd);
       const list = byDir.get(key);
       if (list) list.push(f);
       else byDir.set(key, [f]);
     }
     const budgets = new Map<string, number>();
-    for (const f of this.facts.values()) {
-      if (!f.cwd) continue;
-      budgets.set(f.cwd.toLowerCase(), this.liveness.countFor(f.cwd));
+    for (const key of byDir.keys()) {
+      budgets.set(key, this.liveness.countFor(key));
     }
 
     const alive = new Set<string>();

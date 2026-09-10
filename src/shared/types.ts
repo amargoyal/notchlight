@@ -17,7 +17,11 @@ import type { CompanionBridge } from './companion';
  * `idle` is a session that exists but has nothing to report (started, never
  * prompted) and `failed` is a red with a different face, not a fourth colour.
  */
-export type Status = 'working' | 'asking' | 'done' | 'failed' | 'idle';
+export type AgentProvider = 'claude' | 'codex';
+export type AgentFilter = 'all' | AgentProvider;
+export type ApprovalDecision = 'allow' | 'deny' | 'defer';
+
+export type Status = 'working' | 'asking' | 'done' | 'failed' | 'idle' | 'interrupted' | 'unknown';
 
 /** The little mark beside a row that says what kind of work is happening. */
 export type Activity = 'code' | 'shell' | 'search' | 'read' | 'web' | 'think' | 'ask' | 'done' | 'agent' | 'idle';
@@ -26,6 +30,7 @@ export type Activity = 'code' | 'shell' | 'search' | 'read' | 'web' | 'think' | 
 export type Face = 'working' | 'thinking' | 'asking' | 'done' | 'failed' | 'idle' | 'approved';
 
 export interface Agent {
+  tokensKnown?: boolean;
   /** `main` for the session's own thread, otherwise the Task tool_use id. */
   id: string;
   kind: 'main' | 'sub';
@@ -59,6 +64,13 @@ export interface Ask {
 }
 
 export interface Session {
+  /** Brief expression feedback, independent of task status. */
+  approvedAt?: number;
+  provider?: AgentProvider;
+  source?: 'desktop' | 'cli' | 'unknown';
+  originalId?: string;
+  parentSessionId?: string;
+  tokensKnown?: boolean;
   id: string;
   /** Claude Code's own title for the conversation when it has written one. */
   title: string;
@@ -80,9 +92,15 @@ export interface Session {
   tail: string[];
   /** The tool the session is inside right now, if any. */
   tool?: string;
+  /** Short terminal error text when a provider reported the turn as failed. */
+  failure?: string;
 }
 
 export interface Snapshot {
+  tokensKnown?: boolean;
+  codex?: { state: 'disabled' | 'ready' | 'missing' | 'unsupported'; message: string; hooksSeen: boolean };
+  /** Claude Code connection: whether its hooks are installed and the socket is up. */
+  claude?: { state: 'ready' | 'no-hooks' | 'demo'; message: string };
   sessions: Session[];
   /** Worst-first: asking, then working, then done. */
   overall: Status;
@@ -124,13 +142,13 @@ export interface IslandBridge extends CompanionBridge {
   /** The hover dwell was satisfied — unfold. */
   onOpen(cb: (open: boolean) => void): () => void;
   /** Answer a held permission request. */
-  decide(sessionId: string, askId: string, decision: 'allow' | 'deny'): void;
+  decide(sessionId: string, askId: string, decision: ApprovalDecision): Promise<import('./companion').OperationResult>;
   /** Drop a finished session's red light. */
   dismiss(sessionId: string): void;
 }
 
 declare global {
   interface Window {
-    claudeLight: IslandBridge;
+    notchlight: IslandBridge;
   }
 }

@@ -9,10 +9,10 @@ function App() {
   const [hovering, setHovering] = useState(false);
   const [open, setOpen] = useState(false);
   useEffect(() => {
-    const stopHover = window.claudeLight.onHover(setHovering);
-    const stopOpen = window.claudeLight.onOpen(setOpen);
+    const stopHover = window.notchlight.onHover(setHovering);
+    const stopOpen = window.notchlight.onOpen(setOpen);
     return () => { stopHover(); stopOpen(); };
   }, []);
-  return <CompanionSurface live={live} open={open} hovering={hovering} onBox={r => window.claudeLight.setHitRect(r)} onCustomize={() => window.claudeLight.openCustomize()}/>;
+  return <CompanionSurface live={live} open={open} hovering={hovering} onBox={r => window.notchlight.setHitRect(r)} onCustomize={() => window.notchlight.openCustomize()}/>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

@@ -1,4 +1,4 @@
-export type CompanionView = 'claude' | 'music' | 'tray';
+export type CompanionView = 'agents' | 'music' | 'tray';
 export interface CompanionPreferences {
   theme: 'system' | 'light' | 'dark';
   density: 'compact' | 'comfortable';
@@ -12,13 +12,19 @@ export interface CompanionPreferences {
   spotifyEnabled: boolean;
   /** Which faces keep a presence on the resting bar. */
   restClaude: boolean;
+  restCodex: boolean;
+  codexEnabled: boolean;
+  codexApprovals: boolean;
+  codexBuddy: boolean;
+  codexPulse: boolean;
+  codexHome: string;
   restMusic: boolean;
   restTray: boolean;
 }
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false,
-  restClaude: true, restMusic: true, restTray: true
+  restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true
 };
 export interface ShelfFile {
   id: string;
@@ -48,6 +54,8 @@ export interface CompanionSnapshot {
 export interface OperationResult { ok: boolean; error?: string }
 export type SpotifyCommand = 'toggle' | 'next' | 'previous' | 'seek';
 export interface CompanionBridge {
+  installCodexHooks(remove?: boolean): Promise<OperationResult>;
+  chooseCodexHome(): Promise<OperationResult>;
   getCompanion(): Promise<CompanionSnapshot>;
   onCompanion(cb: (state: CompanionSnapshot) => void): () => void;
   updatePreferences(patch: Partial<CompanionPreferences>): Promise<OperationResult>;
@@ -74,6 +82,10 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
   };
   for (const [key, item] of Object.entries(value)) {
     if (!Object.hasOwn(DEFAULT_COMPANION_PREFERENCES, key)) throw new Error('Unknown preference.');
+    if (key === 'codexHome') {
+      if (typeof item !== 'string' || item.length > 4096 || item.includes('\0') || item !== '' && !item.startsWith('/')) throw new Error('Choose an absolute Codex home directory.');
+      result[key] = item; continue;
+    }
     if (choices[key] ? !choices[key].includes(String(item)) || typeof item !== 'string' : typeof item !== 'boolean') throw new Error('Invalid preference value.');
     result[key] = item;
   }

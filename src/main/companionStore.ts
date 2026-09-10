@@ -12,7 +12,7 @@ export class CompanionStore extends EventEmitter {
   private icons = new Map<string, string>();
   constructor(private file: string, private icon: (file: string) => Promise<string>, pulse = true) {
     super();
-    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'claude', files: [], music: { ...EMPTY_SPOTIFY }, notice: '' };
+    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, notice: '' };
   }
   current(): CompanionSnapshot { return this.state; }
   private emitState() { this.emit('change', this.state); }
@@ -57,7 +57,8 @@ export class CompanionStore extends EventEmitter {
     });
   }
   setView(view: unknown): void {
-    if (view !== 'claude' && view !== 'music' && view !== 'tray') throw new Error('Unknown view.');
+    if (view === 'claude') view = 'agents';
+    if (view !== 'agents' && view !== 'music' && view !== 'tray') throw new Error('Unknown view.');
     this.state = { ...this.state, view: view as CompanionView }; this.emitState();
   }
   setMusic(music: SpotifySnapshot): void { this.state = { ...this.state, music }; this.emitState(); }

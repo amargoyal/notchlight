@@ -1,13 +1,13 @@
 /**
- * Everything tunable lives in ~/.claude-light/config.json, and everything has a
+ * Everything tunable lives in ~/.notchlight/config.json, and everything has a
  * default that works, so the file never has to exist.
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export const CL_DIR = path.join(os.homedir(), '.claude-light');
-export const SOCK = path.join(CL_DIR, 'claude-light.sock');
+export const APP_DIR = path.join(os.homedir(), '.notchlight');
+export const SOCK = path.join(APP_DIR, 'notchlight.sock');
 export const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 
 export interface Config {
@@ -29,7 +29,7 @@ export interface Config {
    * Tool names whose calls the daemon holds open until the island answers.
    *
    * Empty by default, and that is the whole safety story: with nothing listed,
-   * no hook ever blocks, so Claude Light being slow, wedged, or half-installed
+   * no hook ever blocks, so Notchlight being slow, wedged, or half-installed
    * cannot stall a single tool call. Add `"Bash"` and the yellow card grows
    * real Allow/Deny buttons for bash — at the cost of every bash call waiting
    * on this app. Opt in deliberately.
@@ -89,14 +89,14 @@ const DEFAULTS: Config = {
 let cached: Config | null = null;
 
 export function ensureDir(): void {
-  fs.mkdirSync(CL_DIR, { recursive: true });
+  fs.mkdirSync(APP_DIR, { recursive: true });
 }
 
 export function config(): Config {
   if (cached) return cached;
   let file: Partial<Config> = {};
   try {
-    file = JSON.parse(fs.readFileSync(path.join(CL_DIR, 'config.json'), 'utf8'));
+    file = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'config.json'), 'utf8'));
   } catch {
     /* defaults are the whole config until someone writes one */
   }
@@ -115,6 +115,6 @@ export function reloadConfig(): Config {
 export function writeConfig(next: Partial<Config>): void {
   ensureDir();
   const merged = { ...config(), ...next };
-  fs.writeFileSync(path.join(CL_DIR, 'config.json'), JSON.stringify(merged, null, 2) + '\n');
+  fs.writeFileSync(path.join(APP_DIR, 'config.json'), JSON.stringify(merged, null, 2) + '\n');
   cached = merged;
 }

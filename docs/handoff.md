@@ -1,7 +1,42 @@
-# Handoff: where Claude Light is and what comes next
+# Handoff: where Notchlight is and what comes next
 
 Written September 9, 2026 so a fresh session can pick this up without the
 conversation that produced it. Update it when something below lands or changes.
+
+## Codex integration (branch `codex/codex-integration`)
+
+The integration adds **Agents** (All / Claude / Codex), local Codex
+Desktop/CLI monitoring, a separate robot and optional permission answers.
+The merged-feature inventory below predates it. The suites pass and the native
+checks that could run are recorded in the Codex guide's validation record.
+
+- `src/main/codex.ts` reads local rollouts and optional task titles; the
+  coordinator in `src/main/agentCoordinator.ts` namespaces identities by
+  provider. Source metadata, unknown status and token availability remain
+  explicit. There is no verified Codex process ownership or remote API reader.
+- `src/main/codexApprovals.ts` receives the separate `codex.sock` stream.
+  Monitoring and approvals default off in companion preferences. Held requests
+  allow/deny/defer, expire after 55 seconds and release without a decision on
+  shutdown or disabled preferences. Native questions stay in Codex.
+- `bin/notchlight-codex-hook.mjs` forwards events and waits only with both
+  opt-ins. `bin/install-codex-hooks.mjs` merges only its handlers into the
+  selected home's `hooks.json`, creates unique backups and writes atomically.
+  It does not edit config or trust. Review `/hooks` and reload sessions.
+- `src/renderer/Agents.tsx`, `Buddy.tsx`, live customization and sample/gallery
+  surfaces provide provider filters, attention and independent resting options.
+  Unknown/interrupted states are neutral; sample interactions are not evidence
+  of native operation.
+
+Setup, custom-home precedence, removal, backups, status interpretation, known
+limits and the validation record are in [Codex integration](codex-integration.md).
+`scripts/smoke-codex.mjs` (`npm run smoke:codex replay|live`) is the native
+harness: replay is read-only against a real Codex home; live runs `codex exec`
+in an isolated `CODEX_HOME` with hooks installed only there. The live approval
+outcomes (allow / deny / defer) still need one run after the Codex usage quota
+resets; everything up to the model turn, including hook delivery over the
+socket, was observed working. Then `npm run service:restart` so the running
+notch picks up the Agents view, and enable **Monitor local Codex** in
+Customize → Agents to see real tasks.
 
 ## How the owner likes work done
 
@@ -24,10 +59,11 @@ conversation that produced it. Update it when something below lands or changes.
 ## What exists today (merged PRs #2–#5)
 
 - **Three faces**: Claude, Music, Tray. Navigation in the expanded island,
-  customize window under Customize Claude Light… in the menu bar.
+  customize window under Customize Notchlight… in the menu bar.
   `src/renderer/LiveCompanion.tsx` is the live surface,
   `src/renderer/Preview.tsx` the sample-data version used by the gallery and
-  the customize preview. Both share `preview.css`.
+  browser-only customization preview. The Electron customization window uses
+  live state and saved preferences. Both share `preview.css`.
 - **Spotify** via JavaScript for Automation (`native/spotify.js`,
   `src/main/spotify.ts`). Polls every 2.5 s after opt-in. Full artist credit
   comes from the track's public page (`music:musician_description`), cached
@@ -35,7 +71,7 @@ conversation that produced it. Update it when something below lands or changes.
 - **Live equalizer**: `native/audiotap.swift` opens a Core Audio process tap on
   Spotify (macOS 14.2+), FFT at 30 fps, five band levels on stdout, delayed by
   the output device's reported latency (about 170 ms on AirPods).
-  `src/main/audioLevels.ts` compiles it on first use into `~/.claude-light/bin`
+  `src/main/audioLevels.ts` compiles it on first use into `~/.notchlight/bin`
   and runs it only while wanted (`wantsLevels`). Levels reach the renderer over
   the `music:levels` channel; `LiveEqualizer` writes them straight to the DOM.
 - **Compact music panel**: one row, 88 px artwork, centered title/artist, times
@@ -48,10 +84,35 @@ conversation that produced it. Update it when something below lands or changes.
   Save copy… to a chosen folder.
 - Design notes: `docs/multipurpose-faces.md`, `DESIGN.md`, `PRODUCT.md`.
 
-## Backlog, roughly in the order worth doing
+## Review and recommended priorities — September 9, 2026
 
-### 1. Apple Music and other players (biggest gap)
-Only Spotify is supported. Options, in order of preference:
+The strongest additions are the compact music panel and independently chosen
+resting faces: they make the companion useful without opening a panel. Keep
+that direction. Prefer reliability and quick actions before more visual effects
+or another permanent tab.
+
+The owner specified **Spotify only** in this conversation. Apple Music remains
+an optional future expansion, not the next milestone. Existing item numbers
+below are retained for reference; use this priority order:
+
+1. Fix resting-wing audio capture eligibility and Spotify recovery (13–14).
+2. Improve transport feedback (2) and Tray multi-select/recovery (8, 16).
+3. Add keyboard access and verify native lifecycle/energy behavior (15, 17).
+4. Apply the selected Notchlight identity and prepare distribution (18, 3–4).
+5. Consider clipboard history (12) as an opt-in feature after those foundations.
+   Extra players and decorative effects can follow actual demand.
+
+Code review also found that display remeasurement already exists (10), and
+transport commands already publish their result immediately (2). Neither should
+be scoped as a missing implementation without first reproducing the problem.
+
+This review adds work to the backlog; it does not implement the proposed fixes.
+
+## Backlog (stable item numbers)
+
+### 1. Apple Music and other players (deferred)
+Only Spotify is supported, matching the owner's current player preference.
+Revisit for a wider audience. Options, in order of preference:
 - Apple Music has a scripting dictionary like Spotify's (`Application('Music')`,
   `currentTrack`, `playerState`, `playerPosition`, `artwork`). Add a second
   runner beside `native/spotify.js` and a `player` field on the snapshot.
@@ -64,9 +125,12 @@ Only Spotify is supported. Options, in order of preference:
   (whichever app is playing).
 
 ### 2. Faster play/pause feedback
-The 2.5 s poll makes pause feel late. Either flip `playing` optimistically
-inside `SpotifyPlayer.command('toggle')` and let the next poll confirm, or
-listen for Spotify's distributed notification
+`SpotifyPlayer.enqueue()` already publishes the snapshot returned by a transport
+command immediately. The 2.5 s interval affects passive updates, including
+actions taken inside Spotify; it does not by itself explain slow in-app clicks.
+Measure command queue wait and JXA response time before choosing a fix.
+If optimistic feedback is needed, reconcile or roll it back on failure. Another
+candidate is Spotify's distributed notification
 `com.spotify.client.PlaybackStateChanged` from a small helper (or from
 `audiotap` itself, which already runs a run loop) and poll immediately on it.
 Also interpolate `position` between polls while playing so the seek bar and
@@ -115,9 +179,11 @@ command to `native/spotify.js` and `SpotifyPlayer.command`.
   way the equalizer is.
 
 ### 10. Display changes
-`resetProbe()` exists in `src/main/notchProbe.ts`; confirm something calls it
-on `screen.on('display-metrics-changed')` so docking and undocking a MacBook
-re-measures the cutout.
+Already implemented in `src/main/notchWindow.ts`: display metrics, added, and
+removed events share a 250 ms debounce, reset the probe, reposition, then
+notify geometry consumers. Remaining work is native verification of docking,
+undocking, clamshell, scaling changes, and identical-width displays, not adding
+another listener. See item 17.
 
 ### 11. Bluetooth latency tuning
 CoreAudio's latency figure for AirPods is an estimate. If the bars still feel
@@ -135,7 +201,7 @@ item's kind and a count.
   pasteboard carries `org.nspasteboard.ConcealedType` or
   `org.nspasteboard.TransientType` (password managers, autofill) — read them
   with `clipboard.availableFormats()`.
-- **Storage**: `~/.claude-light/clipboard.json`, capped (50 items, images
+- **Storage**: `~/.notchlight/clipboard.json`, capped (50 items, images
   under 2 MB as PNG data URLs, text under 20 kB). Pinned items survive the cap
   and the clear action. Nothing leaves the Mac.
 - **Face**: list of entries newest first, each with a preview (first line of
@@ -144,12 +210,82 @@ item's kind and a count.
   the list grows.
 - **Preferences**: `clipboardEnabled` (off by default — it is a privacy
   choice), `clipboardHistorySize`, `restClipboard` for the resting bar.
+- **Before shipping**: check the pasteboard's excluded formats before reading
+  content; these markers cannot catch every secret. Provide pause capture,
+  retention limits, and a separate explicit Clear all action that includes
+  pins. Cap total bytes and pinned items too, so pinning cannot bypass storage
+  limits. Avoid reading/encoding the same image every 500 ms; use a native
+  change-count helper if needed. Turning capture off must stop the poller.
 - **Where it plugs in**: `CompanionView` gains `'clipboard'`; `CompanionStore`
   or a sibling `ClipboardStore` owns the list; IPC in `companionIpc.ts`
   (`clipboard:copy`, `clipboard:pin`, `clipboard:remove`, `clipboard:clear`);
   the nav in `LiveCompanion.tsx` and `Preview.tsx` gets a fourth tab, and
   `RestingWings` a fourth part. Add gallery scenarios and a
   `scripts/test-clipboard.mjs` for the store and the poller's skip rules.
+
+### 13. Make real audio levels follow visible resting faces
+`wantsLevels()` in `src/main/audioLevels.ts` still requires `view === 'music'`,
+but `LiveCompanion.tsx` renders the music resting part whenever `restMusic` is
+enabled and a track is ready. Selecting Claude or Tray therefore stops the real
+tap even though its bars remain visible; they fall back to decorative motion.
+Base capture on the surfaces actually showing bars, including the resting face,
+while preserving opt-in, playback, visualizer, and reduced-motion gates. Update
+the existing test that assumes Claude view always means the bars are off screen.
+
+Keep silence distinct from unavailable capture. `LiveEqualizer` currently
+switches to canned animation after 1.5 s of silence; let real silence settle
+the bars. If capture is unavailable, show a restrained playback indicator and
+explain its status in Music settings. Check runtime changes to the system's
+reduced-motion preference, not just the media-query value at effect setup.
+
+### 14. Recover Spotify and audio capture without repeated reconnects
+`SpotifyPlayer` stops automatic polls for both `permission` and `error`.
+Keep permission denial actionable, but retry transient read errors with bounded
+backoff and recover after Spotify relaunch or Mac wake. Preserve generation
+checks so an old read cannot reconnect a disabled integration.
+
+Expose capture status separately from the Spotify connection; track metadata
+and playback controls should still work when capture is denied. Add helper
+fixtures for output-device change, unexpected exit before the first status
+line, refusal, and permission granted later. In `AudioLevels`, a refusal calls
+`backOff()` and then `kill()`, which clears the scheduled retry; explicitly
+define and test the intended retry behavior instead of relying on later music
+polls to restart it.
+
+### 15. Keyboard access without stealing terminal focus
+The live overlay is intentionally non-focusable. Browser tab-key tests alone
+cannot establish native keyboard access. Add a configurable shortcut that opens
+a focusable companion surface, restores the previously focused app on Escape,
+and supports tabs, playback, file selection, and actions. Preserve the usual
+hover behavior and the existing Claude Allow/Deny permission contract. Verify
+VoiceOver names and focus order in the actual desktop window.
+
+### 16. Tray recovery and predictable transfers
+Alongside multi-select in item 8, add Undo remove and Locate missing file.
+Keep references when an external disk is temporarily unavailable. Expiry must
+remove references only, never originals. For large Save copy operations, show
+progress and a clear outcome; report partial failures without claiming a
+successful transfer. Preserve no-overwrite behavior and native drag retention.
+Acceptance examples: duplicate filenames, renamed source, unplugged volume,
+cancelled drag, and a failed directory copy with a partial destination.
+
+### 17. Native verification and resource budget
+Record a small repeatable native check: sleep/wake, Spotify quit/relaunch,
+AirPods/output switching, docking, fullscreen/Spaces, cancelled and successful
+Finder drags, customization close/reopen, and reduced motion toggled at runtime.
+Measure idle versus playing CPU, memory, and helper starts over a fixed interval.
+Ensure hidden/unneeded visualizers do not keep capture alive. Gallery renders
+and mocked helper tests complement these checks; they do not prove native drag,
+TCC permission recovery, or real audio synchronization.
+
+### 18. Naming, accurate docs, and migration — implemented locally
+The owner selected **Notchlight**. Repository, checkout, visible titles, menu
+labels, package metadata, renderer bridge, service, and hooks now use it.
+Saved data was preserved, and compatibility aliases keep cached hook paths
+working. See [rename notes](rename.md) and [naming decision](naming.md).
+The prototype-only documentation was corrected to distinguish the native app
+from browser/gallery samples. Signed app packaging and release materials
+remain in item 4; Claude's buddy and permission meanings are retained.
 
 ## Things to know before touching the music code
 

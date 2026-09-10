@@ -1,11 +1,36 @@
-# Claude Light
+# Notchlight
 
-A dynamic island for Claude Code. A status light on the left wing, a buddy on the
-right, and nothing behind the lens.
+A macOS notch companion for Claude Code, Spotify, and files. Three focused
+faces, a customizable resting bar, and nothing behind the lens.
 
-When nothing is running there is nothing to see — the island is invisible, and
+### Codex integration
+
+The current working tree adds local Codex Desktop and CLI activity to a shared
+**Agents** face with **All / Claude / Codex** filters and a separate Codex robot.
+The Claude-specific descriptions below retain their existing behavior; Codex
+setup and status limits are documented in the [Codex integration guide](docs/codex-integration.md).
+
+In **Customize Notchlight… → Agents → Codex**, explicitly enable
+**Monitor local Codex**. Monitoring is off by default. Choose the Codex home if
+needed; **Install Codex hooks**, review and trust them in Codex's `/hooks`, then
+reload or restart existing sessions. **Answer Codex approvals in Notchlight**
+is a separate, optional opt-in. The guide covers CLI installation/removal,
+custom homes, backups and returning unanswered requests to Codex.
+
+Unknown or interrupted Codex activity stays neutral; silence is not completion.
+`npm run test:codex` covers the parser, coordinator, approval bridge, hook client
+and installer against the local `0.153.4` format; `npm run smoke:codex replay`
+replays your own recorded Codex rollouts read-only, and `npm run smoke:codex live`
+runs real `codex exec` tasks in an isolated home to exercise hooks and
+approvals. Browser/gallery samples do not establish live behavior.
+
+Open **Customize Notchlight…** from the menu bar to choose its appearance.
+Settings and Tray references are saved on this Mac. See the
+[rename and migration notes](docs/rename.md) for existing installations.
+
+When no face has activity there is nothing to see — the island is invisible, and
 the notch is just the notch. Hold the cursor on the notch and it reveals itself.
-When a session is running, the light says what it wants from you:
+In the Claude face, the light says what a session wants from you:
 
 | Light | Means |
 |---|---|
@@ -13,10 +38,9 @@ When a session is running, the light says what it wants from you:
 | 🟡 yellow | it wants something from you |
 | 🔴 red | finished with what it was doing |
 
-Collapsed it is a light, an activity mark and a buddy, and nothing else — no
-clock, no token count. That bar is on screen for as long as something is
-running, so anything on it is something you did not ask to read. The numbers are
-one hover away.
+The collapsed Claude face is a light, an activity mark, and a buddy. Choose
+which of Claude, Music, and Tray also keep a presence on the resting bar.
+Detailed session information and controls are one hover away.
 
 Hovering unfolds it. One session drops you straight onto its agents, however
 many there are. Several sessions give you a list you click into.
@@ -29,7 +53,7 @@ many there are. Several sessions give you a list you click into.
    ┌──────────────────────────────────────────┐
    │  ●               [ notch ]      🖥  🤖   │
    ├──────────────────────────────────────────┤   unfolded
-   │  claude-light   ~/dev/claude-light · main│
+   │  notchlight   ~/dev/notchlight · main│
    │  ● 🤖 🖥  Editing Buddy.tsx   24.1k 2m 04s│
    │  ● 🤖 >_  Running test suite  12.9k 1m 03s│
    └──────────────────────────────────────────┘
@@ -55,14 +79,14 @@ folder, and quit.
 npm run service              # build, install a LaunchAgent, start it
 npm run service:status       # running · pid 97741
 npm run service:restart      # rebuild and kick it
-npm run service:logs         # tail ~/.claude-light/island.log
+npm run service:logs         # tail ~/.notchlight/island.log
 npm run service:uninstall    # stop it and remove the LaunchAgent
 ```
 
 launchd rather than `nohup … &`: a backgrounded shell job dies with the session
 on some terminal setups, does not come back after a reboot, and has nowhere to
 put its output. The agent lives at
-`~/Library/LaunchAgents/com.claudelight.island.plist` and restarts the app if it
+`~/Library/LaunchAgents/com.notchlight.island.plist` and restarts the app if it
 crashes.
 
 Only one copy runs at a time, so stop any `npm start` instance before installing
@@ -138,7 +162,7 @@ signal, so its transcript simply stops — which is byte for byte what an idle
 session waiting for you to type looks like. No timing threshold can separate
 them, and a session shut an hour ago went on burning a light on the notch.
 
-So Claude Light asks the process table instead, every five seconds: `claude`
+So Notchlight asks the process table instead, every five seconds: `claude`
 runs as a process of that name, and its working directory is the project
 directory its session belongs to. That gives a count per directory — two live
 processes in `~/dev/thing` means at most the two newest session files there are
@@ -169,7 +193,7 @@ By default the island is read-only, and the yellow card says *"waiting for your
 answer in the terminal"*. Nothing this app does can ever block a tool call.
 
 If you want real **Allow once / Deny** buttons, opt in per tool in
-`~/.claude-light/config.json`:
+`~/.notchlight/config.json`:
 
 ```json
 { "gateTools": ["Bash"] }
@@ -182,13 +206,13 @@ the hook off at that value however long the daemon is willing to wait.
 Now a `Bash` call is held open while the island shows it. Understand the trade:
 *every* bash call waits on this app until you answer or `gateTimeoutSec` passes.
 Timing out answers nothing, so Claude Code falls back to asking in the terminal
-exactly as it would with Claude Light uninstalled — which is also what happens if
+exactly as it would with Notchlight uninstalled — which is also what happens if
 the app is down, wedged, or half-installed. That property is the point of the
 default being an empty list.
 
 ## Config
 
-`~/.claude-light/config.json`. Every key has a working default, so the file never
+`~/.notchlight/config.json`. Every key has a working default, so the file never
 has to exist.
 
 | key | default | |
@@ -210,7 +234,7 @@ has to exist.
 
 ```
 native/notchprobe.swift   measures the real cutout — AppKit knows, Electron does not
-bin/cl-hook.mjs           the hook client; every failure path exits 0 with no output
+bin/notchlight-hook.mjs   the hook client; every failure path exits 0 with no output
 bin/install-hooks.mjs     wires the above into ~/.claude/settings.json
 
 src/main/notchWindow.ts   full-width, transparent, above the menu bar, click-through
@@ -238,14 +262,15 @@ it. Without `swiftc` it falls back to the configured width and is wrong by a few
 points; without a notch, set `allowWithoutNotch`.
 
 **While resting**, the collapsed bar shows whichever faces you switch on under
-Customize → Appearance: Claude's light and buddy while a session runs, album
-art and playback while a track is ready, a count while Tray holds something.
-Faces share the bar, mirrored around the cutout, Claude outermost. A hidden
-Claude still shows a dot when it needs you.
+Customize → Appearance (Music, Tray) and Customize → Agents (Claude, Codex):
+an agent's light and buddy while a session runs, album art and playback while a
+track is ready, a count while Tray holds something. Faces share the bar,
+mirrored around the cutout, with Claude nearest the lens, then Codex, then the
+others. A hidden agent still shows an identifiable request when it needs you.
 
 The bars beside the artwork in the Music wing follow what Spotify is actually
 playing. A second Swift helper (`native/audiotap.swift`, compiled the same way
-into `~/.claude-light/bin`) opens a Core Audio process tap on Spotify's output
+into `~/.notchlight/bin`) opens a Core Audio process tap on Spotify's output
 and streams five band levels while a track plays and the wing is showing.
 Nothing is recorded; samples become five numbers and are dropped. macOS 14.2+
 asks once to allow audio capture. Say no, run without `swiftc`, or send the
@@ -253,24 +278,25 @@ music to another speaker, and the bars keep their canned rhythm instead. The
 levels are held back by the output device's reported latency, so over AirPods
 the bars land with the sound rather than a beat ahead of it.
 
-Spotify's scripting dictionary names only the lead artist. Claude Light asks
+Spotify's scripting dictionary names only the lead artist. Notchlight asks
 the track's public page once per track for the full credit, so a collaboration
 reads "Internet Money, Lil Tecca" rather than a solo record. Offline, the lead
 artist stands.
 
 
-## Multipurpose design preview
+## Live companion and design preview
 
-Run `npm run customize` for the new desktop customization window, or choose
-**Customize Claude Light…** from the menu bar. The faces gallery now includes
-an interactive Claude / Music / Tray walkthrough and every new state.
+Run `npm run customize` or choose **Customize Notchlight…** from the menu bar
+for the native window. Its controls update the live notch and save preferences.
+Connect Spotify in Music; macOS may request Automation access and, separately,
+audio capture for the visualizer. No Spotify account sign-in is required here.
 
-Music, files, and preferences use sample data for this design iteration. Try
-play/pause, track seeking, dragging mock Finder files into Tray and out to the
-sample destination, or changing appearance beside a live preview. Keyboard
-alternatives are available for the sample transfers. Settings reset when the
-window closes; **Reset Preview** restores everything immediately.
+Tray keeps real file references. Native drag-out keeps an item on the shelf;
+**Save copy…** confirms a copy before optionally removing its reference.
+Neither action deletes the original file, and Save copy does not overwrite
+existing destinations.
 
-The normal notch still shows real Claude activity. This prototype does not
-control your music apps, move real files, or change the production config.
+`npm run gallery` includes an interactive sample walkthrough and state matrix.
+Opening `customize.html` in a browser also uses sample music/files and temporary
+preferences, with **Reset Preview**. Sample playback never plays audio.
 See [design notes and research](docs/multipurpose-faces.md).

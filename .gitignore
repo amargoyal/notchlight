@@ -6,7 +6,7 @@ dist/
 *.tsbuildinfo
 
 # The compiled notch probe. The Swift source in native/ is committed; the
-# binary is built into ~/.claude-light/bin on first run, but keep stray local
+# binary is built into ~/.notchlight/bin on first run, but keep stray local
 # builds out of the tree.
 native/notchprobe
 native/*.o
@@ -18,8 +18,8 @@ release/
 *.app/
 *.dmg
 
-# Local runtime state lives in ~/.claude-light, never here.
-.claude-light/
+# Local runtime state lives in ~/.notchlight, never here.
+.notchlight/
 
 # Logs and scratch
 *.log

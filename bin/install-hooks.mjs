@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Wires cl-hook into ~/.claude/settings.json, or a project's own settings with
+ * Wires notchlight-hook into ~/.claude/settings.json, or a project's own settings with
  * --project. Idempotent, keeps every hook that is already there, and writes a
  * backup of the file it is about to change.
  *
@@ -12,7 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const HOOK = path.join(here, 'cl-hook.mjs');
+const HOOK = path.join(here, 'notchlight-hook.mjs');
 const remove = process.argv.includes('--remove');
 const target = process.argv.includes('--project')
   ? path.join(process.cwd(), '.claude', 'settings.json')
@@ -21,12 +21,12 @@ const target = process.argv.includes('--project')
 /**
  * PreToolUse is here for the green light, not for gating: it is what makes the
  * island react the instant a tool starts. It only ever blocks when a tool name
- * has been added to `gateTools` in ~/.claude-light/config.json, which is empty
+ * has been added to `gateTools` in ~/.notchlight/config.json, which is empty
  * by default — so the generous timeout below costs nothing until you opt in.
  */
 function gateTimeout() {
   try {
-    const c = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude-light', 'config.json'), 'utf8'));
+    const c = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.notchlight', 'config.json'), 'utf8'));
     return (c.gateTimeoutSec ?? 55) + 8;
   } catch {
     return 63;
@@ -43,7 +43,7 @@ const EVENTS = {
   SessionEnd: 5
 };
 
-const isOurs = (h) => typeof h?.command === 'string' && h.command.includes('cl-hook.mjs');
+const isOurs = (h) => typeof h?.command === 'string' && (h.command.includes('notchlight-hook.mjs') || h.command.includes('cl-hook.mjs'));
 
 let settings = {};
 if (fs.existsSync(target)) {
@@ -54,7 +54,7 @@ if (fs.existsSync(target)) {
     console.error(`${target} is not valid JSON — refusing to touch it. (${e.message})`);
     process.exit(1);
   }
-  fs.writeFileSync(target + '.claude-light-backup', text);
+  fs.writeFileSync(target + '.notchlight-backup', text);
 }
 settings.hooks = settings.hooks || {};
 
@@ -77,5 +77,5 @@ if (!Object.keys(settings.hooks).length) delete settings.hooks;
 
 fs.mkdirSync(path.dirname(target), { recursive: true });
 fs.writeFileSync(target, JSON.stringify(settings, null, 2) + '\n');
-console.log(`${remove ? 'Removed' : 'Installed'} Claude Light hooks in ${target}`);
-if (!remove) console.log('Backup at ' + target + '.claude-light-backup');
+console.log(`${remove ? 'Removed' : 'Installed'} Notchlight hooks in ${target}`);
+if (!remove) console.log('Backup at ' + target + '.notchlight-backup');

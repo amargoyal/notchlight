@@ -7,12 +7,12 @@ Reviewed September 9, 2026 using Google image search and the products' published
 - [Boring Notch source and usage](https://github.com/TheBoredTeam/boring.notch) documents hover expansion and menu-bar access to customization.
 - [NotchBox published screenshots and description](https://apps.apple.com/us/app/notchbox-easier-drag-drop/id6737410946?mt=12) show music wings and a drag-in/drag-out file pocket.
 
-Adopt focused tabs, recognizable file thumbnails, and a separate settings window. Preserve Claude Light's buddy and status contract. Do not reproduce either product's branding or claim category exclusivity.
+Adopt focused tabs, recognizable file thumbnails, and a separate settings window. Preserve Notchlight's buddy and status contract. Do not reproduce either product's branding or claim category exclusivity.
 
 ## Reviewing the prototype
-`npm run customize` opens the desktop customization preview. `npm run gallery` includes the interactive walkthrough plus the full state matrix. The tray menu also opens customization. The normal overlay remains Claude-only.
+`npm run customize` opens native customization using live Claude, Spotify, file references, and saved preferences. The normal overlay supports all three faces. `npm run gallery` includes the sample walkthrough and state matrix; browser-only customization is also a sample preview.
 
-Music controls change a fictional playlist without playing audio. Drag sample documents from the mock Finder into the notch, then drag shelf items into the Finder's destination area. Keyboard users can use Add to Tray and Take out instead. Real filesystem drops are ignored. Preferences and demo activity last only for the current window session; Reset Preview restores defaults.
+In the sample preview, music controls change a fictional playlist without playing audio. Drag sample documents from the mock Finder into the notch, then drag shelf items into the Finder's destination area. Keyboard users can use Add to Tray and Take out instead. Real filesystem drops are ignored. Preferences and demo activity last only for the current window session; Reset Preview restores defaults.
 
 ## Resting faces
 The collapsed bar no longer mirrors the selected tab. Three preferences (`restClaude`, `restMusic`, `restTray`) choose which faces keep a presence on it; each appears only when it has something to show (a session, a ready track, files in Tray). `RestingWings` in `Preview.tsx` lays them out mirrored around the cutout with hairline dividers, Claude outermost and Tray nearest the lens, so each face's two halves sit the same distance from the camera. `restingClaude` in `IslandView.tsx` exposes Claude's own collapsed pieces for this. With Claude hidden, an asking session still surfaces the attention dot. The gallery has five resting scenarios.
@@ -23,7 +23,7 @@ The five bars used to loop a fixed keyframe animation regardless of the sound. T
 Each bar sits against its own running average (±11 dB spans the bar) scaled by overall loudness, with instant attack and ~120 ms release. That keeps compressed pop moving as much as a sparse piano piece. Whenever levels stop arriving — helper unavailable, capture refused, playback on another device, silence for 1.5 s — the bars drop back to the old animation, so nothing ever looks broken.
 
 ## Intended follow-up
-Real music adapters, native filesystem drag-out, persistent preferences, and distribution are separate work. No integration permission is requested by this prototype.
+Spotify, native filesystem drag-out, and persistent preferences have landed in the native app. Distribution and additional player integrations remain separate work. Browser/gallery samples request no integration permissions.
 
 ## Validation of this iteration
 
