@@ -7,13 +7,34 @@ import { pathToFileURL } from 'node:url';
 
 const root = await mkdtemp(path.join(os.tmpdir(), 'notchlight-companion-'));
 try {
-  await build({ entryPoints: ['src/main/companionStore.ts','src/main/spotify.ts','src/main/audioLevels.ts','src/main/spotifyWatch.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
+  await build({ entryPoints: ['src/main/companionStore.ts','src/main/spotify.ts','src/main/audioLevels.ts','src/main/spotifyWatch.ts','src/main/hover.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   await build({ entryPoints: ['src/shared/companion.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   const { CompanionStore } = await import(pathToFileURL(path.join(root,'companionStore.js')).href);
   const { SpotifyPlayer, normalizeSpotify, validArtwork, artistsFromPage } = await import(pathToFileURL(path.join(root,'spotify.js')).href);
   const { AudioLevels, wantsLevels, captureReason } = await import(pathToFileURL(path.join(root,'audioLevels.js')).href);
   const { SpotifyWatcher, parsePlaybackChange } = await import(pathToFileURL(path.join(root,'spotifyWatch.js')).href);
   const { playhead } = await import(pathToFileURL(path.join(root,'companion.js')).href);
+  const { Hover } = await import(pathToFileURL(path.join(root,'hover.js')).href);
+  // Hover intent: dwell opens, grace closes; a keyboard hold keeps it open and lets go politely.
+  const opened = [];
+  const hover = new Hover(o => opened.push(o), () => ({ hoverDelay: 20, leaveGrace: 20 }));
+  hover.set(true); hover.set(false);
+  await new Promise(r=>setTimeout(r,40));
+  assert.deepEqual(opened,[],'a pass through the notch opens nothing');
+  hover.set(true); await new Promise(r=>setTimeout(r,40));
+  assert.deepEqual(opened,[true],'dwelling opens');
+  hover.set(false); await new Promise(r=>setTimeout(r,40));
+  assert.deepEqual(opened,[true,false],'leaving closes after the grace');
+  hover.hold(true);
+  assert.deepEqual(opened,[true,false,true],'the keyboard opens at once');
+  hover.set(true); hover.set(false); await new Promise(r=>setTimeout(r,40));
+  assert.deepEqual(opened,[true,false,true],'the cursor leaving does not close a held island');
+  hover.hold(false);
+  assert.deepEqual(opened,[true,false,true,false],'letting go closes at once when the cursor is elsewhere');
+  hover.hold(true); hover.set(true); hover.hold(false);
+  assert.deepEqual(opened,[true,false,true,false,true],'letting go with the cursor inside keeps it open');
+  hover.set(false); await new Promise(r=>setTimeout(r,40));
+  assert.deepEqual(opened,[true,false,true,false,true,false],'…and hovering carries on as usual');
   const source = path.join(root,'source'), dest = path.join(root,'destination');
   await mkdir(source); await mkdir(dest);
   const original = path.join(source,'notes.txt');
@@ -365,5 +386,5 @@ try {
   await new Promise(r=>setTimeout(r,50));
   assert.equal(missing.retryTimer,null,'a missing compiler never schedules a retry');
   missing.stop();
-  console.log('Companion checks passed: real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
+  console.log('Companion checks passed: hover intent and keyboard hold, real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
 } finally { await rm(root,{recursive:true,force:true}); }
