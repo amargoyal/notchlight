@@ -182,6 +182,9 @@ try {
   const music = normalizeSpotify({status:'ready',playing:true,position:72,track:{id:'spotify:track:test',title:'Example',artist:'Artist',album:'Album',durationMs:234000,artwork:'https://i.scdn.co/image/example'}});
   assert.equal(music.track.duration,234); assert.equal(music.position,72);
   assert.equal(normalizeSpotify({status:'permission'}).status,'permission');
+  assert.equal(music.volume,-1,'volume is unknown until Spotify says');
+  assert.equal(normalizeSpotify({status:'ready',playing:true,position:1,volume:63.4,track:{id:'v',title:'V',durationMs:1000}}).volume,63);
+  assert.equal(normalizeSpotify({status:'ready',playing:true,position:1,volume:140,track:{id:'v',title:'V',durationMs:1000}}).volume,100,'volume is clamped');
   assert.equal(validArtwork('https://i.scdn.co.evil.example/art'),undefined);
   assert.equal(validArtwork('file:///etc/passwd'),undefined);
   assert.equal(validArtwork('https://i.scdn.co/image/test'),'https://i.scdn.co/image/test');
@@ -196,6 +199,11 @@ try {
   assert.equal(calls.at(-1).position,234,'seek is bounded to the current track');
   await player.command('toggle');
   assert.equal(player.current().playing,false);
+  await player.command('volume',250);
+  assert.deepEqual([calls.at(-1).command, calls.at(-1).position],['volume',100],'volume is clamped to 100');
+  await player.command('volume',-3);
+  assert.equal(calls.at(-1).position,0);
+  await assert.rejects(player.command('volume','loud'));
   await assert.rejects(player.command('execute'));
   await assert.rejects(player.command(['toggle']));
   player.setEnabled(false);
