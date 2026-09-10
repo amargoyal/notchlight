@@ -166,9 +166,15 @@ try {
   assert.equal(denied,1,'permission denial is not polled again');
   assert.equal(forbidden.current().status,'permission');
   forbidden.stop();
-  const ready = { preferences:{spotifyEnabled:true,visualizer:true,reducedMotion:false}, view:'music', music:{status:'ready',playing:true} };
+  const ready = { preferences:{spotifyEnabled:true,visualizer:true,reducedMotion:false,restMusic:true}, view:'music', music:{status:'ready',playing:true} };
   assert.equal(wantsLevels(ready),true);
-  assert.equal(wantsLevels({...ready,view:'claude'}),false,'no helper while the bars are off screen');
+  assert.equal(wantsLevels({...ready,view:'agents'}),true,'the resting bar shows real bars whichever face is selected');
+  assert.equal(wantsLevels({...ready,view:'tray'}),true);
+  assert.equal(wantsLevels({...ready,view:'agents',preferences:{...ready.preferences,restMusic:false}}),false,'no helper while the bars are off screen');
+  assert.equal(wantsLevels({...ready,view:'music',preferences:{...ready.preferences,restMusic:false}}),true,'the Music face shows bars even when Music does not rest');
+  assert.equal(wantsLevels({...ready,preferences:{...ready.preferences,visualizer:false}}),false);
+  assert.equal(wantsLevels({...ready,preferences:{...ready.preferences,spotifyEnabled:false}}),false);
+  assert.equal(wantsLevels({...ready,music:{status:'not-running',playing:false}}),false);
   assert.equal(wantsLevels({...ready,music:{status:'ready',playing:false}}),false);
   assert.equal(wantsLevels({...ready,preferences:{...ready.preferences,reducedMotion:true}}),false);
   const fakeTap = path.join(root,'fake-tap.mjs');
