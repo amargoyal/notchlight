@@ -9,6 +9,8 @@ const root = await mkdtemp(path.join(os.tmpdir(), 'notchlight-companion-'));
 try {
   await build({ entryPoints: ['src/main/companionStore.ts','src/main/spotify.ts','src/main/audioLevels.ts','src/main/spotifyWatch.ts','src/main/hover.ts','src/main/terminal.ts','src/main/helpers.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   await build({ entryPoints: ['src/shared/companion.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
+  await build({ entryPoints: ['src/main/tint.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root, external: ['electron'] });
+  await build({ entryPoints: ['src/renderer/equalizer.ts','src/renderer/sparkline.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   const { CompanionStore } = await import(pathToFileURL(path.join(root,'companionStore.js')).href);
   const { SpotifyPlayer, normalizeSpotify, validArtwork, artistsFromPage } = await import(pathToFileURL(path.join(root,'spotify.js')).href);
   const { AudioLevels, wantsLevels, captureReason, helperArguments } = await import(pathToFileURL(path.join(root,'audioLevels.js')).href);
@@ -17,6 +19,38 @@ try {
   const { SpotifyWatcher, parsePlaybackChange } = await import(pathToFileURL(path.join(root,'spotifyWatch.js')).href);
   const { playhead } = await import(pathToFileURL(path.join(root,'companion.js')).href);
   const { Hover } = await import(pathToFileURL(path.join(root,'hover.js')).href);
+  const { tintOf } = await import(pathToFileURL(path.join(root,'tint.js')).href);
+  const { barBands, barFrame, bassOf } = await import(pathToFileURL(path.join(root,'equalizer.js')).href);
+  const { observeTokens, sparklinePath, rateLabel } = await import(pathToFileURL(path.join(root,'sparkline.js')).href);
+  // Tint: the liveliest pixels win; grey, white and black images give nothing.
+  const px = (...rows) => Buffer.from(rows.flat());
+  assert.equal(tintOf(px([200,40,40,255],[210,50,50,255],[30,30,30,255],[250,250,250,255]),2,2),'#c82828','a red sleeve tints red');
+  assert.equal(tintOf(px([128,128,128,255],[130,130,130,255]),2,1),null,'grey gives no tint');
+  assert.equal(tintOf(px([255,255,255,255],[0,0,0,255]),2,1),null,'white and black give no tint');
+  assert.equal(tintOf(px([200,40,40,0]),1,1),null,'transparent pixels do not count');
+  assert.equal(tintOf(Buffer.alloc(3),1,1),null,'a short buffer is not an image');
+  // Bars: the same five levels, laid out rising or folded; the quiet shape when there are none.
+  assert.deepEqual(barBands('rising'),[0,1,2,3,4]);
+  assert.deepEqual(barBands('mirrored'),[4,3,2,1,0,1,2,3,4]);
+  const frame = barFrame('mirrored',[1,0.5,0.25,0,0]);
+  assert.equal(frame.length,9); assert.equal(frame[4],'1.000'); assert.equal(frame[0],frame[8]);
+  assert.equal(barFrame('rising',null).length,5);
+  assert.equal(barFrame('rising',[0,0,0,0,0])[0],'0.180','bars never vanish');
+  assert.equal(bassOf([1,0,0,0,0]),1); assert.equal(bassOf([0.25]),Math.min(1,0.25**1.5));
+  // Sparkline: rates from token totals, one point a second, a minute kept.
+  let points = observeTokens('s1',1000,0);
+  assert.deepEqual(points,[],'the first observation is a baseline');
+  points = observeTokens('s1',1500,1000);
+  assert.equal(points[0].rate,500);
+  points = observeTokens('s1',1500,1400);
+  assert.equal(points.length,1,'sub-second observations wait');
+  points = observeTokens('s1',1400,2000);
+  assert.equal(points[1].rate,0,'a total that shrinks reads as zero, not negative');
+  for (let t=3;t<=80;t++) points = observeTokens('s1',1400+t*100,t*1000);
+  assert.ok(points.length<=60 && points.every(p => 80000-p.at <= 60000),'only the last minute is kept');
+  assert.match(sparklinePath(points,56,14),/^M0\.0,[\d.]+ L/);
+  assert.equal(sparklinePath([{at:0,rate:1}],56,14),'','one point is no line');
+  assert.equal(rateLabel([{at:0,rate:1234}]),'1.2k/s'); assert.equal(rateLabel([{at:0,rate:12}]),'12/s'); assert.equal(rateLabel([]),'');
   const { classifyHost, selectTabScript, parentChain } = await import(pathToFileURL(path.join(root,'terminal.js')).href);
   const { planHelper, ensureHelper, prebuiltFor } = await import(pathToFileURL(path.join(root,'helpers.js')).href);
   // Helpers: a prebuilt whose manifest hash matches the source is installed without a compiler; anything else compiles.
@@ -430,5 +464,5 @@ try {
   await new Promise(r=>setTimeout(r,50));
   assert.equal(missing.retryTimer,null,'a missing compiler never schedules a retry');
   missing.stop();
-  console.log('Companion checks passed: hover intent and keyboard hold, terminal host detection, prebuilt helper selection, real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
+  console.log('Companion checks passed: artwork tint, bar layouts, token sparkline, hover intent and keyboard hold, terminal host detection, prebuilt helper selection, real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
 } finally { await rm(root,{recursive:true,force:true}); }
