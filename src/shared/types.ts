@@ -141,6 +141,10 @@ export interface IslandBridge extends CompanionBridge {
   onHover(cb: (inside: boolean) => void): () => void;
   /** The hover dwell was satisfied — unfold. */
   onOpen(cb: (open: boolean) => void): () => void;
+  /** The island has been given the keyboard (or has given it back). */
+  onKeyboard(cb: (taken: boolean) => void): () => void;
+  /** Escape: hand the keyboard back to the app you were in. */
+  keyboardDone(): void;
   /** Answer a held permission request. */
   decide(sessionId: string, askId: string, decision: ApprovalDecision): Promise<import('./companion').OperationResult>;
   /** Drop a finished session's red light. */

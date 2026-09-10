@@ -1,6 +1,8 @@
 /* Shared preview surfaces. All selectors are scoped away from the live island. */
 .mp-surface { position: absolute; inset: 0; pointer-events: none; color: #f2ede7; font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; z-index: 3; }
 .mp-surface button, .mp-surface input { pointer-events: auto; }
+/* Focus is visible only once the keyboard is in play; the mouse never draws rings. */
+.mp-keyboard :focus-visible { outline: 2px solid #d9c4a6; outline-offset: 2px; border-radius: 6px; }
 .mp-surface button, .mp-finder button, .mp-preview-toolbar button, .mp-walkthrough button { font: inherit; }
 .mp-surface button { color: inherit; border: 0; }
 .mp-nav { height: 43px; display: flex; align-items: center; justify-content: space-between; padding: 0 13px; border-bottom: 1px solid #24211e; }
