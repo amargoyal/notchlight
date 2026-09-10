@@ -16,6 +16,7 @@ import readline from 'node:readline';
 import { ensureHelper } from './helpers';
 import { logEvent } from './lifecycle';
 import { config } from './config';
+import { PLAYER_BUNDLES, type MusicPlayer } from '../shared/companion';
 
 const BARS = 5;
 
@@ -38,10 +39,10 @@ export function captureReason(head: string | undefined): AudioLevelsReason {
   return 'failed';
 }
 
-/** What the helper is started with: the frame rate, and the owner's latency correction from config.json. */
-export function helperArguments(cfg: { levelsOffsetMs: number } = config()): string[] {
+/** What the helper is started with: the frame rate, the app to tap, and the owner's latency correction from config.json. */
+export function helperArguments(cfg: { levelsOffsetMs: number } = config(), player: MusicPlayer = 'spotify'): string[] {
   const offset = Math.round(cfg.levelsOffsetMs || 0);
-  return ['--fps', '24', ...(offset ? ['--offset-ms', String(offset)] : [])];
+  return ['--fps', '24', ...(player !== 'spotify' ? ['--bundle', PLAYER_BUNDLES[player]] : []), ...(offset ? ['--offset-ms', String(offset)] : [])];
 }
 
 export class AudioLevels extends EventEmitter {

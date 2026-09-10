@@ -17,6 +17,8 @@ import { ensureHelper } from './helpers';
 import { logEvent } from './lifecycle';
 
 export interface PlaybackChange {
+  /** Which app said so; absent from older helpers, which only knew Spotify. */
+  player?: 'spotify' | 'apple';
   playing: boolean;
   trackId?: string;
   position?: number;
@@ -34,7 +36,8 @@ export function parsePlaybackChange(line: string): PlaybackChange | null {
   let raw: Record<string, unknown>;
   try { raw = JSON.parse(line); } catch { return null; }
   if (!raw || typeof raw !== 'object' || typeof raw.state !== 'string') return null;
-  return { playing: raw.state === 'Playing', trackId: str(raw.trackId), position: num(raw.position), durationMs: num(raw.durationMs), title: str(raw.title), artist: str(raw.artist), album: str(raw.album) };
+  const player = raw.player === 'apple' ? 'apple' : raw.player === 'spotify' ? 'spotify' : undefined;
+  return { ...(player ? { player } : {}), playing: raw.state === 'Playing', trackId: str(raw.trackId), position: num(raw.position), durationMs: num(raw.durationMs), title: str(raw.title), artist: str(raw.artist), album: str(raw.album) };
 }
 
 export class SpotifyWatcher extends EventEmitter {

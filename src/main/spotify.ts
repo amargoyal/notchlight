@@ -2,22 +2,25 @@ import { EventEmitter } from 'node:events';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
-import { EMPTY_SPOTIFY, type SpotifySnapshot, type SpotifyCommand } from '../shared/companion';
+import { EMPTY_SPOTIFY, PLAYER_NAMES, type MusicPlayer, type SpotifySnapshot, type SpotifyCommand } from '../shared/companion';
 import { logEvent } from './lifecycle';
 import type { PlaybackChange } from './spotifyWatch';
 
 const execute = promisify(execFile);
-export type SpotifyRunner = (command: string, position?: number) => Promise<unknown>;
+export type SpotifyRunner = (command: string, position?: number, player?: MusicPlayer) => Promise<unknown>;
+/** Apple Music hands artwork over as raw bytes; this turns the current track's into a data URL, or null. */
+export type ArtworkLookup = (trackId: string) => Promise<string | null>;
 const number = (v: unknown) => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v) : 0;
 const str = (v: unknown) => typeof v === 'string' ? v.slice(0, 2000) : '';
-export function normalizeSpotify(value: unknown): SpotifySnapshot {
-  if (!value || typeof value !== 'object') return { ...EMPTY_SPOTIFY, status: 'error', message: 'Spotify did not return playback information.' };
+export function normalizeSpotify(value: unknown, player: MusicPlayer = 'spotify'): SpotifySnapshot {
+  const name = PLAYER_NAMES[player];
+  if (!value || typeof value !== 'object') return { ...EMPTY_SPOTIFY, player, status: 'error', message: `${name} did not return playback information.` };
   const raw = value as Record<string, unknown>;
-  const base = { ...EMPTY_SPOTIFY };
-  if (raw.status === 'not-running') return { ...base, status: 'not-running', message: 'Open Spotify to see what’s playing.' };
-  if (raw.status === 'empty') return { ...base, status: 'empty', message: 'Choose something to play in Spotify.' };
-  if (raw.status === 'permission') return { ...base, status: 'permission', message: 'Allow Notchlight to control Spotify in System Settings → Privacy & Security → Automation, then reconnect.' };
-  if (raw.status !== 'ready' || !raw.track || typeof raw.track !== 'object') return { ...base, status: 'error', message: 'Could not read Spotify.' };
+  const base = { ...EMPTY_SPOTIFY, player };
+  if (raw.status === 'not-running') return { ...base, status: 'not-running', message: `Open ${name} to see what’s playing.` };
+  if (raw.status === 'empty') return { ...base, status: 'empty', message: `Choose something to play in ${name}.` };
+  if (raw.status === 'permission') return { ...base, status: 'permission', message: `Allow Notchlight to control ${name} in System Settings → Privacy & Security → Automation, then reconnect.` };
+  if (raw.status !== 'ready' || !raw.track || typeof raw.track !== 'object') return { ...base, status: 'error', message: `Could not read ${name}.` };
   const track = raw.track as Record<string, unknown>;
   const duration = number(track.durationMs) / 1000;
   const volume = typeof raw.volume === 'number' && Number.isFinite(raw.volume) && raw.volume >= 0 ? Math.min(100, Math.round(raw.volume)) : -1;
@@ -25,6 +28,8 @@ export function normalizeSpotify(value: unknown): SpotifySnapshot {
     track: { id: str(track.id), title: str(track.title) || 'Untitled track', artist: str(track.artist), album: str(track.album), duration, artwork: validArtwork(str(track.artwork)) } };
 }
 export function validArtwork(value: string): string | undefined {
+  // Apple Music artwork arrives as bytes and is carried as a PNG data URL the app made itself.
+  if (/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(value) && value.length < 400_000) return value;
   try {
     const u = new URL(value);
     return u.protocol === 'https:' && (u.hostname === 'i.scdn.co' || u.hostname.endsWith('.scdn.co')) && !u.username && !u.password ? u.href : undefined;
@@ -61,8 +66,8 @@ async function fetchArtists(trackId: string): Promise<string | undefined> {
   finally { clearTimeout(timer); }
 }
 
-async function runSpotify(command: string, position?: number): Promise<unknown> {
-  const script = path.join(__dirname, '../../native/spotify.js');
+async function runSpotify(command: string, position?: number, player: MusicPlayer = 'spotify'): Promise<unknown> {
+  const script = path.join(__dirname, `../../native/${player === 'apple' ? 'music' : 'spotify'}.js`);
   try {
     const { stdout } = await execute('/usr/bin/osascript', ['-l', 'JavaScript', script, command, ...(position === undefined ? [] : [String(position)])], { timeout: 8000, maxBuffer: 128 * 1024 });
     return JSON.parse(stdout);
@@ -88,7 +93,28 @@ export class SpotifyPlayer extends EventEmitter {
   private retryAt = 0;
   private tints = new Map<string, string | null>();
   private pendingTints = new Set<string>();
-  constructor(private run: SpotifyRunner = runSpotify, private lookup: ArtistLookup = fetchArtists, private interval = 2500, private tint: TintLookup = async () => null) { super(); }
+  /** The player being read right now, and whether auto is choosing it. */
+  private player: MusicPlayer = 'spotify';
+  private auto = false;
+  private artworks = new Map<string, string | null>();
+  private pendingArtwork = new Set<string>();
+  constructor(private run: SpotifyRunner = runSpotify, private lookup: ArtistLookup = fetchArtists, private interval = 2500, private tint: TintLookup = async () => null, private artwork: ArtworkLookup = async () => null) { super(); }
+  currentPlayer(): MusicPlayer { return this.player; }
+  /**
+   * Follow one player, or whichever is open. Auto starts with Spotify and,
+   * while that is not running, tries Apple Music on the next read, and back —
+   * so the first one found stays until it quits. A change of player resets
+   * the state, like a reconnect, so nothing from the other app lingers.
+   */
+  setPlayer(choice: 'spotify' | 'apple' | 'auto'): void {
+    const auto = choice === 'auto';
+    const player: MusicPlayer = auto ? (this.player ?? 'spotify') : choice;
+    if (auto === this.auto && player === this.player) return;
+    this.auto = auto;
+    this.player = player;
+    logEvent('spotify', `following ${auto ? 'whichever is open, starting with ' : ''}${PLAYER_NAMES[player]}`);
+    if (this.enabled) this.setEnabled(true);
+  }
   /**
    * How often to read while nothing else says a change happened. With the
    * watcher listening a slow heartbeat is enough — every read spawns osascript
@@ -108,6 +134,11 @@ export class SpotifyPlayer extends EventEmitter {
    */
   onExternalChange(change: PlaybackChange): void {
     if (!this.enabled || this.suspended) return;
+    if (change.player && change.player !== this.player) {
+      // The other app moved. Under auto that is worth a look; otherwise it is not ours.
+      if (this.auto && change.playing) this.refresh();
+      return;
+    }
     logEvent('spotify', `notified ${change.playing ? 'playing' : 'paused'}${change.trackId && change.trackId !== this.state.track?.id ? ' new track' : ''} at ${change.position?.toFixed(1) ?? '?'}s`);
     const current = this.state;
     if (current.status === 'ready' && current.track) {
@@ -131,7 +162,7 @@ export class SpotifyPlayer extends EventEmitter {
     this.timer = null;
     if (!enabled) { this.publish({ ...EMPTY_SPOTIFY }); return; }
     this.failures = 0; this.retryAt = 0;
-    this.publish({ ...EMPTY_SPOTIFY, status: 'empty', busy: true, message: 'Connecting to Spotify…' });
+    this.publish({ ...EMPTY_SPOTIFY, player: this.player, status: 'empty', busy: true, message: `Connecting to ${PLAYER_NAMES[this.player]}…` });
     void this.poll();
     this.timer = setInterval(() => this.tick(), this.interval);
   }
@@ -190,8 +221,16 @@ export class SpotifyPlayer extends EventEmitter {
     const work = this.queue.then(async () => {
       if (!this.enabled || generation !== this.generation) return;
       if (command !== 'status' && command !== 'volume') this.publish({ ...this.state, busy: true });
-      const next = normalizeSpotify(await this.run(command, position).catch(() => ({ status: 'error' })));
+      const player = this.player;
+      let next = normalizeSpotify(await this.run(command, position, player).catch(() => ({ status: 'error' })), player);
       if (!this.enabled || generation !== this.generation) return;
+      // Auto: the chosen player is not open, so look at the other one; whichever answers stays.
+      if (this.auto && command === 'status' && next.status === 'not-running') {
+        const other: MusicPlayer = player === 'spotify' ? 'apple' : 'spotify';
+        const alternative = normalizeSpotify(await this.run('status', undefined, other).catch(() => ({ status: 'error' })), other);
+        if (!this.enabled || generation !== this.generation) return;
+        if (alternative.status !== 'not-running' && alternative.status !== 'error') { this.player = other; next = alternative; logEvent('spotify', `auto: ${PLAYER_NAMES[other]} is open`); }
+      }
       if (next.status === 'error') {
         this.failures++;
         const delay = SpotifyPlayer.retryDelay(this.failures);
@@ -202,10 +241,31 @@ export class SpotifyPlayer extends EventEmitter {
       }
       if (this.failures) logEvent('spotify', `recovered after ${this.failures} failed read${this.failures === 1 ? '' : 's'}`);
       this.failures = 0;
-      this.publish(this.withTint(this.withArtists(next)));
+      this.publish(this.withTint(this.withArtists(this.withArtwork(next))));
     });
     this.queue = work.catch(() => {});
     return work;
+  }
+  /** Apple Music: the sleeve comes as bytes through a script, once per track; Spotify already has a URL. */
+  private withArtwork(state: SpotifySnapshot): SpotifySnapshot {
+    const track = state.track;
+    if (state.player !== 'apple' || !track?.id || track.artwork) return state;
+    if (this.artworks.has(track.id)) {
+      const artwork = this.artworks.get(track.id);
+      return artwork ? { ...state, track: { ...track, artwork } } : state;
+    }
+    if (!this.pendingArtwork.has(track.id)) {
+      this.pendingArtwork.add(track.id);
+      const generation = this.generation;
+      void this.artwork(track.id).catch(() => null).then(artwork => {
+        this.pendingArtwork.delete(track.id);
+        const usable = artwork ? validArtwork(artwork) ?? null : null;
+        this.artworks.set(track.id, usable);
+        if (this.artworks.size > 30) this.artworks.delete(this.artworks.keys().next().value!);
+        if (usable && this.enabled && generation === this.generation && this.state.track?.id === track.id) this.publish(this.withTint({ ...this.state, track: { ...this.state.track, artwork: usable } }));
+      });
+    }
+    return state;
   }
   /** Attach the artwork's colour when known; otherwise start finding it. Missing artwork means no tint. */
   private withTint(state: SpotifySnapshot): SpotifySnapshot {
@@ -231,7 +291,7 @@ export class SpotifyPlayer extends EventEmitter {
   /** Swap in the full credit when known; otherwise start finding it and keep the lead for now. */
   private withArtists(state: SpotifySnapshot): SpotifySnapshot {
     const track = state.track;
-    if (!track?.id) return state;
+    if (!track?.id || state.player !== 'spotify') return state;
     if (this.artists.has(track.id)) {
       const full = this.artists.get(track.id);
       return full ? { ...state, track: { ...track, artist: full } } : state;

@@ -76,7 +76,10 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
     await store.updatePreferences({ spotifyEnabled: true });
     if (alreadyEnabled) spotify.setEnabled(true);
   });
-  handle('spotify:open', () => shell.openExternal('spotify:'));
+  handle('spotify:open', async () => {
+    if (spotify.currentPlayer() === 'apple') await promisify(execFile)('open', ['-b', 'com.apple.Music'], { timeout: 5000 });
+    else await shell.openExternal('spotify:');
+  });
   handle('clipboard:copy', async (_e, id) => { await clips.copy(id); store.notice('Copied. Paste it wherever you like.'); });
   handle('clipboard:pin', (_e, id, pinned) => clips.pin(id, pinned));
   handle('clipboard:remove', (_e, id) => clips.remove(id));
