@@ -117,6 +117,16 @@ audio helper stops — and comes back on wake by re-measuring the display and
 reading Spotify at once. [Native checks](docs/native-checks.md) lists the
 steps that verify this on real hardware and the resource budget they measured.
 
+### Keyboard
+
+The island never takes focus on its own, so its Allow and Deny buttons can be
+clicked without pulling you out of the terminal. **⌥⇧N** gives it the keyboard
+for as long as you want it: the panel opens, the selected tab takes focus,
+arrows move between faces, Tab walks into the panel, Enter and Space press
+things, and **Escape** hands the keyboard back to the app you were in. The
+same action is in the menu bar item, and `shortcut` in `config.json` changes
+the key (Electron accelerator syntax; an empty string registers nothing).
+
 ### Hooks (optional, recommended)
 
 ```sh

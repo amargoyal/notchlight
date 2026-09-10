@@ -36,6 +36,7 @@ record row `measure` prints into the table at the end.
 | Customize | open Customize Notchlight…, change a toggle, close it | nothing new | Dock icon appears while open, goes on close; the change is on the island |
 | Reduced motion | System Settings → Accessibility → Display → Reduce motion, on then off | nothing new | lights stop breathing at once, resume at once; no restart |
 | Finder drag | drag a file onto the notch and drop; drag another and press Escape | nothing new | dropped file in Tray; cancelled drag adds nothing and the island closes |
+| Keyboard | in a terminal, press ⌥⇧N, Tab a few times, press Escape | `island keyboard taken`, `island keyboard released: escape` | panel opens with a focus ring on the selected tab; Escape returns you to the terminal with the cursor where it was |
 
 ## Resource budget
 

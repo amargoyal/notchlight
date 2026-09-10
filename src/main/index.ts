@@ -4,7 +4,7 @@
  * Hooks and transcripts feed one live store and one notch overlay. The gallery
  * and customization preview are ordinary windows with a shared Dock lifecycle.
  */
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, powerMonitor, shell, Tray } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, powerMonitor, shell, Tray } from 'electron';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -25,6 +25,7 @@ import { CodexAdapter } from './codex';
 import { CodexApprovals } from './codexApprovals';
 import { AgentCoordinator } from './agentCoordinator';
 import { logEvent } from './lifecycle';
+import { Hover } from './hover';
 import type { HitRect, Snapshot } from '../shared/types';
 
 const DEMO = process.argv.includes('--demo');
@@ -57,8 +58,11 @@ let watcher: SpotifyWatcher;
 let levels: AudioLevels;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
+let hover: Hover | null = null;
 /** Asleep or locked: nobody is looking, so no helper should be running. */
 let dark = false;
+/** The island has the keyboard; Escape or a click elsewhere gives it back. */
+let keyboard = false;
 
 function send(win: BrowserWindow | null, channel: string, payload: unknown): void {
   if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send(channel, payload);
@@ -176,6 +180,7 @@ function refreshTray(): void {
             : 'Cutout not measured',
         enabled: false
       },
+      { label: `Open for the keyboard${config().shortcut ? ` (${shortcutLabel(config().shortcut)})` : ''}`, click: () => openForKeyboard() },
       { label: 'Add files to Tray…', click: () => { void pickFiles?.().catch(e => companion.notice(String(e.message))); } },
       { label: 'Customize Notchlight…', click: () => openCustomize() },
       { label: 'Open faces gallery', click: () => openGallery() },
@@ -197,48 +202,6 @@ function startTray(): void {
   tray.setToolTip('Notchlight');
   tray.on('drop-files', (_event, files) => { void companion.add(files).catch(e => companion.notice(String(e.message))); });
   refreshTray();
-}
-
-/**
- * Hover intent lives here rather than in the island.
- *
- * The renderer only learns the cursor is inside after the daemon has already
- * decided to stop being click-through, so the dwell has to be timed on this
- * side or the first half of it is invisible.
- */
-class Hover {
-  private openTimer: NodeJS.Timeout | null = null;
-  private closeTimer: NodeJS.Timeout | null = null;
-  private open = false;
-
-  constructor(private emit: (open: boolean) => void) {}
-
-  set(inside: boolean): void {
-    const cfg = config();
-    if (inside) {
-      if (this.closeTimer) {
-        clearTimeout(this.closeTimer);
-        this.closeTimer = null;
-      }
-      if (this.open || this.openTimer) return;
-      this.openTimer = setTimeout(() => {
-        this.openTimer = null;
-        this.open = true;
-        this.emit(true);
-      }, cfg.hoverDelay);
-      return;
-    }
-    if (this.openTimer) {
-      clearTimeout(this.openTimer);
-      this.openTimer = null;
-    }
-    if (!this.open || this.closeTimer) return;
-    this.closeTimer = setTimeout(() => {
-      this.closeTimer = null;
-      this.open = false;
-      this.emit(false);
-    }, cfg.leaveGrace);
-  }
 }
 
 async function boot(): Promise<void> {
@@ -299,19 +262,20 @@ async function boot(): Promise<void> {
   if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);
 
-  const hover = new Hover((open) => send(notch?.win ?? null, 'open', open));
+  hover = new Hover((open) => send(notch?.win ?? null, 'open', open), () => config());
   notch = new NotchWindow(
     (inside) => {
       // Two separate facts. `hover` is the cursor arriving, which is what draws
       // the little stubs that say "keep going"; `open` is the dwell being
       // satisfied, which is what unfolds the panel.
       send(notch?.win ?? null, 'hover', inside);
-      hover.set(inside);
+      hover?.set(inside);
     },
     () => applyNotchGeometry()
   );
 
   const win = notch.create();
+  win.on('blur', () => { if (keyboard) releaseKeyboard('focus left'); });
   win.webContents.on('did-finish-load', () => {
     applyNotchGeometry();
     send(win, 'snapshot', store.current());
@@ -342,6 +306,7 @@ async function boot(): Promise<void> {
   }
 
   watchPower(syncLevels);
+  registerShortcut();
   store.start();
   startTray();
   ready = true;
@@ -384,6 +349,64 @@ function watchPower(syncLevels: () => void): void {
   powerMonitor.on('unlock-screen', () => comeBack('unlock-screen'));
   powerMonitor.on('shutdown', () => { logEvent('power', 'shutdown'); app.quit(); });
 }
+
+/** ⌥⇧N for the menu, from Electron's accelerator spelling. */
+function shortcutLabel(accelerator: string): string {
+  const names: Record<string, string> = { commandorcontrol: '⌘', cmdorctrl: '⌘', command: '⌘', cmd: '⌘', control: '⌃', ctrl: '⌃', alt: '⌥', option: '⌥', shift: '⇧', super: '⌘', meta: '⌘', space: 'Space', escape: 'Esc', return: '↩', enter: '↩', tab: '⇥' };
+  return accelerator.split('+').map(part => names[part.toLowerCase()] ?? part.toUpperCase()).join('');
+}
+
+/**
+ * The keyboard.
+ *
+ * The island is a non-focusable panel so that its buttons never pull focus
+ * from the terminal you are typing in. A shortcut makes it focusable for as
+ * long as you are using it: the panel opens, the selected tab takes focus, and
+ * Tab, arrows, Enter and Space work as they would in any window. Escape — or
+ * clicking anywhere else — makes it click-through again and, if the app came
+ * forward to take the keys, hides the app so macOS returns to the one you were
+ * in. The overlay is shown again inactive, so nothing you can see changes.
+ */
+function openForKeyboard(): void {
+  if (!notch?.win || notch.win.isDestroyed()) return;
+  keyboard = true;
+  logEvent('island', 'keyboard taken');
+  hover?.hold(true);
+  send(notch.win, 'keyboard', true);
+  notch.takeKeyboard();
+}
+
+function releaseKeyboard(why: string): void {
+  if (!keyboard) return;
+  keyboard = false;
+  logEvent('island', `keyboard released: ${why}`);
+  send(notch?.win ?? null, 'keyboard', false);
+  const cameForward = notch?.releaseKeyboard() ?? false;
+  hover?.hold(false);
+  // Hiding an active app is how macOS hands focus back to the previous one.
+  // Only when no ordinary window is open: those belong to this app and would
+  // vanish with it.
+  if (cameForward && !gallery && !customize) {
+    app.hide();
+    notch?.win?.showInactive();
+    notch?.assertLevel();
+  }
+}
+
+function registerShortcut(): void {
+  const accelerator = config().shortcut;
+  if (!accelerator) return;
+  try {
+    const ok = globalShortcut.register(accelerator, () => keyboard ? releaseKeyboard('shortcut') : openForKeyboard());
+    logEvent('island', ok ? `shortcut ${accelerator} registered` : `shortcut ${accelerator} is taken by another app`);
+  } catch (error) {
+    logEvent('island', `shortcut ${accelerator} rejected: ${(error as Error).message}`);
+  }
+}
+
+ipcMain.on('keyboard:done', (event) => {
+  if (BrowserWindow.fromWebContents(event.sender) === notch?.win) releaseKeyboard('escape');
+});
 
 /** Hand the measured cutout to both the store and the window's own sizing. */
 function applyNotchGeometry(): void {
@@ -449,6 +472,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   logEvent('notchlight', 'quitting');
+  globalShortcut.unregisterAll();
   if (shelfTimer) clearInterval(shelfTimer);
   spotify?.stop();
   watcher?.stop();

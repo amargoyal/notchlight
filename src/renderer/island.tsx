@@ -8,11 +8,13 @@ function App() {
   const live = useCompanion();
   const [hovering, setHovering] = useState(false);
   const [open, setOpen] = useState(false);
+  const [keyboard, setKeyboard] = useState(false);
   useEffect(() => {
     const stopHover = window.notchlight.onHover(setHovering);
     const stopOpen = window.notchlight.onOpen(setOpen);
-    return () => { stopHover(); stopOpen(); };
+    const stopKeyboard = window.notchlight.onKeyboard(setKeyboard);
+    return () => { stopHover(); stopOpen(); stopKeyboard(); };
   }, []);
-  return <CompanionSurface live={live} open={open} hovering={hovering} onBox={r => window.notchlight.setHitRect(r)} onCustomize={() => window.notchlight.openCustomize()}/>;
+  return <CompanionSurface live={live} open={open || keyboard} hovering={hovering || keyboard} keyboard={keyboard} onBox={r => window.notchlight.setHitRect(r)} onCustomize={() => window.notchlight.openCustomize()}/>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

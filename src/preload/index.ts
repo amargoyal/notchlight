@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('notchlight', {
   onSnapshot: (cb: (s: Snapshot) => void) => subscribe('snapshot', cb),
   onHover: (cb: (inside: boolean) => void) => subscribe('hover', cb),
   onOpen: (cb: (open: boolean) => void) => subscribe('open', cb),
+  onKeyboard: (cb: (taken: boolean) => void) => subscribe('keyboard', cb),
+  keyboardDone: () => ipcRenderer.send('keyboard:done'),
   setHitRect: (r: HitRect) => ipcRenderer.send('hit-rect', r),
   decide: (sessionId: string, askId: string, decision: ApprovalDecision) => ipcRenderer.invoke('decide', { sessionId, askId, decision }),
   dismiss: (sessionId: string) => ipcRenderer.send('dismiss', sessionId),
