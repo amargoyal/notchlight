@@ -1,14 +1,13 @@
 /**
  * Where the cutout is, measured rather than guessed.
  *
- * The Swift probe is compiled on first run into ~/.notchlight/bin. If swiftc
- * is missing the whole thing degrades to the configured fallback width, which
- * is wrong by a few points and still perfectly usable.
+ * The Swift probe is installed from the shipped prebuilt or compiled on first
+ * run into ~/.notchlight/bin (see helpers.ts). With neither, the whole thing
+ * degrades to the configured fallback width, which is wrong by a few points
+ * and still perfectly usable.
  */
 import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
-import { APP_DIR, ensureDir } from './config';
+import { ensureHelperSync } from './helpers';
 
 export interface NotchProbe {
   notch: boolean;
@@ -20,29 +19,9 @@ export interface NotchProbe {
   builtin?: boolean;
 }
 
-const BIN = path.join(APP_DIR, 'bin', 'notchprobe');
-
-/** dist/main/index.js → ../../native/notchprobe.swift */
-function sourcePath(): string {
-  return path.join(__dirname, '..', '..', 'native', 'notchprobe.swift');
-}
-
+/** Prebuilt when the packaged app ships one for this source; compiled otherwise. */
 function ensureBinary(): string | null {
-  const src = sourcePath();
-  if (!fs.existsSync(src)) return null;
-  try {
-    if (fs.existsSync(BIN) && fs.statSync(BIN).mtimeMs > fs.statSync(src).mtimeMs) return BIN;
-  } catch {
-    /* fall through and rebuild */
-  }
-  try {
-    ensureDir();
-    fs.mkdirSync(path.dirname(BIN), { recursive: true });
-    execFileSync('swiftc', ['-O', '-o', BIN, src], { stdio: 'ignore', timeout: 90_000 });
-    return BIN;
-  } catch {
-    return null;
-  }
+  return ensureHelperSync('notchprobe');
 }
 
 /**
