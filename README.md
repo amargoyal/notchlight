@@ -331,6 +331,12 @@ costs a quarter of a core. Real silence settles them. The levels are held back
 by the output device's reported latency, so over AirPods the bars land with
 the sound rather than a beat ahead of it.
 
+Core Audio's latency figure for Bluetooth outputs is an estimate. If the bars
+still run early or late over AirPods, set `levelsOffsetMs` in
+`~/.notchlight/config.json` — try 80 if they are early, -80 if they are late —
+and restart; the helper's first log line shows the offset and the resulting
+delay in frames.
+
 Capture is separate from the Spotify connection. Track details and the
 transport come over Apple Events; the bars come from the tap, which has its
 own permission and its own ways to be unavailable. **Customize → Music → Audio
