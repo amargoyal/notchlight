@@ -302,6 +302,15 @@ music to another speaker, and the bars keep their canned rhythm instead. The
 levels are held back by the output device's reported latency, so over AirPods
 the bars land with the sound rather than a beat ahead of it.
 
+Capture is separate from the Spotify connection. Track details and the
+transport come over Apple Events; the bars come from the tap, which has its
+own permission and its own ways to be unavailable. **Customize → Music → Audio
+capture** says which is the case — refused, Spotify not open, unsupported
+macOS, no output device, helper missing or crashed — and a refusal is retried
+on its own, so allowing it a minute later takes effect without a reconnect. A
+Spotify read that fails is retried after 5, 10, 20, 40 and then 60 seconds
+rather than stopping; only a permission denial waits for you.
+
 Spotify's scripting dictionary names only the lead artist. Notchlight asks
 the track's public page once per track for the full credit, so a collaboration
 reads "Internet Money, Lil Tecca" rather than a solo record. Offline, the lead
