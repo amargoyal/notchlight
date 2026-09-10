@@ -103,6 +103,7 @@ export class SpotifyPlayer extends EventEmitter {
    */
   onExternalChange(change: PlaybackChange): void {
     if (!this.enabled || this.suspended) return;
+    logEvent('spotify', `notified ${change.playing ? 'playing' : 'paused'}${change.trackId && change.trackId !== this.state.track?.id ? ' new track' : ''} at ${change.position?.toFixed(1) ?? '?'}s`);
     const current = this.state;
     if (current.status === 'ready' && current.track) {
       const sameTrack = !change.trackId || change.trackId === current.track.id;
