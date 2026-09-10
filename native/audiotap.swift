@@ -13,6 +13,7 @@
 // when the tap cannot be built. `ok:false` is a fallback signal, not an error.
 //
 //   swiftc -O -o audiotap audiotap.swift
+//   audiotap [--fps 24]     frames per second on stdout; 24 by default
 
 import AppKit
 import Accelerate
@@ -22,17 +23,23 @@ import Foundation
 let bundleID = "com.spotify.client"
 /// Band edges in Hz. Five bars, bass on the left.
 let bandEdges: [Double] = [40, 130, 400, 1200, 3500, 11000]
-let framesPerSecond = 30.0
+/// Every frame is a composite of the whole overlay window on the other side, so
+/// fewer frames is directly less GPU. 24 reads as continuous on 14 px bars.
+let framesPerSecond: Double = {
+    let args = CommandLine.arguments
+    if let index = args.firstIndex(of: "--fps"), index + 1 < args.count, let fps = Double(args[index + 1]), fps >= 5, fps <= 60 { return fps }
+    return 24
+}()
 let fftSize = 2048
 let log2n = vDSP_Length(11)
 /// A bar spans this many dB around its band's running average: ±half maps to 0…1.
 let swing: Float = 22
-/// How quickly the running average follows the music (per frame, at 30 fps ≈ 2 s).
-let averageRate: Float = 0.016
+/// How quickly the running average follows the music (per frame; about 2 s at 24 fps).
+let averageRate: Float = Float(0.5 / framesPerSecond)
 /// Overall loudness this far below the recent loudest moment reads as quiet.
 let loudnessRange: Float = 26
 /// The loudness peak falls this many dB per frame, so a soft outro still moves.
-let peakDecay: Float = 0.04
+let peakDecay: Float = Float(1.2 / framesPerSecond)
 /// Below this, the tap is hearing nothing worth drawing.
 let silenceFloor: Float = -66
 
@@ -233,6 +240,8 @@ let bins: [Range<Int>] = (0..<(bandEdges.count - 1)).map { band in
 var averages: [Float?] = Array(repeating: nil, count: bins.count)
 var levels = [Float](repeating: 0, count: bins.count)
 var loudestRecently = silenceFloor + loudnessRange
+/// Per-frame decay that halves a bar in about 84 ms whatever the frame rate (0.76 at the old 30 fps).
+let release = Float(pow(0.5, 1 / (0.084 * framesPerSecond)))
 var heard = 0
 
 func analyze() -> [Float] {
@@ -275,7 +284,7 @@ func analyze() -> [Float] {
         // scaled by how loud the whole mix is right now.
         let target = max(0, min(1, 0.5 + (db - average) / swing)) * presence
         // Instant attack, ~120 ms release. Bars jump on a hit and settle on their own.
-        levels[index] = target >= levels[index] ? target : max(target, levels[index] * 0.76)
+        levels[index] = target >= levels[index] ? target : max(target, levels[index] * release)
     }
     return levels
 }
