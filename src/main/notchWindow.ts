@@ -2,7 +2,7 @@
  * The overlay: full screen width, transparent, above the menu bar, and
  * click-through everywhere except the island itself.
  *
- * There is no text input anywhere in Claude Light, so unlike its ancestor this
+ * There is no text input anywhere in Notchlight, so unlike its ancestor this
  * window never takes the keyboard. Mouse events reach a non-focusable window
  * fine, which is the whole reason the Allow/Deny buttons can work without ever
  * stealing focus from the terminal you are actually typing in.
@@ -234,7 +234,7 @@ export function createGalleryWindow(): BrowserWindow {
     width: 1360,
     height: 940,
     show: false,
-    title: 'Claude Light — faces',
+    title: 'Notchlight — faces',
     backgroundColor: '#EFEBE4',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -259,7 +259,7 @@ export function createCustomizeWindow(): BrowserWindow {
     minWidth: 980,
     minHeight: 700,
     show: false,
-    title: 'Claude Light — Customize',
+    title: 'Notchlight — Customize',
     backgroundColor: '#F5F2ED',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

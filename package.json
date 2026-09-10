@@ -1,8 +1,8 @@
 {
-  "name": "claude-light",
+  "name": "notchlight",
   "version": "0.1.0",
   "private": true,
-  "description": "Claude Light \u2014 a dynamic island for Claude Code. A light on the left, a buddy on the right, nothing behind the lens.",
+  "description": "Notchlight \u2014 Claude and Codex activity, Spotify, and a file shelf, within reach.",
   "main": "dist/main/index.js",
   "type": "commonjs",
   "scripts": {
@@ -21,7 +21,11 @@
     "service:logs": "node bin/service.mjs logs",
     "service:uninstall": "node bin/service.mjs uninstall",
     "install-hooks": "node bin/install-hooks.mjs",
-    "uninstall-hooks": "node bin/install-hooks.mjs --remove"
+    "uninstall-hooks": "node bin/install-hooks.mjs --remove",
+    "test:rename": "node scripts/test-rename.mjs",
+    "test:liveness": "node scripts/test-liveness.mjs",
+    "test:codex": "node scripts/test-codex.mjs",
+    "smoke:codex": "node scripts/smoke-codex.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
@@ -38,5 +42,6 @@
   "allowScripts": {
     "electron@33.4.11": true,
     "esbuild@0.28.2": true
-  }
+  },
+  "productName": "Notchlight"
 }

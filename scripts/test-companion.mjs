@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const root = await mkdtemp(path.join(os.tmpdir(), 'claude-light-companion-'));
+const root = await mkdtemp(path.join(os.tmpdir(), 'notchlight-companion-'));
 try {
   await build({ entryPoints: ['src/main/companionStore.ts','src/main/spotify.ts','src/main/audioLevels.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   const { CompanionStore } = await import(pathToFileURL(path.join(root,'companionStore.js')).href);

@@ -14,7 +14,7 @@ export function normalizeSpotify(value: unknown): SpotifySnapshot {
   const base = { ...EMPTY_SPOTIFY };
   if (raw.status === 'not-running') return { ...base, status: 'not-running', message: 'Open Spotify to see what’s playing.' };
   if (raw.status === 'empty') return { ...base, status: 'empty', message: 'Choose something to play in Spotify.' };
-  if (raw.status === 'permission') return { ...base, status: 'permission', message: 'Allow Claude Light to control Spotify in System Settings → Privacy & Security → Automation, then reconnect.' };
+  if (raw.status === 'permission') return { ...base, status: 'permission', message: 'Allow Notchlight to control Spotify in System Settings → Privacy & Security → Automation, then reconnect.' };
   if (raw.status !== 'ready' || !raw.track || typeof raw.track !== 'object') return { ...base, status: 'error', message: 'Could not read Spotify. Try reconnecting.' };
   const track = raw.track as Record<string, unknown>;
   const duration = number(track.durationMs) / 1000;

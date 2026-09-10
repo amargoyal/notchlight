@@ -191,7 +191,7 @@ export class HookServer extends EventEmitter {
       ? {
           decision,
           reason:
-            decision === 'allow' ? 'Allowed from the Claude Light island.' : 'Denied from the Claude Light island.'
+            decision === 'allow' ? 'Allowed from the Notchlight island.' : 'Denied from the Notchlight island.'
         }
       : {};
     try {
