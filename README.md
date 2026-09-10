@@ -335,8 +335,15 @@ for the native window. Its controls update the live notch and save preferences.
 Connect Spotify in Music; macOS may request Automation access and, separately,
 audio capture for the visualizer. No Spotify account sign-in is required here.
 
-Tray keeps real file references. Native drag-out keeps an item on the shelf;
-**Save copy…** confirms a copy before optionally removing its reference.
+Tray keeps real file references. Click selects one, Command-click adds,
+Shift-click takes a range, Command-A takes all; every action then works on
+the selection, and a drag from any selected item carries them all out.
+Native drag-out keeps an item on the shelf; **Save copy…** shows progress,
+never overwrites, carries on past an item that fails and says exactly what
+was and was not copied — a folder that fails part way is reported as a
+partial copy at the destination, not deleted and not claimed. Remove can be
+undone; a file that has moved stays on the shelf marked missing until you
+**Locate…** it or let it go.
 Neither action deletes the original file, and Save copy does not overwrite
 existing destinations.
 
