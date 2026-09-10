@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 
 const root = await mkdtemp(path.join(os.tmpdir(), 'notchlight-companion-'));
 try {
-  await build({ entryPoints: ['src/main/companionStore.ts','src/main/spotify.ts','src/main/audioLevels.ts','src/main/spotifyWatch.ts','src/main/hover.ts','src/main/terminal.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
+  await build({ entryPoints: ['src/main/companionStore.ts','src/main/spotify.ts','src/main/audioLevels.ts','src/main/spotifyWatch.ts','src/main/hover.ts','src/main/terminal.ts','src/main/helpers.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   await build({ entryPoints: ['src/shared/companion.ts'], bundle: true, platform: 'node', format: 'esm', outdir: root });
   const { CompanionStore } = await import(pathToFileURL(path.join(root,'companionStore.js')).href);
   const { SpotifyPlayer, normalizeSpotify, validArtwork, artistsFromPage } = await import(pathToFileURL(path.join(root,'spotify.js')).href);
@@ -16,6 +16,24 @@ try {
   const { playhead } = await import(pathToFileURL(path.join(root,'companion.js')).href);
   const { Hover } = await import(pathToFileURL(path.join(root,'hover.js')).href);
   const { classifyHost, selectTabScript, parentChain } = await import(pathToFileURL(path.join(root,'terminal.js')).href);
+  const { planHelper, ensureHelper, prebuiltFor } = await import(pathToFileURL(path.join(root,'helpers.js')).href);
+  // Helpers: a prebuilt whose manifest hash matches the source is installed without a compiler; anything else compiles.
+  const { createHash } = await import('node:crypto');
+  const hp = { sourceDir: path.join(root,'native'), prebuiltDir: path.join(root,'native','prebuilt'), binDir: path.join(root,'helper-bin'), arch: 'testarch' };
+  await mkdir(path.join(hp.prebuiltDir,'testarch'),{recursive:true});
+  await writeFile(path.join(hp.sourceDir,'audiotap.swift'),'print("v1")');
+  await writeFile(path.join(hp.prebuiltDir,'testarch','audiotap'),'#!/bin/sh\necho prebuilt-v1\n',{mode:0o755});
+  const hashOf = text => createHash('sha256').update(text).digest('hex');
+  await writeFile(path.join(hp.prebuiltDir,'manifest.json'),JSON.stringify({audiotap:{testarch:{sha256:hashOf('print("v1")')}}}));
+  assert.equal(planHelper('audiotap',hp).action,'copy','a matching prebuilt is installed');
+  assert.equal(await ensureHelper('audiotap',hp),path.join(hp.binDir,'audiotap'));
+  assert.equal(await readFile(path.join(hp.binDir,'audiotap'),'utf8'),'#!/bin/sh\necho prebuilt-v1\n');
+  assert.equal(planHelper('audiotap',hp).action,'ready','installed once, current afterwards');
+  await writeFile(path.join(hp.sourceDir,'audiotap.swift'),'print("v2")');
+  assert.equal(prebuiltFor('audiotap',hp),null,'an edited source disowns the prebuilt');
+  assert.equal(planHelper('audiotap',hp).action,'compile','…and only the compiler can help');
+  assert.equal(planHelper('audiotap',{...hp,arch:'otherarch'}).action,'compile','no prebuilt for this architecture');
+  assert.equal(planHelper('spotifywatch',hp).action,'none','no source, no binary, nothing to do');
   // Jump to terminal: the first .app ancestor is the host; only Terminal and iTerm2 can pick a tab by tty.
   assert.deepEqual(classifyHost(['/usr/local/bin/claude','/bin/zsh','/Applications/Ghostty.app/Contents/MacOS/ghostty','/sbin/launchd']),{kind:'app',app:'/Applications/Ghostty.app',name:'Ghostty'});
   assert.deepEqual(classifyHost(['claude','/bin/zsh','/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal']).kind,'terminal');
@@ -399,5 +417,5 @@ try {
   await new Promise(r=>setTimeout(r,50));
   assert.equal(missing.retryTimer,null,'a missing compiler never schedules a retry');
   missing.stop();
-  console.log('Companion checks passed: hover intent and keyboard hold, terminal host detection, real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
+  console.log('Companion checks passed: hover intent and keyboard hold, terminal host detection, prebuilt helper selection, real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
 } finally { await rm(root,{recursive:true,force:true}); }
