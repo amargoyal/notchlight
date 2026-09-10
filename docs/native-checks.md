@@ -55,6 +55,7 @@ working Claude session on the resting bar):
 | 2026-09-09 | playing, real bars on the resting bar, Agents selected, 70 ms transition per write | 22s | 45.0% | 484 MB | 1 / 0 | 0 | ok |
 | 2026-09-09 | playing, real bars, no transition, 30 fps helper | 20s | 23.6% | 472 MB | 1 / 0 | 0 | ok |
 | 2026-09-09 | playing, real bars, 24 fps helper | 20s | 23.1% | 423 MB | 1 / 0 | 0 | ok |
+| 2026-09-09 | idle, Spotify watcher listening, polls every 10 s | 20s | 10.1% | 413 MB | 0 / 0 | 0 | ok |
 
 What the numbers say:
 
