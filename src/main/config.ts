@@ -56,6 +56,12 @@ export interface Config {
   watchProcesses: boolean;
   /** A session whose process has been missing this long is gone. */
   processGraceSec: number;
+  /**
+   * Global shortcut that opens the island for the keyboard, in Electron's
+   * accelerator syntax. Escape hands focus back to the app you were in.
+   * Empty string registers nothing.
+   */
+  shortcut: string;
 }
 
 const DEFAULTS: Config = {
@@ -83,7 +89,8 @@ const DEFAULTS: Config = {
   doneLingerSec: 0,
   staleSec: 3 * 60 * 60,
   watchProcesses: true,
-  processGraceSec: 8
+  processGraceSec: 8,
+  shortcut: 'Alt+Shift+N'
 };
 
 let cached: Config | null = null;
@@ -104,6 +111,7 @@ export function config(): Config {
   // A zero-length gate list is the safe state; a bad type in the file must not
   // become a blocking hook by accident.
   if (!Array.isArray(cached.gateTools)) cached.gateTools = [];
+  if (typeof cached.shortcut !== 'string') cached.shortcut = DEFAULTS.shortcut;
   return cached;
 }
 
