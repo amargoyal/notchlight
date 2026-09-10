@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Notchlight \u2014 Claude and Codex activity, Spotify, and a file shelf, within reach.",
+  "author": "Amar Goyal",
   "main": "dist/main/index.js",
   "type": "commonjs",
   "scripts": {
@@ -25,13 +26,15 @@
     "test:rename": "node scripts/test-rename.mjs",
     "test:liveness": "node scripts/test-liveness.mjs",
     "test:codex": "node scripts/test-codex.mjs",
-    "smoke:codex": "node scripts/smoke-codex.mjs"
+    "smoke:codex": "node scripts/smoke-codex.mjs",
+    "dist": "npm run build && electron-builder --mac dmg --arm64"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "typescript": "^5.7.2"
   },
@@ -43,5 +46,52 @@
     "electron@33.4.11": true,
     "esbuild@0.28.2": true
   },
-  "productName": "Notchlight"
+  "productName": "Notchlight",
+  "build": {
+    "appId": "com.notchlight.island",
+    "productName": "Notchlight",
+    "copyright": "Amar Goyal",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "asar": false,
+    "files": [
+      "dist/**/*",
+      "bin/**/*",
+      "native/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.icns",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Notchlight controls Spotify through its scripting interface to show and change what is playing.",
+        "NSAudioCaptureUsageDescription": "Notchlight listens to Spotify's output so the equalizer bars can follow the music."
+      }
+    },
+    "dmg": {
+      "title": "Notchlight",
+      "contents": [
+        {
+          "x": 140,
+          "y": 180
+        },
+        {
+          "x": 400,
+          "y": 180,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "npmRebuild": false
+  }
 }
