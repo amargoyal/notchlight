@@ -69,6 +69,7 @@ function seconds(cputime) {
 function role(row, root) {
   if (row.comm.endsWith('/audiotap')) return 'audiotap';
   if (row.comm.endsWith('/notchprobe')) return 'notchprobe';
+  if (row.comm.endsWith('/spotifywatch')) return 'spotifywatch';
   if (/osascript$/.test(row.comm)) return 'osascript';
   if (row.pid === root) return 'main';
   const args = spawnSync('ps', ['-o', 'args=', '-p', String(row.pid)], { encoding: 'utf8' }).stdout;
