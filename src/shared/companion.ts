@@ -46,11 +46,13 @@ export interface SpotifySnapshot {
   position: number;
   /** When `position` was read (ms since epoch), so the renderer can let it advance between reads. */
   at: number;
+  /** Spotify's own volume, 0–100, or -1 when it did not say. */
+  volume: number;
   track: MusicTrack | null;
   busy: boolean;
   message?: string;
 }
-export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', playing: false, position: 0, at: 0, track: null, busy: false };
+export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', playing: false, position: 0, at: 0, volume: -1, track: null, busy: false };
 /** Where playback is now, given the last read and the clock. Paused stays put; nothing runs past the end. */
 export function playhead(music: SpotifySnapshot, now: number): number {
   if (!music.track) return 0;
@@ -130,7 +132,7 @@ export interface CompanionSnapshot {
   notice: string;
 }
 export interface OperationResult { ok: boolean; error?: string }
-export type SpotifyCommand = 'toggle' | 'next' | 'previous' | 'seek';
+export type SpotifyCommand = 'toggle' | 'next' | 'previous' | 'seek' | 'volume';
 export interface CompanionBridge {
   installCodexHooks(remove?: boolean): Promise<OperationResult>;
   chooseCodexHome(): Promise<OperationResult>;
