@@ -98,7 +98,7 @@ below are retained for reference; use this priority order:
 1. Resting-wing capture eligibility (13) and Spotify/capture recovery (14) landed September 9.
 2. Transport feedback (2) and Tray multi-select/recovery (8, 16) landed September 9.
 3. Keyboard access (15) and native lifecycle and energy checks (17) landed September 9.
-4. Apply the selected Notchlight identity and prepare distribution (18, 3–4).
+4. Identity (18), prebuilt helpers (3) and the packaged app (4) landed September 9; signing and notarization remain.
 5. Consider clipboard history (12) as an opt-in feature after those foundations.
    Extra players and decorative effects can follow actual demand.
 
@@ -137,17 +137,28 @@ renderer advance the seek bar four times a second between reads. Play/pause
 shows its expected state on click and the following read confirms it.
 Helper transport commands were already published immediately.
 
-### 3. Prebuilt helpers
-`audiotap` and `notchprobe` compile at runtime and need Xcode command line
-tools. Build them in GitHub Actions on a macOS runner (`swiftc -O`), commit or
-attach the binaries, and fall back to compiling only when a prebuilt one is
-missing or older than its source. Removes the `swiftc` requirement from the
-README.
+### 3. Prebuilt helpers — implemented September 9, 2026
+`scripts/build-helpers.mjs` (`npm run helpers`, `--check`) compiles
+`native/*.swift` into `native/prebuilt/<arch>/` and records each source's
+SHA-256 in `native/prebuilt/manifest.json`. `src/main/helpers.ts`
+(`planHelper`, `ensureHelper`, `ensureHelperSync`) installs a matching
+prebuilt into `~/.notchlight/bin` with a sidecar hash, compiles only when the
+source differs or the architecture has no prebuilt, and logs which. The
+notch probe uses it too. `.github/workflows/helpers.yml` builds on
+`macos-15` for pushes touching `native/` and attaches the DMG on `v*` tags.
+The arm64 binaries built on this Mac are committed; an Intel build needs the
+runner or an Intel Mac.
 
-### 4. Packaged app
-Run through `electron-builder` with a real bundle id and its own
-`NSAudioCaptureUsageDescription`. Today the audio capture prompt says
-"Electron". Also fixes TCC attribution for the helpers.
+### 4. Packaged app — implemented September 9, 2026
+`npm run dist` (electron-builder, PR #7) with `com.notchlight.island`,
+`LSUIElement`, `NSAppleEventsUsageDescription` and
+`NSAudioCaptureUsageDescription`. Version 0.2.0. Helpers ship inside the
+bundle and run as children of Notchlight.app, so TCC prompts name
+Notchlight. The menu bar item offers **Start at login** in the packaged app
+(`app.setLoginItemSettings`). `bin/install-hooks.mjs` spells the hook
+command with the running runtime, so a Mac without Node uses Notchlight's
+own binary as Node. Still unsigned and not notarized: first launch needs
+right-click → Open or `xattr -dr com.apple.quarantine`.
 
 ### 5. Levels drive more than the bars
 The level stream is cheap to reuse: pulse the mini artwork's scale with the

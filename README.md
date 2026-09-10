@@ -35,10 +35,21 @@ yet, so the first launch needs a right-click → **Open**, or:
 xattr -dr com.apple.quarantine /Applications/Notchlight.app
 ```
 
+The app ships its Swift helpers prebuilt for Apple silicon under
+`native/prebuilt/`, so nothing needs the Xcode command line tools; each binary
+is installed into `~/.notchlight/bin` when its manifest hash matches the source
+beside it, and `swiftc` is used only for an edited source or another
+architecture. Because the helpers then run as children of Notchlight.app, the
+Automation and audio capture prompts name Notchlight rather than Electron.
+**Start at login** is in the menu bar item of the packaged app.
+
 The packaged app and the checkout's launchd service share one single-instance
 lock; stop the service (`npm run service:uninstall`) before switching to the
 app, or keep using the service and skip the DMG. Build your own with
-`npm run dist` (output under `release/`).
+`npm run dist` (output under `release/`); `npm run helpers` rebuilds the
+prebuilt binaries and the GitHub Actions workflow does the same on a macOS
+runner for every push that touches `native/` and every `v*` tag, attaching the
+DMG to the release.
 
 Open **Customize Notchlight…** from the menu bar to choose its appearance.
 Settings and Tray references are saved on this Mac. See the
