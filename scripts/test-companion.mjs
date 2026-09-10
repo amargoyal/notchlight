@@ -15,6 +15,7 @@ try {
   const { SpotifyPlayer, normalizeSpotify, validArtwork, artistsFromPage } = await import(pathToFileURL(path.join(root,'spotify.js')).href);
   const { AudioLevels, wantsLevels, captureReason, helperArguments } = await import(pathToFileURL(path.join(root,'audioLevels.js')).href);
   assert.deepEqual(helperArguments({levelsOffsetMs:0}),['--fps','24'],'no correction by default');
+  assert.deepEqual(helperArguments({levelsOffsetMs:0},'apple'),['--fps','24','--bundle','com.apple.Music'],'Apple Music is tapped by bundle id');
   assert.deepEqual(helperArguments({levelsOffsetMs:-80}),['--fps','24','--offset-ms','-80'],'a latency correction reaches the helper');
   const { SpotifyWatcher, parsePlaybackChange } = await import(pathToFileURL(path.join(root,'spotifyWatch.js')).href);
   const { playhead } = await import(pathToFileURL(path.join(root,'companion.js')).href);
@@ -218,6 +219,10 @@ try {
   const music = normalizeSpotify({status:'ready',playing:true,position:72,track:{id:'spotify:track:test',title:'Example',artist:'Artist',album:'Album',durationMs:234000,artwork:'https://i.scdn.co/image/example'}});
   assert.equal(music.track.duration,234); assert.equal(music.position,72);
   assert.equal(normalizeSpotify({status:'permission'}).status,'permission');
+  assert.equal(normalizeSpotify({status:'not-running'},'apple').message,'Open Apple Music to see what’s playing.','messages name the player');
+  assert.equal(normalizeSpotify({status:'ready',playing:true,position:1,track:{id:'music:1',title:'A',durationMs:1000}},'apple').player,'apple');
+  assert.equal(validArtwork('data:image/png;base64,iVBORw0KGgo='),'data:image/png;base64,iVBORw0KGgo=','the app’s own PNG data URLs are accepted');
+  assert.equal(validArtwork('data:text/html;base64,PHNjcmlwdD4='),undefined,'only PNG data URLs');
   assert.equal(music.volume,-1,'volume is unknown until Spotify says');
   assert.equal(normalizeSpotify({status:'ready',playing:true,position:1,volume:63.4,track:{id:'v',title:'V',durationMs:1000}}).volume,63);
   assert.equal(normalizeSpotify({status:'ready',playing:true,position:1,volume:140,track:{id:'v',title:'V',durationMs:1000}}).volume,100,'volume is clamped');
@@ -329,6 +334,26 @@ try {
   assert.deepEqual(parsePlaybackChange('{"state":"Paused","trackId":"spotify:track:b","position":12.5,"durationMs":200000,"title":"B","artist":"Y","album":"Z"}'),{playing:false,trackId:'spotify:track:b',position:12.5,durationMs:200000,title:'B',artist:'Y',album:'Z'});
   assert.equal(parsePlaybackChange('not json'),null);
   assert.equal(parsePlaybackChange('{"ok":true}'),null,'the status line is not a change');
+  assert.equal(parsePlaybackChange('{"player":"apple","state":"Playing","trackId":"music:1"}').player,'apple');
+  // Auto follows whichever player is open: Spotify first, Apple Music while Spotify is not running, back when it returns.
+  const apps = { spotify: 'not-running', apple: 'ready' };
+  const asked = [];
+  const auto = new SpotifyPlayer(async (command, position, player) => { asked.push(player); const st = apps[player]; return st === 'ready' ? {status:'ready',playing:true,position:1,track:{id:`${player}:1`,title:player,artist:'',durationMs:1000}} : {status: st}; }, undefined, 15);
+  auto.setPlayer('auto');
+  auto.setEnabled(true);
+  await new Promise(r=>setTimeout(r,25));
+  assert.equal(auto.current().player,'apple','auto moved to Apple Music while Spotify is closed');
+  assert.deepEqual(asked.slice(0,2),['spotify','apple']);
+  apps.apple = 'not-running'; apps.spotify = 'ready';
+  await new Promise(r=>setTimeout(r,40));
+  assert.equal(auto.current().player,'spotify','…and back to Spotify when it is the one open');
+  auto.onExternalChange({player:'apple',playing:true,trackId:'music:2'});
+  assert.equal(auto.current().player,'spotify','the other app’s notification does not switch the state by itself');
+  auto.setPlayer('apple');
+  await new Promise(r=>setTimeout(r,25));
+  assert.equal(auto.current().status,'not-running','a fixed choice is followed even when it is closed');
+  assert.equal(auto.currentPlayer(),'apple');
+  auto.stop();
   const watchedReads = [];
   const watched = new SpotifyPlayer(async()=>{ watchedReads.push(Date.now()); return {status:'ready',playing:true,position:30,track:{id:'spotify:track:a',title:'A',artist:'X',album:'',durationMs:100000,artwork:'https://i.scdn.co/image/a'}}; }, undefined, 15);
   watched.setEnabled(true);
@@ -464,5 +489,5 @@ try {
   await new Promise(r=>setTimeout(r,50));
   assert.equal(missing.retryTimer,null,'a missing compiler never schedules a retry');
   missing.stop();
-  console.log('Companion checks passed: artwork tint, bar layouts, token sparkline, hover intent and keyboard hold, terminal host detection, prebuilt helper selection, real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
+  console.log('Companion checks passed: player choice and auto-follow, artwork tint, bar layouts, token sparkline, hover intent and keyboard hold, terminal host detection, prebuilt helper selection, real filesystem persistence/copy/conflicts, multi-select copy with progress, undo and locate, reference safety, Spotify normalization/control/disconnect races, audio level helper lifecycle and recovery, Spotify retry backoff, watcher changes and playhead, full artist credits.');
 } finally { await rm(root,{recursive:true,force:true}); }
