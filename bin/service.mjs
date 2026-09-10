@@ -87,10 +87,37 @@ function writePlist() {
   fs.writeFileSync(PLIST, plist);
 }
 
-function stop() {
+function runningPid() {
+  const r = launchctl(['print', `${TARGET}/${LABEL}`]);
+  const pid = r.status === 0 ? /\bpid = (\d+)/.exec(r.stdout)?.[1] : null;
+  return pid ? Number(pid) : null;
+}
+
+function alive(pid) {
+  try { process.kill(pid, 0); return true; } catch (error) { return error.code === 'EPERM'; }
+}
+
+/**
+ * Stop, and wait for the old process to actually be gone.
+ *
+ * `bootout` returns before the job has finished quitting. The new copy holds
+ * the same single-instance lock, so starting it while the old one is still on
+ * its way out makes the new one exit cleanly on the spot — and a clean exit is
+ * exactly what KeepAlive is told not to restart. The result was a restart that
+ * left nothing running.
+ */
+async function stop() {
+  const pid = runningPid();
   // `bootout` on a job that is not loaded returns non-zero; that is a no-op,
   // not a failure, so its output is swallowed.
   launchctl(['bootout', `${TARGET}/${LABEL}`]);
+  if (!pid) return;
+  const deadline = Date.now() + 8000;
+  while (alive(pid) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
+  if (alive(pid)) {
+    process.kill(pid, 'SIGKILL');
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
 }
 
 function migratePreviousService() {
@@ -124,7 +151,7 @@ async function start() {
 switch (cmd) {
   case 'install': {
     build();
-    stop();
+    await stop();
     migratePreviousService();
     writePlist();
     await start();
@@ -136,7 +163,7 @@ switch (cmd) {
   }
   case 'restart': {
     build();
-    stop();
+    await stop();
     migratePreviousService();
     writePlist();
     await start();
@@ -144,7 +171,7 @@ switch (cmd) {
     break;
   }
   case 'uninstall': {
-    stop();
+    await stop();
     fs.rmSync(PLIST, { force: true });
     console.log(`removed ${LABEL}`);
     break;
@@ -166,8 +193,18 @@ switch (cmd) {
     }
     const pid = /\bpid = (\d+)/.exec(r.stdout)?.[1];
     const state = /\bstate = (\S+)/.exec(r.stdout)?.[1];
+    const runs = /\bruns = (\d+)/.exec(r.stdout)?.[1];
+    const lastExit = /last exit code = ([^\n]+)/.exec(r.stdout)?.[1]?.trim();
     console.log(pid ? `running · pid ${pid}` : `loaded · ${state ?? 'not running'}`);
+    if (runs) console.log(`runs ${runs}${lastExit && lastExit !== '(never exited)' ? ` · last exit ${lastExit}` : ''}`);
+    if (pid) {
+      const tree = spawnSync('ps', ['-Ao', 'pid=,ppid=,%cpu=,rss=,comm='], { encoding: 'utf8' }).stdout.split('\n')
+        .map(line => /^\s*(\d+)\s+(\d+)\s+([\d.]+)\s+(\d+)\s+(.*)$/.exec(line)).filter(Boolean)
+        .filter(m => m[2] === pid).map(m => ({ pid: m[1], cpu: Number(m[3]), rss: Math.round(Number(m[4]) / 1024), comm: m[5].trim() }));
+      for (const child of tree) console.log(`  ${child.comm.endsWith('audiotap') ? 'audiotap' : /Renderer/.test(child.comm) ? 'renderer' : /osascript/.test(child.comm) ? 'osascript' : 'helper'} pid ${child.pid} · ${child.cpu.toFixed(1)}% · ${child.rss} MB`);
+    }
     console.log('log ' + LOG);
+    console.log('`node scripts/native-check.mjs measure` samples CPU over an interval.');
     break;
   }
   default:

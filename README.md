@@ -97,6 +97,8 @@ npm run service:status       # running · pid 97741
 npm run service:restart      # rebuild and kick it
 npm run service:logs         # tail ~/.notchlight/island.log
 npm run service:uninstall    # stop it and remove the LaunchAgent
+npm run check:native -- measure   # CPU, memory and helper starts over 30 s
+npm run check:native -- log       # what the app saw: sleep, wake, displays, Spotify
 ```
 
 launchd rather than `nohup … &`: a backgrounded shell job dies with the session
@@ -107,7 +109,13 @@ crashes.
 
 Only one copy runs at a time, so stop any `npm start` instance before installing
 the service — the second one takes the single-instance lock, sees it is not the
-primary, and exits.
+primary, and exits. `service:restart` waits for the old process to be gone
+before starting the new one, for the same reason.
+
+The service goes dark on sleep and screen lock — Spotify polls hold and the
+audio helper stops — and comes back on wake by re-measuring the display and
+reading Spotify at once. [Native checks](docs/native-checks.md) lists the
+steps that verify this on real hardware and the resource budget they measured.
 
 ### Hooks (optional, recommended)
 

@@ -4,7 +4,7 @@
  * Hooks and transcripts feed one live store and one notch overlay. The gallery
  * and customization preview are ordinary windows with a shared Dock lifecycle.
  */
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, powerMonitor, shell, Tray } from 'electron';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -23,6 +23,7 @@ import { Store } from './store';
 import { CodexAdapter } from './codex';
 import { CodexApprovals } from './codexApprovals';
 import { AgentCoordinator } from './agentCoordinator';
+import { logEvent } from './lifecycle';
 import type { HitRect, Snapshot } from '../shared/types';
 
 const DEMO = process.argv.includes('--demo');
@@ -54,6 +55,8 @@ let spotify: SpotifyPlayer;
 let levels: AudioLevels;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
+/** Asleep or locked: nobody is looking, so no helper should be running. */
+let dark = false;
 
 function send(win: BrowserWindow | null, channel: string, payload: unknown): void {
   if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send(channel, payload);
@@ -266,11 +269,12 @@ async function boot(): Promise<void> {
   if (!DEMO) codexApprovals.start();
   let spotifyEnabled = companion.current().preferences.spotifyEnabled;
   spotify.on('change', music => companion.setMusic(music));
+  const syncLevels = () => levels.setActive(!dark && wantsLevels(companion.current()));
   companion.on('change', state => {
     syncCodex();
     send(notch?.win ?? null, 'companion', state);
     send(customize, 'companion', state);
-    levels.setActive(wantsLevels(state));
+    syncLevels();
     if (state.preferences.spotifyEnabled !== spotifyEnabled) {
       spotifyEnabled = state.preferences.spotifyEnabled;
       spotify.setEnabled(spotifyEnabled);
@@ -329,12 +333,48 @@ async function boot(): Promise<void> {
     hooks.start();
   }
 
+  watchPower(syncLevels);
   store.start();
   startTray();
   ready = true;
+  logEvent('notchlight', `ready pid ${process.pid} electron ${process.versions.electron} ${DEMO ? 'demo' : 'live'}`);
   if (GALLERY_ONLY || pendingWindow === 'gallery') openGallery();
   if (CUSTOMIZE || pendingWindow === 'customize') openCustomize();
   pendingWindow = null;
+}
+
+/**
+ * Sleep, lock and wake.
+ *
+ * Going dark stops the audio helper and holds the Spotify polls: a tap on a
+ * device that is about to disappear exits anyway, and an osascript that starts
+ * as the lid closes times out and reads as an error. Coming back re-measures
+ * the display — the one that wakes is not always the one that slept — reads
+ * Spotify at once, and lets the helper come back only if the bars are still
+ * wanted. Every step is logged so the native checks can see it happened.
+ */
+function watchPower(syncLevels: () => void): void {
+  const goDark = (why: string) => {
+    if (dark) return;
+    dark = true;
+    logEvent('power', why);
+    spotify.suspend();
+    syncLevels();
+  };
+  const comeBack = (why: string) => {
+    if (!dark) return;
+    dark = false;
+    logEvent('power', why);
+    notch?.settle(why);
+    spotify.resume();
+    syncLevels();
+    void companion.refresh().catch(() => {});
+  };
+  powerMonitor.on('suspend', () => goDark('suspend'));
+  powerMonitor.on('lock-screen', () => goDark('lock-screen'));
+  powerMonitor.on('resume', () => comeBack('resume'));
+  powerMonitor.on('unlock-screen', () => comeBack('unlock-screen'));
+  powerMonitor.on('shutdown', () => { logEvent('power', 'shutdown'); app.quit(); });
 }
 
 /** Hand the measured cutout to both the store and the window's own sizing. */
@@ -394,12 +434,13 @@ app.whenReady().then(() => {
   /** No dock icon: the island is furniture, not an app you switch to. */
   app.dock?.hide();
   if (notchState() === 'no' && !config().allowWithoutNotch && !DEMO) {
-    console.log('[notchlight] no cutout on this display — set allowWithoutNotch to run anyway');
+    logEvent('notchlight', 'no cutout on this display — set allowWithoutNotch to run anyway');
   }
   void boot().catch(error => { console.error('[companion] startup failed:', error.message); app.quit(); });
 });
 
 app.on('before-quit', () => {
+  logEvent('notchlight', 'quitting');
   if (shelfTimer) clearInterval(shelfTimer);
   spotify?.stop();
   levels?.stop();

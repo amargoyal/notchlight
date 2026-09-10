@@ -20,6 +20,7 @@
     "service:restart": "node bin/service.mjs restart",
     "service:status": "node bin/service.mjs status",
     "service:logs": "node bin/service.mjs logs",
+    "check:native": "node scripts/native-check.mjs",
     "service:uninstall": "node bin/service.mjs uninstall",
     "install-hooks": "node bin/install-hooks.mjs",
     "uninstall-hooks": "node bin/install-hooks.mjs --remove",

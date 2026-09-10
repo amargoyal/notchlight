@@ -106,14 +106,16 @@ export function CompanionSurface({ live, open, hovering, onBox, onCustomize }: {
   const preferences = live.state.preferences;
   const view = dragging ? 'tray' : live.state.view;
   const expanded = open || dragging;
-  const snapshot = { ...live.snapshot, pulse: preferences.pulse };
+  // Reduced motion stills the lights too; the pulse timer never starts for them.
+  const motion = !preferences.reducedMotion;
+  const snapshot = { ...live.snapshot, pulse: preferences.pulse && motion };
   useLayoutEffect(() => { if (focus.current && expanded) { document.getElementById(`${id}-${view}`)?.focus(); focus.current = false; } }, [id, view, expanded]);
   useEffect(() => () => { if (leaveTimer.current) clearTimeout(leaveTimer.current); }, []);
   const choose = (view: CompanionView, keyboard = false) => { focus.current = keyboard; void live.run(() => window.notchlight.setView(view)); };
   const tabs = <nav className="mp-nav" aria-label="Notch views"><div role="tablist" aria-label="Companion view">{views.map((item,index) => <button key={item} role="tab" id={`${id}-${item}`} aria-controls={`${id}-panel`} aria-selected={view === item} tabIndex={view === item ? 0 : -1} onClick={() => choose(item,true)} onKeyDown={e => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return; e.preventDefault(); choose(views[e.key === 'Home' ? 0 : e.key === 'End' ? 2 : (index + (e.key === 'ArrowRight' ? 1 : 2)) % 3],true); }}>{item === 'agents' ? <Buddy size={15}/> : <Icon name={item} size={14}/>} {names[item]}{item === 'agents' && snapshot.overall === 'asking' && <span className="mp-attention-dot" aria-label="Needs your attention"/>}{item === 'tray' && <span className="mp-count">{live.state.files.length}</span>}</button>)}</div><button className="mp-icon-button" aria-label="Open customization" onClick={onCustomize}><Icon name="settings" size={16}/></button></nav>;
   const { music, files } = live.state;
   const selectProvider = (provider: 'claude' | 'codex') => { setFilter(provider); choose('agents'); };
-  const agents = agentRestingParts(snapshot, preferences, selectProvider);
+  const agents = agentRestingParts(snapshot, { ...preferences, pulse: preferences.pulse && motion, codexPulse: preferences.codexPulse && motion }, selectProvider);
   const parts: RestingPart[] = [...agents,
     ...(preferences.restMusic && music.status === 'ready' && music.track ? [{left:<LiveArtwork live={live} mini/>,right:<LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion}/>}]:[]),
     ...(preferences.restTray && files.length || dragging ? [{left:<span className="mp-shelf-wing"><Icon name="tray" size={16}/>{files.length}</span>,right:<Icon name="file" size={16}/>}]:[])

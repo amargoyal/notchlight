@@ -97,7 +97,7 @@ below are retained for reference; use this priority order:
 
 1. Fix resting-wing audio capture eligibility and Spotify recovery (13–14).
 2. Improve transport feedback (2) and Tray multi-select/recovery (8, 16).
-3. Add keyboard access and verify native lifecycle/energy behavior (15, 17).
+3. Add keyboard access (15). Native lifecycle and energy checks (17) landed September 9.
 4. Apply the selected Notchlight identity and prepare distribution (18, 3–4).
 5. Consider clipboard history (12) as an opt-in feature after those foundations.
    Extra players and decorative effects can follow actual demand.
@@ -181,9 +181,9 @@ command to `native/spotify.js` and `SpotifyPlayer.command`.
 ### 10. Display changes
 Already implemented in `src/main/notchWindow.ts`: display metrics, added, and
 removed events share a 250 ms debounce, reset the probe, reposition, then
-notify geometry consumers. Remaining work is native verification of docking,
-undocking, clamshell, scaling changes, and identical-width displays, not adding
-another listener. See item 17.
+notify geometry consumers, and now log the change and the display they
+settled on. A wake runs the same settle. Docking, undocking, clamshell,
+scaling and identical-width displays are steps in [Native checks](native-checks.md).
 
 ### 11. Bluetooth latency tuning
 CoreAudio's latency figure for AirPods is an estimate. If the bars still feel
@@ -269,14 +269,20 @@ successful transfer. Preserve no-overwrite behavior and native drag retention.
 Acceptance examples: duplicate filenames, renamed source, unplugged volume,
 cancelled drag, and a failed directory copy with a partial destination.
 
-### 17. Native verification and resource budget
-Record a small repeatable native check: sleep/wake, Spotify quit/relaunch,
-AirPods/output switching, docking, fullscreen/Spaces, cancelled and successful
-Finder drags, customization close/reopen, and reduced motion toggled at runtime.
-Measure idle versus playing CPU, memory, and helper starts over a fixed interval.
-Ensure hidden/unneeded visualizers do not keep capture alive. Gallery renders
-and mocked helper tests complement these checks; they do not prove native drag,
-TCC permission recovery, or real audio synchronization.
+### 17. Native verification and resource budget — implemented September 9, 2026
+[Native checks](native-checks.md) records the repeatable steps and the
+budget. `scripts/native-check.mjs` (`npm run check:native`) measures the
+service's process tree, counts helper starts and renderer crashes, and reads
+the lifecycle log (`src/main/lifecycle.ts`) that every power, display,
+levels and Spotify transition now writes. `powerMonitor` stops the helper
+and holds Spotify polls on sleep or lock and recovers on wake;
+`bin/service.mjs` waits for the old process before bootstrapping the new one.
+The idle budget was dominated by the CSS pulse animation (34 % of a core);
+the light now breathes from a shared 12 fps timer (`src/renderer/pulse.ts`)
+and idle is under 14 %, under 3 % with nothing pulsing. The canned equalizer
+animation costs the same 25 % while Music rests — item 13 fixes that.
+Sleep, lock, output switching and display steps remain manual; the doc says
+which log lines prove each one.
 
 ### 18. Naming, accurate docs, and migration — implemented locally
 The owner selected **Notchlight**. Repository, checkout, visible titles, menu

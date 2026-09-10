@@ -21,6 +21,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { Buddy, BuddyStack, faceFor } from './Buddy';
 import { Mark } from './marks';
 import { C, MONO, PANEL_W, SANS, glow, lightColor } from './theme';
+import { pulseStyle, usePulse } from './pulse';
 import { duration, tokens as fmtTokens } from '../shared/fmt';
 import type { Activity, Agent, AgentProvider, ApprovalDecision, Face, HitRect, Session, Snapshot, Status } from '../shared/types';
 
@@ -45,6 +46,7 @@ export interface IslandProps {
 function Light({ status, size = 9, pulse = false }: { status: Status; size?: number; pulse?: boolean }) {
   const color = lightColor(status);
   const dead = status === 'idle';
+  const pulsing = usePulse(pulse && status === 'working');
   return (
     <div
       style={{
@@ -54,7 +56,7 @@ function Light({ status, size = 9, pulse = false }: { status: Status; size?: num
         flex: 'none',
         background: dead ? 'transparent' : color,
         boxShadow: dead ? `inset 0 0 0 1.5px ${C.dead}` : glow(color, 0.9),
-        animation: pulse && status === 'working' ? 'cl-pulse 1.7s ease-in-out infinite' : undefined
+        ...pulseStyle(pulsing)
       }}
     />
   );
