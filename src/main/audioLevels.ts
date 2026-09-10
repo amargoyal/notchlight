@@ -15,6 +15,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import readline from 'node:readline';
 import { ensureHelper } from './helpers';
 import { logEvent } from './lifecycle';
+import { config } from './config';
 
 const BARS = 5;
 
@@ -37,6 +38,12 @@ export function captureReason(head: string | undefined): AudioLevelsReason {
   return 'failed';
 }
 
+/** What the helper is started with: the frame rate, and the owner's latency correction from config.json. */
+export function helperArguments(cfg: { levelsOffsetMs: number } = config()): string[] {
+  const offset = Math.round(cfg.levelsOffsetMs || 0);
+  return ['--fps', '24', ...(offset ? ['--offset-ms', String(offset)] : [])];
+}
+
 export class AudioLevels extends EventEmitter {
   private child: ChildProcess | null = null;
   private wanted = false;
@@ -49,7 +56,7 @@ export class AudioLevels extends EventEmitter {
   reason: AudioLevelsReason | null = null;
   /** Helper processes spawned so far. The native checks watch this stay flat while nothing changes. */
   starts = 0;
-  constructor(private locate: () => Promise<string | null> = () => ensureHelper('audiotap')) { super(); }
+  constructor(private locate: () => Promise<string | null> = () => ensureHelper('audiotap'), private arguments_: () => string[] = helperArguments) { super(); }
 
   /** Start or stop listening. Safe to call on every state change; it only acts on the edges. */
   setActive(active: boolean): void {
@@ -103,7 +110,7 @@ export class AudioLevels extends EventEmitter {
     if (!bin) { this.retryAt = Infinity; this.setStatus('unavailable', 'no-helper'); return; }
     if (!this.wanted) { this.setStatus('idle'); return; }
     let child: ChildProcess;
-    try { child = spawn(bin, [], { stdio: ['pipe', 'pipe', 'ignore'] }); }
+    try { child = spawn(bin, this.arguments_(), { stdio: ['pipe', 'pipe', 'ignore'] }); }
     catch { this.backOff(60_000, 'crashed'); return; }
     this.child = child;
     this.starts++;
@@ -116,7 +123,7 @@ export class AudioLevels extends EventEmitter {
         first = false;
         let head: { ok?: boolean; reason?: string } = {};
         try { head = JSON.parse(line); } catch { /* treated as a refusal below */ }
-        if (head.ok) { this.setStatus('listening'); return; }
+        if (head.ok) { logEvent('levels', `helper ready: ${line.slice(0, 160)}`); this.setStatus('listening'); return; }
         // Spotify not open is momentary; anything else is the OS saying no, so wait longer.
         logEvent('levels', `helper refused: ${head.reason ?? 'no status line'}`);
         const reason = captureReason(head.reason);

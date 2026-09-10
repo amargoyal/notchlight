@@ -208,10 +208,14 @@ notify geometry consumers, and now log the change and the display they
 settled on. A wake runs the same settle. Docking, undocking, clamshell,
 scaling and identical-width displays are steps in [Native checks](native-checks.md).
 
-### 11. Bluetooth latency tuning
-CoreAudio's latency figure for AirPods is an estimate. If the bars still feel
-early or late, add a `levelsOffsetMs` config key in `src/main/config.ts` and
-pass it to `audiotap` as an argument to add to `delayFrames`.
+### 11. Bluetooth latency tuning — knob added September 9, 2026
+Synchronization was not judged by ear in this session, so no correction is
+applied: `levelsOffsetMs` in `src/main/config.ts` defaults to 0 and is
+clamped to ±2000. `helperArguments()` in `src/main/audioLevels.ts` passes it
+as `audiotap --offset-ms`, which adds to (or subtracts from, down to zero)
+the measured latency before `delayFrames`. The helper's ready line now
+reports `latencyMs`, `offsetMs` and `delayFrames` and is logged. Tune only if
+listening shows the bars persistently early or late.
 
 ### 12. Clipboard manager (a fourth face) — implemented September 9, 2026
 `src/main/clipboardStore.ts` polls every 500 ms while `clipboardEnabled`

@@ -13,7 +13,11 @@
 // when the tap cannot be built. `ok:false` is a fallback signal, not an error.
 //
 //   swiftc -O -o audiotap audiotap.swift
-//   audiotap [--fps 24]     frames per second on stdout; 24 by default
+//   audiotap [--fps 24] [--offset-ms 0]
+//     --fps        frames per second on stdout; 24 by default
+//     --offset-ms  extra delay added to the output device's reported latency,
+//                  for a Bluetooth output whose figure is an estimate; negative
+//                  values pull the bars earlier, down to no delay at all
 
 import AppKit
 import Accelerate
@@ -25,10 +29,19 @@ let bundleID = "com.spotify.client"
 let bandEdges: [Double] = [40, 130, 400, 1200, 3500, 11000]
 /// Every frame is a composite of the whole overlay window on the other side, so
 /// fewer frames is directly less GPU. 24 reads as continuous on 14 px bars.
-let framesPerSecond: Double = {
+func argument(_ name: String) -> Double? {
     let args = CommandLine.arguments
-    if let index = args.firstIndex(of: "--fps"), index + 1 < args.count, let fps = Double(args[index + 1]), fps >= 5, fps <= 60 { return fps }
+    guard let index = args.firstIndex(of: name), index + 1 < args.count else { return nil }
+    return Double(args[index + 1])
+}
+let framesPerSecond: Double = {
+    if let fps = argument("--fps"), fps >= 5, fps <= 60 { return fps }
     return 24
+}()
+/// Seconds added to (or taken from) the measured output latency. See --offset-ms.
+let offsetSeconds: Double = {
+    if let ms = argument("--offset-ms"), ms.isFinite, abs(ms) <= 2000 { return ms / 1000 }
+    return 0
 }()
 let fftSize = 2048
 let log2n = vDSP_Length(11)
@@ -135,7 +148,7 @@ do {
     }
 }
 let latencySeconds = Double(latencyFrames) / outputRate
-let delayFrames = Int((latencySeconds * framesPerSecond).rounded())
+let delayFrames = max(0, Int(((latencySeconds + offsetSeconds) * framesPerSecond).rounded()))
 
 let aggregateDescription: [String: Any] = [
     kAudioAggregateDeviceNameKey: "Notchlight levels",
@@ -291,7 +304,7 @@ func analyze() -> [Float] {
 
 // MARK: - Run
 
-emit("{\"ok\":true,\"rate\":\(Int(sampleRate)),\"latencyMs\":\(Int(latencySeconds * 1000))}")
+emit("{\"ok\":true,\"rate\":\(Int(sampleRate)),\"latencyMs\":\(Int(latencySeconds * 1000)),\"offsetMs\":\(Int(offsetSeconds * 1000)),\"delayFrames\":\(delayFrames)}")
 var held: [String] = []
 
 // The aggregate is pinned to one output device. When the default output moves
