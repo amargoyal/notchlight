@@ -84,12 +84,17 @@ export function describeCapture(capture: CaptureSnapshot, music: SpotifySnapshot
     default: return music.status === 'ready' && music.playing ? 'Capture starts when the bars are on screen.' : 'Capture runs only while Spotify plays and the bars are showing.';
   }
 }
+/** A Save copy in flight: bytes so far, and which item of how many. */
+export interface TransferProgress { name: string; done: number; total: number; item: number; items: number }
 export interface CompanionSnapshot {
   preferences: CompanionPreferences;
   view: CompanionView;
   files: ShelfFile[];
   music: SpotifySnapshot;
   capture: CaptureSnapshot;
+  transfer: TransferProgress | null;
+  /** How many references the last Remove took; Undo puts them back. */
+  undoable: number;
   notice: string;
 }
 export interface OperationResult { ok: boolean; error?: string }
@@ -103,10 +108,13 @@ export interface CompanionBridge {
   setView(view: CompanionView): Promise<OperationResult>;
   addFiles(files: File[]): Promise<OperationResult>;
   pickFiles(): Promise<OperationResult>;
-  removeFile(id: string): Promise<OperationResult>;
+  removeFiles(ids: string[]): Promise<OperationResult>;
+  undoRemove(): Promise<OperationResult>;
   revealFile(id: string): Promise<OperationResult>;
-  saveFileCopy(id: string): Promise<OperationResult>;
-  startFileDrag(id: string): void;
+  /** Ask where a missing file lives now. */
+  locateFile(id: string): Promise<OperationResult>;
+  saveFileCopy(ids: string[]): Promise<OperationResult>;
+  startFileDrag(ids: string[]): void;
   connectSpotify(): Promise<OperationResult>;
   openSpotify(): Promise<OperationResult>;
   controlSpotify(command: SpotifyCommand, position?: number): Promise<OperationResult>;

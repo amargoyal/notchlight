@@ -12,7 +12,7 @@ import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filte
 const EMPTY: Snapshot = { sessions: [], overall: 'idle', tokens: 0, elapsed: 0, dormant: true, notchW: 200, notchH: 32, hoverDelay: 550, pulse: true, now: Date.now() };
 export function useCompanion() {
   const available = !!window.notchlight?.getCompanion;
-  const [state, setState] = useState<CompanionSnapshot>({ preferences: { ...DEFAULT_COMPANION_PREFERENCES }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, notice: '' });
+  const [state, setState] = useState<CompanionSnapshot>({ preferences: { ...DEFAULT_COMPANION_PREFERENCES }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, transfer: null, undoable: 0, notice: '' });
   const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
@@ -140,13 +140,39 @@ function LiveMusic({ live }: { live: LiveController }) {
   const position = seek ?? current;
   return <div className="mp-music"><div className="mp-track-row"><LiveArtwork live={live}/><div className="mp-track-meta"><h2 title={track.title}>{track.title}</h2><p title={track.artist}>{track.artist}</p><div className="mp-seek"><span>{time(position)}</span><input aria-label="Track position" aria-valuetext={`${time(position)} of ${time(track.duration)}`} type="range" min="0" max={track.duration} step="any" value={position} disabled={music.busy || !track.duration} onChange={e => setSeek(Number(e.target.value))} onPointerUp={e => commitSeek(Number(e.currentTarget.value))} onPointerCancel={() => setSeek(null)} onKeyUp={e => { if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key)) commitSeek(Number(e.currentTarget.value)); }}/><span>−{time(Math.max(0,track.duration-position))}</span></div><div className="mp-transport"><button className="mp-icon-button" disabled={music.busy} aria-label="Previous track" onClick={() => command('previous')}><Icon name="back" size={18}/></button><button className="mp-icon-button mp-play" disabled={music.busy} aria-label={playing ? 'Pause Spotify' : 'Play Spotify'} onClick={() => command('toggle')}><Icon name={playing ? 'pause' : 'play'} size={18}/></button><button className="mp-icon-button" disabled={music.busy} aria-label="Next track" onClick={() => command('next')}><Icon name="next" size={18}/></button></div></div></div></div>;
 }
-function FileButton({ file, live, selected, onSelect }: { file: ShelfFile; live: LiveController; selected: boolean; onSelect: () => void }) {
-  return <div className={`mp-shelf-item ${selected ? 'is-selected' : ''}`}><button className="mp-file-button" aria-label={`Select ${file.name}${file.unavailable ? ', unavailable' : ''}`} aria-pressed={selected} draggable={!file.unavailable} onDragStart={e => { e.preventDefault(); window.notchlight.startFileDrag(file.id); }} onClick={onSelect} onDoubleClick={() => void live.run(() => window.notchlight.revealFile(file.id))}><FileThumb file={file} small={live.state.preferences.thumbnails === 'small'} sample={false}/><span title={file.name}>{file.name}</span><small>{file.unavailable ? 'Unavailable' : file.size}</small></button><button className="mp-remove" aria-label={`Remove ${file.name} from Tray`} onClick={() => void live.run(() => window.notchlight.removeFile(file.id))}><Icon name="close" size={12}/></button></div>;
+function FileButton({ file, live, selected, dragIds, onSelect }: { file: ShelfFile; live: LiveController; selected: boolean; dragIds: string[]; onSelect: (e: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }) => void }) {
+  return <div className={`mp-shelf-item ${selected ? 'is-selected' : ''} ${file.unavailable ? 'is-unavailable' : ''}`}><button className="mp-file-button" aria-label={`Select ${file.name}${file.unavailable ? ', unavailable' : ''}`} aria-pressed={selected} draggable={!file.unavailable} onDragStart={e => { e.preventDefault(); window.notchlight.startFileDrag(dragIds); }} onClick={e => onSelect(e)} onDoubleClick={() => void live.run(() => file.unavailable ? window.notchlight.locateFile(file.id) : window.notchlight.revealFile(file.id))}><FileThumb file={file} small={live.state.preferences.thumbnails === 'small'} sample={false}/><span title={file.name}>{file.name}</span><small>{file.unavailable ? 'Missing' : file.size}</small></button><button className="mp-remove" aria-label={`Remove ${file.name} from Tray`} onClick={() => void live.run(() => window.notchlight.removeFiles([file.id]))}><Icon name="close" size={12}/></button></div>;
 }
+const bytes = (n: number) => n < 1048576 ? `${Math.max(1, Math.round(n / 1024))} KB` : n < 1073741824 ? `${(n / 1048576).toFixed(1)} MB` : `${(n / 1073741824).toFixed(2)} GB`;
+/**
+ * The shelf. Click selects one, Command-click adds or removes one, Shift-click
+ * takes the range from the last click; Escape clears. Every action in the
+ * footer works on the whole selection, and dragging any selected item drags
+ * them all. Missing files stay identifiable — Locate points the reference at
+ * where the file is now, or Remove lets it go.
+ */
 function LiveTray({ live, dragging }: { live: LiveController; dragging: boolean }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const file = live.state.files.find(f => f.id === selected);
-  return <div className={`mp-tray ${dragging ? 'is-drop-target' : ''}`}><div className="mp-tray-heading"><span>{dragging ? 'Drop it here. Pick it up later.' : 'A place between places.'}</span><button className="mp-text-button" onClick={() => void live.run(() => window.notchlight.pickFiles())}>Add files…</button></div>{!live.state.files.length ? <div className="mp-empty mp-empty-tray"><Icon name="tray" size={32}/><p>Keep it here for a moment.</p><span>Drop files from Finder. They stay in their original location.</span><button className="mp-soft-button" onClick={() => void live.run(() => window.notchlight.pickFiles())}>Choose files…</button></div> : <div className={`mp-file-grid ${live.state.preferences.thumbnails}`} aria-label="Files in Tray">{live.state.files.map(file => <FileButton key={file.id} file={file} live={live} selected={file.id === selected} onSelect={() => setSelected(file.id)}/>)}</div>}<div className="mp-tray-footer"><span>{file?.name || 'Drag out to another app. Originals stay put.'}</span><button className="mp-text-button" disabled={!file || file.unavailable} onClick={() => file && void live.run(() => window.notchlight.saveFileCopy(file.id))}>Save copy… <Icon name="arrow" size={13}/></button></div></div>;
+  const [selected, setSelected] = useState<string[]>([]);
+  const anchor = useRef<string | null>(null);
+  const files = live.state.files;
+  const ids = files.map(f => f.id);
+  const chosen = selected.filter(id => ids.includes(id));
+  const chosenFiles = files.filter(f => chosen.includes(f.id));
+  const missing = chosenFiles.filter(f => f.unavailable);
+  const transfer = live.state.transfer;
+  const select = (id: string, e: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }) => {
+    if (e.shiftKey && anchor.current && ids.includes(anchor.current)) {
+      const [a, b] = [ids.indexOf(anchor.current), ids.indexOf(id)].sort((x, y) => x - y);
+      setSelected(ids.slice(a, b + 1));
+      return;
+    }
+    anchor.current = id;
+    if (e.metaKey || e.ctrlKey) setSelected(chosen.includes(id) ? chosen.filter(x => x !== id) : [...chosen, id]);
+    else setSelected([id]);
+  };
+  const dragIds = (id: string) => chosen.includes(id) ? chosen : [id];
+  const headline = transfer ? `Copying ${transfer.items > 1 ? `${transfer.item} of ${transfer.items} · ` : ''}${transfer.name}` : dragging ? 'Drop it here. Pick it up later.' : chosen.length > 1 ? `${chosen.length} selected` : 'A place between places.';
+  return <div className={`mp-tray ${dragging ? 'is-drop-target' : ''}`} onKeyDown={e => { if (e.key === 'Escape' && chosen.length) { e.stopPropagation(); setSelected([]); } if ((e.metaKey || e.ctrlKey) && e.key === 'a' && files.length) { e.preventDefault(); setSelected(ids); } }}><div className="mp-tray-heading"><span>{headline}</span>{live.state.undoable > 0 && !transfer ? <button className="mp-text-button" onClick={() => void live.run(() => window.notchlight.undoRemove())}>Undo remove</button> : <button className="mp-text-button" onClick={() => void live.run(() => window.notchlight.pickFiles())}>Add files…</button>}</div>{transfer && <div className="mp-transfer" role="progressbar" aria-label="Copy progress" aria-valuemin={0} aria-valuemax={transfer.total || 1} aria-valuenow={Math.min(transfer.done, transfer.total || 1)}><i style={{ width: `${transfer.total ? Math.min(100, (transfer.done / transfer.total) * 100) : 100}%` }}/><span>{bytes(transfer.done)} of {bytes(transfer.total)}</span></div>}{!files.length ? <div className="mp-empty mp-empty-tray"><Icon name="tray" size={32}/><p>Keep it here for a moment.</p><span>Drop files from Finder. They stay in their original location.</span><button className="mp-soft-button" onClick={() => void live.run(() => window.notchlight.pickFiles())}>Choose files…</button></div> : <div className={`mp-file-grid ${live.state.preferences.thumbnails}`} role="listbox" aria-multiselectable="true" aria-label="Files in Tray">{files.map(file => <FileButton key={file.id} file={file} live={live} selected={chosen.includes(file.id)} dragIds={dragIds(file.id)} onSelect={e => select(file.id, e)}/>)}</div>}<div className="mp-tray-footer"><span>{chosen.length === 1 ? chosenFiles[0]?.name : chosen.length > 1 ? `${chosen.length} items${missing.length ? `, ${missing.length} missing` : ''}` : 'Drag out to another app. Originals stay put.'}</span>{chosen.length === 1 && missing.length === 1 ? <button className="mp-text-button" onClick={() => void live.run(() => window.notchlight.locateFile(missing[0].id))}>Locate… <Icon name="arrow" size={13}/></button> : <>{chosen.length > 1 && <button className="mp-text-button" onClick={() => { setSelected([]); void live.run(() => window.notchlight.removeFiles(chosen)); }}>Remove {chosen.length}</button>}<button className="mp-text-button" disabled={!chosen.length || missing.length === chosen.length || !!transfer} onClick={() => void live.run(() => window.notchlight.saveFileCopy(chosen.filter(id => !missing.some(m => m.id === id))))}>Save {chosen.length > 1 ? `${chosen.length - missing.length} copies` : 'copy'}… <Icon name="arrow" size={13}/></button></>}</div></div>;
 }
 
 export function CompanionSurface({ live, open, hovering, onBox, onCustomize }: { live: LiveController; open: boolean; hovering: boolean; onBox?: (r: {x:number;y:number;w:number;h:number}) => void; onCustomize: () => void }) {

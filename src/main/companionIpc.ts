@@ -28,27 +28,35 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
   handle('companion:preferences', (_e, patch) => store.updatePreferences(patch));
   handle('companion:view', (_e, view) => store.setView(view));
   handle('shelf:add', (_e, files) => store.add(files));
-  handle('shelf:remove', (_e, id) => store.remove(id));
+  handle('shelf:remove', (_e, ids) => store.remove(ids));
+  handle('shelf:undo', () => store.undoRemove());
   handle('shelf:reveal', async (_e, id) => shell.showItemInFolder(await store.existingPath(id)));
+  handle('shelf:locate', async (_e, id) => {
+    const entry = store.entry(id);
+    const result = await dialog.showOpenDialog(dialogWindow(), { title: `Where is ${path.basename(entry.path)} now?`, buttonLabel: 'Use This', defaultPath: path.dirname(entry.path), properties: ['openFile', 'openDirectory', 'showHiddenFiles'] });
+    if (!result.canceled && result.filePaths[0]) await store.relocate(id, result.filePaths[0]);
+  });
   handle('shelf:pick', async () => {
     const result = await dialog.showOpenDialog(dialogWindow(), { title: 'Add to Tray', properties: ['openFile', 'openDirectory', 'multiSelections'] });
     if (!result.canceled) await store.add(result.filePaths);
   });
-  handle('shelf:copy', async (_e, id) => {
-    await store.existingPath(id);
-    const result = await dialog.showOpenDialog(dialogWindow(), { title: 'Save a copy in…', buttonLabel: 'Save Copy Here', properties: ['openDirectory', 'createDirectory'] });
-    if (!result.canceled && result.filePaths[0]) await store.copyTo(id, result.filePaths[0]);
+  handle('shelf:copy', async (_e, ids) => {
+    const { present } = await store.existingPaths(ids);
+    if (!present.length) throw new Error('Those files were moved or removed. Use Locate to find them, or add them again.');
+    const result = await dialog.showOpenDialog(dialogWindow(), { title: present.length === 1 ? 'Save a copy in…' : `Save ${present.length} copies in…`, buttonLabel: present.length === 1 ? 'Save Copy Here' : 'Save Copies Here', properties: ['openDirectory', 'createDirectory'] });
+    if (!result.canceled && result.filePaths[0]) await store.copyTo(ids, result.filePaths[0]);
   });
-  ipcMain.on('shelf:drag', (event, id: unknown) => {
+  ipcMain.on('shelf:drag', (event, ids: unknown) => {
     try {
       check(event);
-      const entry = store.entry(id);
-      if (!fs.existsSync(entry.path)) throw new Error('This file was moved or removed. Add it again.');
-      const thumbnail = store.current().files.find(f => f.id === entry.id)?.thumbnail;
+      const list = (Array.isArray(ids) ? ids : [ids]).filter((id): id is string => typeof id === 'string');
+      const files = list.map(id => store.entry(id).path).filter(p => fs.existsSync(p));
+      if (!files.length) throw new Error('Those files were moved or removed. Use Locate to find them, or add them again.');
+      const thumbnail = store.current().files.find(f => f.id === list[0])?.thumbnail;
       let icon = thumbnail ? nativeImage.createFromDataURL(thumbnail) : nativeImage.createFromBuffer(trayIcon());
       if (icon.isEmpty()) icon = nativeImage.createFromBuffer(trayIcon());
-      event.sender.startDrag({ file: entry.path, icon });
-      store.notice('Drag to another app. The item stays in Tray until you remove it.');
+      event.sender.startDrag({ file: files[0], files, icon });
+      store.notice(`Drag to another app. ${files.length === 1 ? 'The item stays' : `The ${files.length} items stay`} in Tray until you remove ${files.length === 1 ? 'it' : 'them'}.${list.length > files.length ? ` ${list.length - files.length} missing ${list.length - files.length === 1 ? 'file was' : 'files were'} left out.` : ''}`);
     } catch (error) { store.notice((error as Error).message || 'Could not start the file drag.'); }
   });
   handle('codex:home', async () => {

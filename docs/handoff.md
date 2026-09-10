@@ -96,7 +96,7 @@ an optional future expansion, not the next milestone. Existing item numbers
 below are retained for reference; use this priority order:
 
 1. Resting-wing capture eligibility (13) and Spotify/capture recovery (14) landed September 9.
-2. Tray multi-select/recovery (8, 16). Transport feedback (2) landed September 9.
+2. Transport feedback (2) and Tray multi-select/recovery (8, 16) landed September 9.
 3. Add keyboard access (15). Native lifecycle and energy checks (17) landed September 9.
 4. Apply the selected Notchlight identity and prepare distribution (18, 3–4).
 5. Consider clipboard history (12) as an opt-in feature after those foundations.
@@ -167,8 +167,8 @@ wing adjusts it; show a brief level in place of the equalizer. Add a `volume`
 command to `native/spotify.js` and `SpotifyPlayer.command`.
 
 ### 8. Tray improvements
-- Multi-select and drag several files out at once (`startDrag` takes one file
-  today; Electron supports `files: []`).
+- ~~Multi-select and drag several files out at once~~ — done September 9
+  (see item 16).
 - Accept text and images from the clipboard, not only Finder files.
 - Optional expiry per item (an hour, a day) so the shelf stays temporary.
 
@@ -262,14 +262,19 @@ and supports tabs, playback, file selection, and actions. Preserve the usual
 hover behavior and the existing Claude Allow/Deny permission contract. Verify
 VoiceOver names and focus order in the actual desktop window.
 
-### 16. Tray recovery and predictable transfers
-Alongside multi-select in item 8, add Undo remove and Locate missing file.
-Keep references when an external disk is temporarily unavailable. Expiry must
-remove references only, never originals. For large Save copy operations, show
-progress and a clear outcome; report partial failures without claiming a
-successful transfer. Preserve no-overwrite behavior and native drag retention.
-Acceptance examples: duplicate filenames, renamed source, unplugged volume,
-cancelled drag, and a failed directory copy with a partial destination.
+### 16. Tray recovery and predictable transfers — implemented September 9, 2026
+`CompanionStore.remove` takes several ids and remembers positions for
+`undoRemove`; `relocate` re-points a reference; `copyTo` takes several ids,
+publishes `transfer` progress on the snapshot (bytes, item of items), never
+overwrites, continues past a failed item, and reports partial folder copies
+by path without deleting them. `existingPaths` skips stale ids and counts
+missing files. IPC: `shelf:remove` (ids), `shelf:undo`, `shelf:locate`,
+`shelf:copy` (ids), `shelf:drag` (ids, native multi-file drag). The live
+shelf in `LiveCompanion.tsx` has Command/Shift selection, Command-A, Escape,
+a progress bar, Undo remove and Locate. Tests cover duplicate filenames,
+renamed source, undo order, progress bounds and a failed directory copy with
+a partial destination. Not done: optional expiry and clipboard drops from
+item 8, which stay in the backlog.
 
 ### 17. Native verification and resource budget — implemented September 9, 2026
 [Native checks](native-checks.md) records the repeatable steps and the
