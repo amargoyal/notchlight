@@ -95,7 +95,7 @@ The owner specified **Spotify only** in this conversation. Apple Music remains
 an optional future expansion, not the next milestone. Existing item numbers
 below are retained for reference; use this priority order:
 
-1. Fix resting-wing audio capture eligibility (13). Spotify and capture recovery (14) landed September 9.
+1. Resting-wing capture eligibility (13) and Spotify/capture recovery (14) landed September 9.
 2. Improve transport feedback (2) and Tray multi-select/recovery (8, 16).
 3. Add keyboard access (15). Native lifecycle and energy checks (17) landed September 9.
 4. Apply the selected Notchlight identity and prepare distribution (18, 3–4).
@@ -223,20 +223,18 @@ item's kind and a count.
   `RestingWings` a fourth part. Add gallery scenarios and a
   `scripts/test-clipboard.mjs` for the store and the poller's skip rules.
 
-### 13. Make real audio levels follow visible resting faces
-`wantsLevels()` in `src/main/audioLevels.ts` still requires `view === 'music'`,
-but `LiveCompanion.tsx` renders the music resting part whenever `restMusic` is
-enabled and a track is ready. Selecting Claude or Tray therefore stops the real
-tap even though its bars remain visible; they fall back to decorative motion.
-Base capture on the surfaces actually showing bars, including the resting face,
-while preserving opt-in, playback, visualizer, and reduced-motion gates. Update
-the existing test that assumes Claude view always means the bars are off screen.
-
-Keep silence distinct from unavailable capture. `LiveEqualizer` currently
-switches to canned animation after 1.5 s of silence; let real silence settle
-the bars. If capture is unavailable, show a restrained playback indicator and
-explain its status in Music settings. Check runtime changes to the system's
-reduced-motion preference, not just the media-query value at effect setup.
+### 13. Make real audio levels follow visible resting faces — implemented September 9, 2026
+`wantsLevels()` now bases capture on the surfaces that show bars: the Music
+face, or the resting bar whenever `restMusic` is on. `LiveEqualizer` takes the
+capture status and never uses the canned CSS rhythm on the live island: while
+listening it writes levels to the DOM and skips unchanged frames, so real
+silence costs nothing; when capture is not listening, or nothing has been
+heard for 1.5 s (music on another speaker), the bars hold a quiet static
+shape. Reduced motion is followed as the system setting changes
+(`useReducedMotion` in `src/renderer/pulse.ts`). The helper runs at 24 fps
+(`audiotap --fps`) with smoothing expressed in seconds. Measured while
+playing with Agents selected: 23 % of a core across the tree, from 38–45 %.
+The gallery keeps `mp-wave` for its sample data.
 
 ### 14. Recover Spotify and audio capture without repeated reconnects — implemented September 9, 2026
 `SpotifyPlayer` retries failed reads after 5, 10, 20, 40 then 60 seconds

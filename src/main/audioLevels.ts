@@ -171,8 +171,16 @@ export class AudioLevels extends EventEmitter {
   }
 }
 
-/** The bars are worth a helper process only when they are visible and would move. */
-export function wantsLevels(state: { preferences: { spotifyEnabled: boolean; visualizer: boolean; reducedMotion: boolean }; view: string; music: { status: string; playing: boolean } }): boolean {
+/**
+ * The bars are worth a helper process only when they are visible and would move.
+ *
+ * Two surfaces show them: the Music face when it is the chosen view, and the
+ * resting bar whenever Music rests there — which is what you see most of the
+ * time, whichever face is selected. A hover that unfolds Agents hides them
+ * for a moment; that is not worth stopping and restarting a helper.
+ */
+export function wantsLevels(state: { preferences: { spotifyEnabled: boolean; visualizer: boolean; reducedMotion: boolean; restMusic: boolean }; view: string; music: { status: string; playing: boolean } }): boolean {
   const { preferences, view, music } = state;
-  return preferences.spotifyEnabled && preferences.visualizer && !preferences.reducedMotion && view === 'music' && music.status === 'ready' && music.playing;
+  const showing = view === 'music' || preferences.restMusic;
+  return preferences.spotifyEnabled && preferences.visualizer && !preferences.reducedMotion && showing && music.status === 'ready' && music.playing;
 }

@@ -37,7 +37,10 @@
 .mp-equalizer { height: 18px; display: flex; align-items: center; gap: 2px; }
 .mp-equalizer i { display: block; width: 2px; height: 4px; background: #c9b79d; border-radius: 2px; }
 .mp-equalizer.is-playing i { height: 14px; animation: mp-wave 1.1s ease-in-out infinite alternate; }
-.mp-equalizer.is-live i { animation: none; transition: transform 70ms linear; will-change: transform; }
+/* Live bars never animate in CSS: the levels helper writes transforms, or the quiet shape holds still. */
+.mp-equalizer.is-live i, .mp-equalizer.is-quiet i { height: 14px; animation: none; transform-origin: center; }
+.mp-equalizer.is-live i { will-change: transform; }
+.mp-equalizer.is-quiet i { transition: transform 240ms ease; opacity: .75; }
 @keyframes mp-wave { from { transform: scaleY(.25); } to { transform: scaleY(1); } }
 .mp-empty { padding: 28px 24px; text-align: center; display: flex; flex-direction: column; align-items: center; color: #b7a797; min-height: 195px; justify-content: center; }
 .mp-empty p { font-size: 16px; font-weight: 500; color: #f2ede7; margin: 13px 0 5px; }

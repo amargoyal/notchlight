@@ -22,6 +22,9 @@ export class NotchWindow {
   private levelPoll: NodeJS.Timeout | null = null;
   private settleTimer: NodeJS.Timeout | null = null;
   private display: Display | null = null;
+  private pending = 0;
+  private forceSettle = false;
+  private lastSignature = '';
 
   constructor(
     private onHover: (inside: boolean) => void,
@@ -41,10 +44,26 @@ export class NotchWindow {
    * and macOS does not always send a display event for it.
    */
   settle(reason: string): void {
-    logEvent('display', `change: ${reason}`);
+    if (!this.pending++) logEvent('display', `change: ${reason}`);
+    if (reason === 'resume' || reason === 'unlock-screen') this.forceSettle = true;
     if (this.settleTimer) clearTimeout(this.settleTimer);
     this.settleTimer = setTimeout(() => {
       this.settleTimer = null;
+      const events = this.pending;
+      this.pending = 0;
+      const signature = this.signature();
+      // macOS also announces "screen parameters changed" for things that are
+      // not screens — an audio device appearing, an app going fullscreen — in
+      // bursts of a dozen. Nothing moved, so nothing is re-measured: the probe
+      // is a blocking subprocess and the answer would be the same.
+      if (!this.forceSettle && signature === this.lastSignature) {
+        logEvent('display', `unchanged after ${events} event${events === 1 ? '' : 's'}; kept`);
+        this.assertLevel();
+        this.assertTop();
+        return;
+      }
+      this.forceSettle = false;
+      this.lastSignature = signature;
       resetProbe();
       // Reposition first. It is what picks the display and re-runs the probe;
       // asking for the geometry before it has moved measures the screen the
@@ -52,8 +71,13 @@ export class NotchWindow {
       if (this.win) this.reposition();
       this.onDisplaysChanged();
       const d = this.display;
-      logEvent('display', `settled on ${d ? `${d.id} ${d.bounds.width}x${d.bounds.height}@${d.scaleFactor}` : 'no display'}`);
+      logEvent('display', `settled on ${d ? `${d.id} ${d.bounds.width}x${d.bounds.height}@${d.scaleFactor}` : 'no display'} after ${events} event${events === 1 ? '' : 's'}`);
     }, 250);
+  }
+
+  /** Everything about the displays that would move the island. */
+  private signature(): string {
+    return screen.getAllDisplays().map(d => `${d.id}:${d.bounds.x},${d.bounds.y},${d.bounds.width}x${d.bounds.height}@${d.scaleFactor}:${d.workArea.y - d.bounds.y}`).sort().join('|');
   }
 
   /**
@@ -114,6 +138,7 @@ export class NotchWindow {
   create(): BrowserWindow {
     const d = this.pickDisplay();
     this.display = d;
+    this.lastSignature = this.signature();
     const win = new BrowserWindow({
       x: d.bounds.x,
       y: d.bounds.y,

@@ -4,7 +4,8 @@ import { Icon, FileThumb, RestingWings, type RestingPart } from './Preview';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import type { AgentFilter, Snapshot } from '../shared/types';
-import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_SPOTIFY, type CompanionSnapshot, type CompanionView, type OperationResult, type ShelfFile } from '../shared/companion';
+import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_SPOTIFY, type CaptureSnapshot, type CompanionSnapshot, type CompanionView, type OperationResult, type ShelfFile } from '../shared/companion';
+import { useReducedMotion } from './pulse';
 import './preview.css';
 import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
 
@@ -43,35 +44,64 @@ function LiveArtwork({ live, mini = false }: { live: LiveController; mini?: bool
   return <div className={`mp-artwork ${mini ? 'mp-artwork-mini' : ''}`}>{source && source !== failed ? <img src={source} alt={mini ? '' : live.state.music.track?.album || 'Album artwork'} draggable={false} onError={() => setFailed(source)}/> : <Icon name="music" size={mini ? 14 : 34}/>}</div>;
 }
 const BARS = [0, 1, 2, 3, 4];
+/** Bars at rest while a track plays but nothing can be heard: a shape, not a rhythm. */
+const QUIET = [0.38, 0.55, 0.46, 0.6, 0.42];
+const scale = (level: number) => (0.18 + 0.82 * Math.min(1, Math.max(0, level))).toFixed(3);
 /**
  * Five bars that follow Spotify's actual output. Levels arrive ~30 times a
  * second and are written straight to the DOM — re-rendering the whole surface
- * at that rate would be silly. Without levels (no helper, refused prompt, music
- * playing on another device) the bars keep the canned rhythm from the preview.
+ * at that rate would be silly, and a frame identical to the last one is not
+ * written at all, so real silence costs nothing.
+ *
+ * There is no canned animation here. A CSS animation on the overlay redraws the
+ * whole transparent window at 60 fps (see pulse.ts); the gallery keeps its
+ * sample rhythm, the live island does not. When capture is not listening, or
+ * has heard nothing for a while because the music is on another speaker, the
+ * bars hold a quiet shape until sound comes back. Real silence settles them.
  */
-function LiveEqualizer({ active, live }: { active: boolean; live: boolean }) {
+function LiveEqualizer({ active, live, capture }: { active: boolean; live: boolean; capture: CaptureSnapshot['status'] }) {
   const ref = useRef<HTMLSpanElement>(null);
+  const reduced = useReducedMotion();
+  const listening = active && live && !reduced && capture === 'listening';
+  const [mode, setMode] = useState<'off' | 'quiet' | 'live'>('off');
   useEffect(() => {
     const el = ref.current;
-    if (!el || !active || !live || !window.notchlight?.onMusicLevels || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!el) return;
     const bars = Array.from(el.children) as HTMLElement[];
-    let idle: ReturnType<typeof setTimeout> | null = null;
-    let lastSound = 0;
-    const rest = () => { el.classList.remove('is-live'); for (const bar of bars) bar.style.transform = ''; };
+    if (!active) { setMode('off'); for (const bar of bars) bar.style.transform = ''; return; }
+    if (!listening || !window.notchlight?.onMusicLevels) { setMode('quiet'); bars.forEach((bar, i) => { bar.style.transform = `scaleY(${scale(QUIET[i])})`; }); return; }
+    let quietTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastSound = Date.now();
+    let lastFrame = '';
+    let current: 'quiet' | 'live' = 'quiet';
+    const quiet = () => {
+      quietTimer = null;
+      if (current === 'quiet') return;
+      current = 'quiet'; lastFrame = '';
+      setMode('quiet');
+      bars.forEach((bar, i) => { bar.style.transform = `scaleY(${scale(QUIET[i])})`; });
+    };
+    quiet();
     const stop = window.notchlight.onMusicLevels(levels => {
       const now = Date.now();
       if (levels.some(level => level > 0.03)) lastSound = now;
-      // Silence for a while with the track still "playing" means the sound is
-      // somewhere else — another speaker, another room. Fall back rather than flatline.
-      if (now - lastSound > 1500) { rest(); return; }
-      el.classList.add('is-live');
-      bars.forEach((bar, i) => { bar.style.transform = `scaleY(${(0.18 + 0.82 * Math.min(1, Math.max(0, levels[i] ?? 0))).toFixed(3)})`; });
-      if (idle) clearTimeout(idle);
-      idle = setTimeout(rest, 400);
+      // Heard nothing for a while with the track still "playing": the sound is
+      // somewhere else — another speaker, another room. Hold the quiet shape.
+      if (now - lastSound > 1500) { quiet(); return; }
+      if (current !== 'live') { current = 'live'; setMode('live'); }
+      const frame = levels.map(scale).join(' ');
+      if (frame !== lastFrame) {
+        lastFrame = frame;
+        const parts = frame.split(' ');
+        bars.forEach((bar, i) => { bar.style.transform = `scaleY(${parts[i] ?? parts[0]})`; });
+      }
+      // Levels stopping altogether — helper gone, device changing — is the quiet shape too, not a freeze.
+      if (quietTimer) clearTimeout(quietTimer);
+      quietTimer = setTimeout(quiet, 800);
     });
-    return () => { stop(); if (idle) clearTimeout(idle); rest(); };
-  }, [active, live]);
-  return <span ref={ref} className={`mp-equalizer ${active ? 'is-playing' : ''}`} aria-hidden="true">{BARS.map(i => <i key={i} style={{ animationDelay: `${i * -.19}s` }}/>)}</span>;
+    return () => { stop(); if (quietTimer) clearTimeout(quietTimer); };
+  }, [active, listening]);
+  return <span ref={ref} className={`mp-equalizer ${mode === 'live' ? 'is-live' : mode === 'quiet' ? 'is-quiet' : ''}`} aria-hidden="true">{BARS.map(i => <i key={i}/>)}</span>;
 }
 function LiveMusic({ live }: { live: LiveController }) {
   const { music } = live.state;
@@ -117,14 +147,14 @@ export function CompanionSurface({ live, open, hovering, onBox, onCustomize }: {
   const selectProvider = (provider: 'claude' | 'codex') => { setFilter(provider); choose('agents'); };
   const agents = agentRestingParts(snapshot, { ...preferences, pulse: preferences.pulse && motion, codexPulse: preferences.codexPulse && motion }, selectProvider);
   const parts: RestingPart[] = [...agents,
-    ...(preferences.restMusic && music.status === 'ready' && music.track ? [{left:<LiveArtwork live={live} mini/>,right:<LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion}/>}]:[]),
+    ...(preferences.restMusic && music.status === 'ready' && music.track ? [{left:<LiveArtwork live={live} mini/>,right:<LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status}/>}]:[]),
     ...(preferences.restTray && files.length || dragging ? [{left:<span className="mp-shelf-wing"><Icon name="tray" size={16}/>{files.length}</span>,right:<Icon name="file" size={16}/>}]:[])
   ];
   const resting = parts.length ? <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={parts}/> : snapshot.sessions.length ? (hovering ? <Stubs snap={snapshot}/> : <div style={{width:snapshot.notchW,height:snapshot.notchH}}/>) : undefined;
   const navigation = <>{tabs}{view === 'agents' && <AgentFilters snapshot={snapshot} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{view === 'agents' && <AgentConnection snapshot={snapshot} filter={filter}/>}<AgentAttention sessions={snapshot.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);choose('agents');}}/>{view === 'agents' && live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</>;
   const active = !snapshot.dormant || parts.length > 0;
   const left = <div className="mp-left-wing">{view === 'music' ? <LiveArtwork live={live} mini/> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
-  const right = <div className="mp-right-wing">{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion}/> : <Icon name="file" size={16}/>}</div>;
+  const right = <div className="mp-right-wing">{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status}/> : <Icon name="file" size={16}/>}</div>;
   const wing = (full: boolean) => <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={full ? PANEL_W : undefined} left={left} right={right}/>;
   const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
   return <div className={`mp-surface ${preferences.density} ${preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!preferences.buddy ? 'mp-hide-buddy' : ''} ${!preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''}`}
