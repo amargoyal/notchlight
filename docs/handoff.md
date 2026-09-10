@@ -97,7 +97,7 @@ below are retained for reference; use this priority order:
 
 1. Resting-wing capture eligibility (13) and Spotify/capture recovery (14) landed September 9.
 2. Transport feedback (2) and Tray multi-select/recovery (8, 16) landed September 9.
-3. Add keyboard access (15). Native lifecycle and energy checks (17) landed September 9.
+3. Keyboard access (15) and native lifecycle and energy checks (17) landed September 9.
 4. Apply the selected Notchlight identity and prepare distribution (18, 3–4).
 5. Consider clipboard history (12) as an opt-in feature after those foundations.
    Extra players and decorative effects can follow actual demand.
@@ -254,13 +254,19 @@ words it for the **Audio capture** group in Customize → Music. Fixtures in
 `scripts/test-companion.mjs` cover refusal, permission granted later,
 output-device exit and a crash before the first line.
 
-### 15. Keyboard access without stealing terminal focus
-The live overlay is intentionally non-focusable. Browser tab-key tests alone
-cannot establish native keyboard access. Add a configurable shortcut that opens
-a focusable companion surface, restores the previously focused app on Escape,
-and supports tabs, playback, file selection, and actions. Preserve the usual
-hover behavior and the existing Claude Allow/Deny permission contract. Verify
-VoiceOver names and focus order in the actual desktop window.
+### 15. Keyboard access without stealing terminal focus — implemented September 9, 2026
+`config.shortcut` (default `Alt+Shift+N`) is registered with `globalShortcut`.
+`openForKeyboard` in `src/main/index.ts` holds the island open
+(`Hover.hold`, now in `src/main/hover.ts`), makes the panel focusable
+(`NotchWindow.takeKeyboard`) and tells the renderer, which focuses the
+selected tab; arrows, Tab, Enter and Space then work as in any window.
+Escape, the shortcut again, or focus leaving call `releaseKeyboard`: the
+window goes back to non-focusable and click-through, and if taking the keys
+brought the app forward, `app.hide()` returns macOS to the previous app and
+the overlay is re-shown inactive. Verified natively through System Events:
+`keyboard taken` and `keyboard released: escape` in the log. Not verified:
+VoiceOver names and focus order by ear — the elements carry roles and labels.
+Hover behavior and the Allow/Deny contract are unchanged.
 
 ### 16. Tray recovery and predictable transfers — implemented September 9, 2026
 `CompanionStore.remove` takes several ids and remembers positions for
