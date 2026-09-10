@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import path from 'node:path';
 import { EMPTY_SPOTIFY, type SpotifySnapshot, type SpotifyCommand } from '../shared/companion';
 import { logEvent } from './lifecycle';
+import type { PlaybackChange } from './spotifyWatch';
 
 const execute = promisify(execFile);
 export type SpotifyRunner = (command: string, position?: number) => Promise<unknown>;
@@ -19,7 +20,7 @@ export function normalizeSpotify(value: unknown): SpotifySnapshot {
   if (raw.status !== 'ready' || !raw.track || typeof raw.track !== 'object') return { ...base, status: 'error', message: 'Could not read Spotify.' };
   const track = raw.track as Record<string, unknown>;
   const duration = number(track.durationMs) / 1000;
-  return { ...base, status: 'ready', playing: raw.playing === true, position: Math.min(number(raw.position), duration),
+  return { ...base, status: 'ready', playing: raw.playing === true, position: Math.min(number(raw.position), duration), at: Date.now(),
     track: { id: str(track.id), title: str(track.title) || 'Untitled track', artist: str(track.artist), album: str(track.album), duration, artwork: validArtwork(str(track.artwork)) } };
 }
 export function validArtwork(value: string): string | undefined {
@@ -83,6 +84,34 @@ export class SpotifyPlayer extends EventEmitter {
   private failures = 0;
   private retryAt = 0;
   constructor(private run: SpotifyRunner = runSpotify, private lookup: ArtistLookup = fetchArtists, private interval = 2500) { super(); }
+  /**
+   * How often to read while nothing else says a change happened. With the
+   * watcher listening a slow heartbeat is enough — every read spawns osascript
+   * for a quarter of a second — and without it the usual pace comes back.
+   */
+  setPollInterval(ms: number): void {
+    if (ms === this.interval) return;
+    this.interval = ms;
+    if (!this.timer) return;
+    clearInterval(this.timer);
+    this.timer = setInterval(() => this.tick(), this.interval);
+  }
+  /**
+   * Spotify said something changed. Apply what the notification carries at
+   * once — the click inside Spotify shows on the notch before osascript could
+   * answer — then read the full status for what it does not carry.
+   */
+  onExternalChange(change: PlaybackChange): void {
+    if (!this.enabled || this.suspended) return;
+    const current = this.state;
+    if (current.status === 'ready' && current.track) {
+      const sameTrack = !change.trackId || change.trackId === current.track.id;
+      const track = sameTrack ? current.track : { ...current.track, id: change.trackId!, title: change.title || 'Untitled track', artist: change.artist ?? '', album: change.album ?? '', duration: change.durationMs !== undefined ? change.durationMs / 1000 : current.track.duration, artwork: undefined };
+      const position = change.position !== undefined ? Math.min(change.position, track.duration) : sameTrack ? current.position : 0;
+      this.publish({ ...current, playing: change.playing, position, at: Date.now(), track, busy: false });
+    }
+    this.refresh();
+  }
   /** How long to wait after the nth failed read: 5 s, 10 s, 20 s, 40 s, then a minute. */
   static retryDelay(failures: number): number { return Math.min(60_000, 5_000 * 2 ** Math.max(0, failures - 1)); }
   current() { return this.state; }
