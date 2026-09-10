@@ -25,7 +25,10 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     check: <path d="m5 12 4 4L19 6"/>,
     reset: <><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></>,
     expand: <path d="m6 9 6 6 6-6"/>,
-    warning: <><path d="m12 3 10 18H2ZM12 9v5"/><path d="M12 17h.01"/></>
+    warning: <><path d="m12 3 10 18H2ZM12 9v5"/><path d="M12 17h.01"/></>,
+    clipboard: <><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6"/></>,
+    pin: <><path d="M9 3h6l-1 6 3 3H7l3-3ZM12 12v9"/></>,
+    search: <><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></>
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.file}</svg>;
 }
@@ -47,11 +50,12 @@ export function usePreview(seed?: PreviewState, clock = true) {
 }
 
 type Controls = { state: PreviewState; dispatch: Dispatch<PreviewAction> };
-const viewNames: Record<PreviewView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray' };
-const views: PreviewView[] = ['agents', 'music', 'tray'];
+const viewNames: Record<PreviewView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray', clipboard: 'Clipboard' };
+const allViews: PreviewView[] = ['agents', 'music', 'tray', 'clipboard'];
 const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
 function Navigation({ state, onNavigate, onCustomize, id, attention }: { state: PreviewState; onNavigate: (view: PreviewView) => void; onCustomize: () => void; id: string; attention: boolean }) {
+  const views = state.preferences.clipboardEnabled ? allViews : allViews.filter(v => v !== 'clipboard');
   return <nav className="mp-nav" aria-label="Notch views">
     <div role="tablist" aria-label="Preview view">
       {views.map((view, index) => <button key={view} role="tab" id={`${id}-${view}`} aria-controls={`${id}-panel`}
@@ -60,13 +64,14 @@ function Navigation({ state, onNavigate, onCustomize, id, attention }: { state: 
         onKeyDown={e => {
           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
           e.preventDefault();
-          const next = e.key === 'Home' ? 0 : e.key === 'End' ? 2 : (index + (e.key === 'ArrowRight' ? 1 : 2)) % 3;
+          const next = e.key === 'Home' ? 0 : e.key === 'End' ? views.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : views.length - 1)) % views.length;
           onNavigate(views[next]);
         }}>
         {view === 'agents' ? <span className="mp-mini-buddy"><Buddy size={15} /></span> : <Icon name={view} size={14}/>}
         {viewNames[view]}
         {view === 'agents' && attention && <span className="mp-attention-dot" aria-label="Needs your attention"/>}
         {view === 'tray' && <span className="mp-count">{state.files.length}</span>}
+        {view === 'clipboard' && <span className="mp-count">{state.clips.length}</span>}
       </button>)}
     </div>
     <button className="mp-icon-button" aria-label="Open customization" title="Customize Notchlight" onClick={onCustomize}><Icon name="settings" size={16}/></button>
@@ -161,6 +166,17 @@ function TrayFace({ state, dispatch }: Controls) {
   </div>;
 }
 
+/** The sample clipboard: a few things one might have copied. Click copies nothing real. */
+function ClipboardFace({ state, dispatch }: Controls) {
+  const pins = state.clips.filter(c => c.pinned).length;
+  const ordered = [...state.clips.filter(c => c.pinned), ...state.clips.filter(c => !c.pinned)];
+  return <div className="mp-clip"><div className="mp-tray-heading"><span>{state.clips.length} {state.clips.length === 1 ? 'item' : 'items'}{pins ? ` · ${pins} pinned` : ''}</span><span>Sample history</span></div>
+    {ordered.length > 4 && <label className="mp-clip-search"><Icon name="search" size={13}/><input type="search" placeholder="Filter" aria-label="Filter clipboard history" readOnly/></label>}
+    {!ordered.length ? <div className="mp-empty mp-empty-tray"><Icon name="clipboard" size={32}/><p>Nothing copied yet.</p><span>Text you copy shows up here. Passwords and one-time codes are skipped.</span></div>
+    : <ul className="mp-clip-list" aria-label="Sample clipboard history">{ordered.map(item => <li key={item.id} className={`mp-clip-item ${item.pinned ? 'is-pinned' : ''}`}><button className="mp-clip-copy" onClick={() => dispatch({ type: 'clip-copy', id: item.id })}><span className="mp-clip-kind" aria-hidden="true">{item.kind === 'url' ? '@' : 'T'}</span><span className="mp-clip-text"><span>{item.preview}</span><small>{item.meta}</small></span></button><button className="mp-clip-pin" aria-label={item.pinned ? `Unpin ${item.preview}` : `Pin ${item.preview}`} aria-pressed={item.pinned} onClick={() => dispatch({ type: 'clip-pin', id: item.id })}><Icon name="pin" size={13}/></button><button className="mp-remove mp-clip-remove" aria-label={`Remove ${item.preview}`} onClick={() => dispatch({ type: 'clip-remove', id: item.id })}><Icon name="close" size={12}/></button></li>)}</ul>}
+    <div className="mp-tray-footer"><span>Click an item to copy it again.</span>{ordered.length > 0 && <button className="mp-text-button" onClick={() => dispatch({ type: 'clip-clear' })}>Clear{pins ? ' unpinned' : ''}</button>}</div></div>;
+}
+
 export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, notchH = 34 }: Controls & { onCustomize: () => void; notchW?: number; notchH?: number }) {
   const id = useId();
   const [filter,setFilter] = useState<AgentFilter>(state.codexConnection ? 'codex' : 'all');
@@ -176,10 +192,11 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
   const tabs = <Navigation state={state} attention={snap.overall === 'asking'} onNavigate={view => { pendingFocus.current = true; dispatch({ type: 'view', view }); }} onCustomize={onCustomize} id={id}/>;
   const playing = state.music.source === 'ready' && state.music.playing && state.preferences.visualizer;
   const music = state.view === 'music';
-  const headLeft = music ? <Artwork state={state} mini/> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>;
+  const clips = state.view === 'clipboard';
+  const headLeft = music ? <Artwork state={state} mini/> : clips ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>;
   const headRight = <div className="mp-right-wing">
     {snap.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" title="Agents need attention" onClick={() => dispatch({ type: 'view', view: 'agents' })}><span className="mp-attention-dot"/></button>}
-    {music ? <Equalizer active={playing}/> : <Icon name="file" size={16}/>}
+    {music ? <Equalizer active={playing}/> : clips ? <span className="mp-clip-kind" aria-hidden="true">T</span> : <Icon name="file" size={16}/>}
   </div>;
   const wing = (expanded: boolean) => <Wings notchW={notchW} height={notchH} width={expanded ? PANEL_W : undefined} left={<div className="mp-left-wing">{headLeft}</div>} right={headRight}/>;
   const nav = <>{tabs}{state.view === 'agents' && <AgentFilters snapshot={snap} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{state.view === 'agents' && <AgentConnection snapshot={snap} filter={filter}/>}<AgentAttention sessions={snap.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);dispatch({type:'view',view:'agents'});}}/></>;
@@ -188,7 +205,8 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
   const parts: RestingPart[] = [
     ...agentParts,
     ...(prefs.restMusic && state.music.source === 'ready' ? [{ left: <Artwork state={state} mini/>, right: <Equalizer active={playing}/> }] : []),
-    ...(prefs.restTray && state.files.length > 0 || state.drag?.origin === 'finder' ? [{ left: <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>, right: <Icon name="file" size={16}/> }] : [])
+    ...(prefs.restTray && state.files.length > 0 || state.drag?.origin === 'finder' ? [{ left: <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>, right: <Icon name="file" size={16}/> }] : []),
+    ...(prefs.clipboardEnabled && prefs.restClipboard && state.clips.length > 0 ? [{ left: <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span>, right: <span className="mp-clip-kind" aria-hidden="true">{state.clips[0].kind === 'url' ? '@' : 'T'}</span> }] : [])
   ];
   const attention = undefined;
   const resting = parts.length || attention ? <RestingWings notchW={notchW} height={notchH} parts={parts} attention={attention}/>
@@ -200,7 +218,7 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
       onDismiss={id => dispatch(id.startsWith('codex:') ? {type:'codex',value:'off'} : {type:'claude',value:'idle'})}
       onDecide={id => dispatch(id.startsWith('codex:') ? {type:'codex',value:'done'} : {type:'claude',value:'done'})}
       surface={{ selectedSession:target,navigation: nav, active: true, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${state.view}` },
-        expanded: state.view === 'agents' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{nav}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${state.view}`}>{music ? <MusicFace state={state} dispatch={dispatch}/> : <TrayFace state={state} dispatch={dispatch}/>}</div></div>,
+        expanded: state.view === 'agents' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{nav}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${state.view}`}>{music ? <MusicFace state={state} dispatch={dispatch}/> : clips ? <ClipboardFace state={state} dispatch={dispatch}/> : <TrayFace state={state} dispatch={dispatch}/>}</div></div>,
         collapsed: resting }}/>
   </div>;
 }
@@ -269,6 +287,9 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'Tray · overflow', note: 'A bounded shelf scrolls; filenames never widen it.', patch: s => ({ ...s, view: 'tray', files: Array.from({ length: 12 }, (_, i) => ({ ...SAMPLE_FILES[i % 4], id: `overflow-${i}` })) }) },
   { name: 'Tray · unavailable file', note: 'Keep the filename and a safe removal action.', patch: s => ({ ...s, view: 'tray', files: [{ ...SAMPLE_FILES[1], unavailable: true }], selected: 'brief' }) },
   { name: 'Resting · tray only', note: 'A small stack, a count, and nothing under the lens.', patch: s => ({ ...s, view: 'tray', open: false, preferences: { ...s.preferences, restClaude: false, restMusic: false } }) },
+  { name: 'Clipboard · history', note: 'Newest first, pins on top. Click copies it back.', patch: s => ({ ...s, view: 'clipboard', preferences: { ...s.preferences, clipboardEnabled: true } }) },
+  { name: 'Clipboard · empty', note: 'Opt-in, and honest about what is skipped.', patch: s => ({ ...s, view: 'clipboard', clips: [], preferences: { ...s.preferences, clipboardEnabled: true } }) },
+  { name: 'Resting · clipboard count', note: 'A count and the kind of the latest item, out at the edge.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, clipboardEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
   { name: 'Claude · needs you', note: 'Attention stays visible without changing your tab.', patch: s => ({ ...s, claude: 'asking' }) },
   ...(['working', 'asking', 'done', 'idle', 'many'] as const).map(claude => ({ name: `Claude · ${claude}`, note: 'The existing Claude face inside shared navigation.', patch: (s: PreviewState): PreviewState => ({ ...s, view: 'agents', claude }) }))
 ];

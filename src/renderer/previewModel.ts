@@ -1,6 +1,6 @@
 import type { Snapshot, Status } from '../shared/types';
 
-export type PreviewView = 'agents' | 'music' | 'tray';
+export type PreviewView = 'agents' | 'music' | 'tray' | 'clipboard';
 export interface PreviewPreferences {
   theme: 'system' | 'light' | 'dark';
   density: 'compact' | 'comfortable';
@@ -17,7 +17,11 @@ export interface PreviewPreferences {
   codexPulse: boolean;
   restMusic: boolean;
   restTray: boolean;
+  clipboardEnabled: boolean;
+  clipboardHistorySize: '20' | '50' | '100';
+  restClipboard: boolean;
 }
+export interface PreviewClip { id: string; kind: 'text' | 'url'; preview: string; meta: string; pinned: boolean }
 export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string }
 export interface PreviewFile { id: string; name: string; kind: 'image' | 'pdf' | 'folder' | 'text'; size: string; unavailable?: boolean }
 export interface PreviewState {
@@ -27,6 +31,7 @@ export interface PreviewState {
   preferences: PreviewPreferences;
   music: { index: number; position: number; playing: boolean; source: 'ready' | 'empty' | 'unavailable'; missingArtwork: boolean };
   files: PreviewFile[];
+  clips: PreviewClip[];
   selected: string | null;
   received: PreviewFile[];
   drag: { origin: 'finder' | 'tray'; id: string; previousView: PreviewView; previousOpen: boolean } | null;
@@ -37,8 +42,16 @@ export interface PreviewState {
 export const DEFAULT_PREFERENCES: PreviewPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true,
-  restClaude: true, restCodex: true, codexBuddy: true, codexPulse: true, restMusic: true, restTray: true
+  restClaude: true, restCodex: true, codexBuddy: true, codexPulse: true, restMusic: true, restTray: true,
+  clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true
 };
+export const SAMPLE_CLIPS: PreviewClip[] = [
+  { id: 'clip-url', kind: 'url', preview: 'https://developer.apple.com/documentation/coreaudio', meta: 'developer.apple.com · 2m', pinned: false },
+  { id: 'clip-cmd', kind: 'text', preview: 'npm run service:restart', meta: '23 chars · 9m', pinned: true },
+  { id: 'clip-note', kind: 'text', preview: 'Bars follow the resting face; capture stays with what is showing.', meta: '2 lines · 41m', pinned: false },
+  { id: 'clip-hex', kind: 'text', preview: '#d9c4a6', meta: '7 chars · 1h', pinned: false },
+  { id: 'clip-path', kind: 'text', preview: '~/.notchlight/island.log', meta: '24 chars · 3h', pinned: false }
+];
 export const TRACKS: PreviewTrack[] = [
   { id: 'late-light', title: 'Late Light', artist: 'The Quiet Hours', album: 'Somewhere, Slowly', duration: 234, artwork: './assets/late-light.svg' },
   { id: 'blue-room', title: 'Blue Room', artist: 'Soft Signal', album: 'After the Rain', duration: 198, artwork: './assets/blue-room.svg' },
@@ -53,7 +66,7 @@ export const SAMPLE_FILES: PreviewFile[] = [
 export function initialPreview(): PreviewState {
   return { view: 'music', open: true, preferences: { ...DEFAULT_PREFERENCES },
     music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false },
-    files: SAMPLE_FILES.slice(0, 2), selected: null, received: [], drag: null, notice: '', codex: 'off', claude: 'working' };
+    files: SAMPLE_FILES.slice(0, 2), clips: SAMPLE_CLIPS, selected: null, received: [], drag: null, notice: '', codex: 'off', claude: 'working' };
 }
 export type PreviewAction =
   | { type: 'view'; view: PreviewView } | { type: 'open'; value: boolean }
@@ -64,7 +77,8 @@ export type PreviewAction =
   | { type: 'claude'; value: PreviewState['claude'] }
   | { type: 'add'; id: string } | { type: 'remove'; id: string } | { type: 'select'; id: string }
   | { type: 'take'; id: string } | { type: 'files'; files: PreviewFile[] }
-  | { type: 'drag-start'; origin: 'finder' | 'tray'; id: string } | { type: 'drag-enter' } | { type: 'drag-end' };
+  | { type: 'drag-start'; origin: 'finder' | 'tray'; id: string } | { type: 'drag-enter' } | { type: 'drag-end' }
+  | { type: 'clip-copy'; id: string } | { type: 'clip-pin'; id: string } | { type: 'clip-remove'; id: string } | { type: 'clip-clear' };
 
 export function previewReducer(s: PreviewState, a: PreviewAction): PreviewState {
   switch (a.type) {
@@ -103,6 +117,10 @@ export function previewReducer(s: PreviewState, a: PreviewAction): PreviewState 
     case 'drag-start': return { ...s, notice: 'Moving a sample file…', drag: { origin: a.origin, id: a.id, previousView: s.view, previousOpen: s.open } };
     case 'drag-enter': return s.drag?.origin === 'finder' ? { ...s, view: 'tray', open: true } : s;
     case 'drag-end': return s.drag ? { ...s, view: s.drag.previousView, open: s.drag.previousOpen, drag: null, notice: 'Transfer canceled. Nothing changed.' } : s;
+    case 'clip-copy': { const clip = s.clips.find(c => c.id === a.id); return clip ? { ...s, clips: [clip, ...s.clips.filter(c => c !== clip)], notice: 'Copied again (sample only; nothing reaches your clipboard).' } : s; }
+    case 'clip-pin': return { ...s, clips: s.clips.map(c => c.id === a.id ? { ...c, pinned: !c.pinned } : c) };
+    case 'clip-remove': return { ...s, clips: s.clips.filter(c => c.id !== a.id), notice: 'Removed from the sample history.' };
+    case 'clip-clear': return { ...s, clips: s.clips.filter(c => c.pinned), notice: 'Sample history cleared. Pins stay.' };
   }
 }
 
