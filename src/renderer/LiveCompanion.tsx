@@ -4,7 +4,7 @@ import { Icon, FileThumb, RestingWings, type RestingPart } from './Preview';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import type { AgentFilter, Snapshot } from '../shared/types';
-import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_SPOTIFY, type CaptureSnapshot, type CompanionSnapshot, type CompanionView, type OperationResult, type ShelfFile } from '../shared/companion';
+import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_SPOTIFY, playhead, type CaptureSnapshot, type CompanionSnapshot, type CompanionView, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
 import { useReducedMotion } from './pulse';
 import './preview.css';
 import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
@@ -103,19 +103,42 @@ function LiveEqualizer({ active, live, capture }: { active: boolean; live: boole
   }, [active, listening]);
   return <span ref={ref} className={`mp-equalizer ${mode === 'live' ? 'is-live' : mode === 'quiet' ? 'is-quiet' : ''}`} aria-hidden="true">{BARS.map(i => <i key={i}/>)}</span>;
 }
+/**
+ * Where playback is right now. Spotify is read every few seconds; between
+ * reads the seek bar and the times advance on their own while a track plays,
+ * four times a second, so they tick rather than jump. Paused, they hold.
+ */
+function usePlayhead(music: SpotifySnapshot): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+    if (!music.playing || music.status !== 'ready') return;
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [music.playing, music.status, music.at]);
+  return playhead(music, now);
+}
 function LiveMusic({ live }: { live: LiveController }) {
   const { music } = live.state;
   const [seek, setSeek] = useState<number | null>(null);
+  // Play/pause shows its new state the moment it is clicked; the read that follows confirms or corrects it.
+  const [expected, setExpected] = useState<boolean | null>(null);
   const track = music.track;
+  const current = usePlayhead(music);
   useEffect(() => setSeek(null), [track?.id]);
-  const command = (name: 'toggle' | 'next' | 'previous') => { void live.run(() => window.notchlight.controlSpotify(name)); };
+  useEffect(() => setExpected(null), [music.playing, music.at]);
+  const command = (name: 'toggle' | 'next' | 'previous') => {
+    if (name === 'toggle') setExpected(!music.playing);
+    void live.run(() => window.notchlight.controlSpotify(name)).finally(() => { if (name === 'toggle') setExpected(null); });
+  };
   const commitSeek = (position: number) => { setSeek(null); void live.run(() => window.notchlight.controlSpotify('seek', position)); };
   if (music.status !== 'ready' || !track) {
     const open = music.status === 'not-running' || music.status === 'empty' && !music.busy;
     return <div className="mp-empty"><Icon name={music.status === 'error' || music.status === 'permission' ? 'warning' : 'music'} size={30}/><p>{music.busy ? 'Connecting to Spotify…' : music.status === 'disconnected' ? 'Your Spotify, closer.' : music.status === 'permission' ? 'Spotify needs your permission.' : open ? 'A little room for music.' : 'Spotify is taking a moment.'}</p><span>{music.message || 'Connect the Spotify desktop app to see and control what’s playing.'}</span><button className="mp-soft-button" disabled={music.busy} onClick={() => void live.run(() => open ? window.notchlight.openSpotify() : window.notchlight.connectSpotify())}>{open ? 'Open Spotify' : music.status === 'disconnected' ? 'Connect Spotify' : 'Reconnect Spotify'}</button></div>;
   }
-  const position = seek ?? music.position;
-  return <div className="mp-music"><div className="mp-track-row"><LiveArtwork live={live}/><div className="mp-track-meta"><h2 title={track.title}>{track.title}</h2><p title={track.artist}>{track.artist}</p><div className="mp-seek"><span>{time(position)}</span><input aria-label="Track position" aria-valuetext={`${time(position)} of ${time(track.duration)}`} type="range" min="0" max={track.duration} value={position} disabled={music.busy || !track.duration} onChange={e => setSeek(Number(e.target.value))} onPointerUp={e => commitSeek(Number(e.currentTarget.value))} onPointerCancel={() => setSeek(null)} onKeyUp={e => { if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key)) commitSeek(Number(e.currentTarget.value)); }}/><span>−{time(Math.max(0,track.duration-position))}</span></div><div className="mp-transport"><button className="mp-icon-button" disabled={music.busy} aria-label="Previous track" onClick={() => command('previous')}><Icon name="back" size={18}/></button><button className="mp-icon-button mp-play" disabled={music.busy} aria-label={music.playing ? 'Pause Spotify' : 'Play Spotify'} onClick={() => command('toggle')}><Icon name={music.playing ? 'pause' : 'play'} size={18}/></button><button className="mp-icon-button" disabled={music.busy} aria-label="Next track" onClick={() => command('next')}><Icon name="next" size={18}/></button></div></div></div></div>;
+  const playing = expected ?? music.playing;
+  const position = seek ?? current;
+  return <div className="mp-music"><div className="mp-track-row"><LiveArtwork live={live}/><div className="mp-track-meta"><h2 title={track.title}>{track.title}</h2><p title={track.artist}>{track.artist}</p><div className="mp-seek"><span>{time(position)}</span><input aria-label="Track position" aria-valuetext={`${time(position)} of ${time(track.duration)}`} type="range" min="0" max={track.duration} step="any" value={position} disabled={music.busy || !track.duration} onChange={e => setSeek(Number(e.target.value))} onPointerUp={e => commitSeek(Number(e.currentTarget.value))} onPointerCancel={() => setSeek(null)} onKeyUp={e => { if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key)) commitSeek(Number(e.currentTarget.value)); }}/><span>−{time(Math.max(0,track.duration-position))}</span></div><div className="mp-transport"><button className="mp-icon-button" disabled={music.busy} aria-label="Previous track" onClick={() => command('previous')}><Icon name="back" size={18}/></button><button className="mp-icon-button mp-play" disabled={music.busy} aria-label={playing ? 'Pause Spotify' : 'Play Spotify'} onClick={() => command('toggle')}><Icon name={playing ? 'pause' : 'play'} size={18}/></button><button className="mp-icon-button" disabled={music.busy} aria-label="Next track" onClick={() => command('next')}><Icon name="next" size={18}/></button></div></div></div></div>;
 }
 function FileButton({ file, live, selected, onSelect }: { file: ShelfFile; live: LiveController; selected: boolean; onSelect: () => void }) {
   return <div className={`mp-shelf-item ${selected ? 'is-selected' : ''}`}><button className="mp-file-button" aria-label={`Select ${file.name}${file.unavailable ? ', unavailable' : ''}`} aria-pressed={selected} draggable={!file.unavailable} onDragStart={e => { e.preventDefault(); window.notchlight.startFileDrag(file.id); }} onClick={onSelect} onDoubleClick={() => void live.run(() => window.notchlight.revealFile(file.id))}><FileThumb file={file} small={live.state.preferences.thumbnails === 'small'} sample={false}/><span title={file.name}>{file.name}</span><small>{file.unavailable ? 'Unavailable' : file.size}</small></button><button className="mp-remove" aria-label={`Remove ${file.name} from Tray`} onClick={() => void live.run(() => window.notchlight.removeFile(file.id))}><Icon name="close" size={12}/></button></div>;
