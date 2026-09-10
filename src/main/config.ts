@@ -62,6 +62,12 @@ export interface Config {
    * Empty string registers nothing.
    */
   shortcut: string;
+  /**
+   * Milliseconds added to the output device's reported latency before the
+   * equalizer bars are shown. Zero trusts Core Audio's figure. AirPods report
+   * an estimate; if the bars run early, try 80; if late, try -80.
+   */
+  levelsOffsetMs: number;
 }
 
 const DEFAULTS: Config = {
@@ -90,7 +96,8 @@ const DEFAULTS: Config = {
   staleSec: 3 * 60 * 60,
   watchProcesses: true,
   processGraceSec: 8,
-  shortcut: 'Alt+Shift+N'
+  shortcut: 'Alt+Shift+N',
+  levelsOffsetMs: 0
 };
 
 let cached: Config | null = null;
@@ -112,6 +119,8 @@ export function config(): Config {
   // become a blocking hook by accident.
   if (!Array.isArray(cached.gateTools)) cached.gateTools = [];
   if (typeof cached.shortcut !== 'string') cached.shortcut = DEFAULTS.shortcut;
+  if (typeof cached.levelsOffsetMs !== 'number' || !Number.isFinite(cached.levelsOffsetMs)) cached.levelsOffsetMs = 0;
+  cached.levelsOffsetMs = Math.max(-2000, Math.min(2000, Math.round(cached.levelsOffsetMs)));
   return cached;
 }
 
