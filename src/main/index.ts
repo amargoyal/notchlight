@@ -18,7 +18,8 @@ import { SpotifyPlayer } from './spotify';
 import { SpotifyWatcher } from './spotifyWatch';
 import { fetchTint } from './tint';
 import { installCompanionIpc } from './companionIpc';
-import { AudioLevels, wantsLevels } from './audioLevels';
+import { AudioLevels, helperArguments, wantsLevels } from './audioLevels';
+import { fetchAppleArtwork } from './appleArtwork';
 import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
 import { createGalleryWindow, createCustomizeWindow, NotchWindow } from './notchWindow';
@@ -218,12 +219,15 @@ async function boot(): Promise<void> {
   const claude = DEMO ? new DemoStore() : new Store();
   claudeStore = DEMO ? null : claude as Store;
   companion = new CompanionStore(path.join(APP_DIR, 'companion.json'), async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(), config().pulse);
-  spotify = new SpotifyPlayer(undefined, undefined, undefined, fetchTint);
+  spotify = new SpotifyPlayer(undefined, undefined, undefined, fetchTint, fetchAppleArtwork);
+  spotify.setPlayer(companion.current().preferences.musicPlayer);
   watcher = new SpotifyWatcher();
   watcher.on('change', change => spotify.onExternalChange(change));
   // With instant word of every change, the polls are only a safety net.
   watcher.on('listening', (listening: boolean) => spotify.setPollInterval(listening ? 10_000 : 2_500));
-  levels = new AudioLevels();
+  // The tap follows the player being read; a change of player restarts it on the other app.
+  let tappedPlayer = spotify.currentPlayer();
+  levels = new AudioLevels(undefined, () => helperArguments(config(), spotify.currentPlayer()));
   levels.on('levels', (bands: number[]) => {
     send(notch?.win ?? null, 'music:levels', bands);
     send(customize, 'music:levels', bands);
@@ -280,13 +284,17 @@ async function boot(): Promise<void> {
   if (!DEMO) codexApprovals.start();
   let spotifyEnabled = companion.current().preferences.spotifyEnabled;
   spotify.on('change', music => companion.setMusic(music));
-  const syncLevels = () => levels.setActive(!dark && wantsLevels(companion.current()));
+  const syncLevels = () => {
+    if (spotify.currentPlayer() !== tappedPlayer) { tappedPlayer = spotify.currentPlayer(); levels.setActive(false); }
+    levels.setActive(!dark && wantsLevels(companion.current()));
+  };
   companion.on('change', state => {
     syncCodex();
     syncClipboard();
     send(notch?.win ?? null, 'companion', state);
     send(customize, 'companion', state);
     syncLevels();
+    spotify.setPlayer(state.preferences.musicPlayer);
     if (state.preferences.spotifyEnabled !== spotifyEnabled) {
       spotifyEnabled = state.preferences.spotifyEnabled;
       spotify.setEnabled(spotifyEnabled);

@@ -13,8 +13,9 @@
 // when the tap cannot be built. `ok:false` is a fallback signal, not an error.
 //
 //   swiftc -O -o audiotap audiotap.swift
-//   audiotap [--fps 24] [--offset-ms 0]
+//   audiotap [--fps 24] [--offset-ms 0] [--bundle com.spotify.client]
 //     --fps        frames per second on stdout; 24 by default
+//     --bundle     the app to tap; Spotify by default, com.apple.Music for Apple Music
 //     --offset-ms  extra delay added to the output device's reported latency,
 //                  for a Bluetooth output whose figure is an estimate; negative
 //                  values pull the bars earlier, down to no delay at all
@@ -24,7 +25,12 @@ import Accelerate
 import CoreAudio
 import Foundation
 
-let bundleID = "com.spotify.client"
+/// The app whose output is tapped. Spotify by default; --bundle com.apple.Music for Apple Music.
+let bundleID: String = {
+    let args = CommandLine.arguments
+    if let index = args.firstIndex(of: "--bundle"), index + 1 < args.count, !args[index + 1].isEmpty { return args[index + 1] }
+    return "com.spotify.client"
+}()
 /// Band edges in Hz. Five bars, bass on the left.
 let bandEdges: [Double] = [40, 130, 400, 1200, 3500, 11000]
 /// Every frame is a composite of the whole overlay window on the other side, so

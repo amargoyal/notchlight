@@ -346,6 +346,15 @@ on its own, so allowing it a minute later takes effect without a reconnect. A
 Spotify read that fails is retried after 5, 10, 20, 40 and then 60 seconds
 rather than stopping; only a permission denial waits for you.
 
+**Customize → Music → Player** chooses what the face follows: **Spotify**
+(the default), **Apple Music**, or **whichever is open** — which starts with
+Spotify and moves to Apple Music while Spotify is not running, and back.
+Apple Music goes through its own scripting dictionary (`native/music.js`);
+its artwork arrives as bytes through a short AppleScript and is carried as a
+PNG the app made itself; the bars tap `com.apple.Music` instead; play, pause
+and skips inside Music reach the notch through the same helper that hears
+Spotify. Only one player is followed at a time.
+
 **Customize → Music** also has the finish: bars **rising** bass to treble or
 **mirrored** around the bass as one shape (compare both in the gallery), a
 soft **glow** in the artwork's own colour behind the artwork and the bars

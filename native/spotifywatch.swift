@@ -1,4 +1,4 @@
-// spotifywatch — says the moment Spotify's playback changes.
+// spotifywatch — says the moment Spotify's (or Apple Music's) playback changes.
 //
 // Spotify posts a distributed notification, com.spotify.client.PlaybackStateChanged,
 // on every play, pause, skip and seek, with the track and position in it. Polling
@@ -25,10 +25,21 @@ func emit(_ object: [String: Any]) {
 let center = DistributedNotificationCenter.default()
 center.addObserver(forName: NSNotification.Name("com.spotify.client.PlaybackStateChanged"), object: nil, queue: nil) { note in
     let info = note.userInfo ?? [:]
-    var out: [String: Any] = ["state": info["Player State"] as? String ?? "Unknown"]
+    var out: [String: Any] = ["player": "spotify", "state": info["Player State"] as? String ?? "Unknown"]
     if let id = info["Track ID"] as? String { out["trackId"] = id }
     if let position = info["Playback Position"] as? Double { out["position"] = position }
     if let duration = info["Duration"] as? Int { out["durationMs"] = duration }
+    if let title = info["Name"] as? String { out["title"] = title }
+    if let artist = info["Artist"] as? String { out["artist"] = artist }
+    if let album = info["Album"] as? String { out["album"] = album }
+    emit(out)
+}
+// Apple Music posts the same idea under its own name. No position in it; the read that follows fills that in.
+center.addObserver(forName: NSNotification.Name("com.apple.Music.playerInfo"), object: nil, queue: nil) { note in
+    let info = note.userInfo ?? [:]
+    var out: [String: Any] = ["player": "apple", "state": info["Player State"] as? String ?? "Unknown"]
+    if let id = info["PersistentID"] { out["trackId"] = "music:\(id)" }
+    if let duration = info["Total Time"] as? Int { out["durationMs"] = duration }
     if let title = info["Name"] as? String { out["title"] = title }
     if let artist = info["Artist"] as? String { out["artist"] = artist }
     if let album = info["Album"] as? String { out["album"] = album }

@@ -25,6 +25,8 @@ export interface CompanionPreferences {
   clipboardHistorySize: '20' | '50' | '100';
   restClipboard: boolean;
   /** Bars rising bass→treble, or folded around the middle so they read as one shape. */
+  /** Which player the Music face follows. Auto follows whichever is open, Spotify first. */
+  musicPlayer: 'spotify' | 'apple' | 'auto';
   equalizerLayout: 'rising' | 'mirrored';
   /** A soft glow in the artwork's colour behind the mini artwork and the bars. */
   artworkGlow: boolean;
@@ -38,8 +40,11 @@ export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false,
   restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
-  equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false
+  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false
 };
+export type MusicPlayer = 'spotify' | 'apple';
+export const PLAYER_NAMES: Record<MusicPlayer, string> = { spotify: 'Spotify', apple: 'Apple Music' };
+export const PLAYER_BUNDLES: Record<MusicPlayer, string> = { spotify: 'com.spotify.client', apple: 'com.apple.Music' };
 export interface ShelfFile {
   id: string;
   name: string;
@@ -51,6 +56,8 @@ export interface ShelfFile {
 export interface MusicTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string; /** The artwork's colour as #rrggbb, once known. */ tint?: string }
 export interface SpotifySnapshot {
   status: 'disconnected' | 'not-running' | 'ready' | 'empty' | 'permission' | 'error';
+  /** The player this snapshot describes. */
+  player: MusicPlayer;
   playing: boolean;
   position: number;
   /** When `position` was read (ms since epoch), so the renderer can let it advance between reads. */
@@ -61,7 +68,7 @@ export interface SpotifySnapshot {
   busy: boolean;
   message?: string;
 }
-export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', playing: false, position: 0, at: 0, volume: -1, track: null, busy: false };
+export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', player: 'spotify', playing: false, position: 0, at: 0, volume: -1, track: null, busy: false };
 /** Where playback is now, given the last read and the clock. Paused stays put; nothing runs past the end. */
 export function playhead(music: SpotifySnapshot, now: number): number {
   if (!music.track) return 0;
@@ -177,7 +184,7 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid preferences.');
   const result: Record<string, unknown> = {};
   const choices: Record<string, readonly string[]> = {
-    theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100'], equalizerLayout: ['rising', 'mirrored']
+    theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100'], equalizerLayout: ['rising', 'mirrored'], musicPlayer: ['spotify', 'apple', 'auto']
   };
   for (const [key, item] of Object.entries(value)) {
     if (!Object.hasOwn(DEFAULT_COMPANION_PREFERENCES, key)) throw new Error('Unknown preference.');
