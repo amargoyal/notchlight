@@ -106,6 +106,44 @@ function LiveEqualizer({ active, live, capture }: { active: boolean; live: boole
   return <span ref={ref} className={`mp-equalizer ${mode === 'live' ? 'is-live' : mode === 'quiet' ? 'is-quiet' : ''}`} aria-hidden="true">{BARS.map(i => <i key={i}/>)}</span>;
 }
 /**
+ * The scroll wheel over the music wing turns Spotify's own volume.
+ *
+ * Wheel ticks accumulate into steps of five; the level shows at once and the
+ * command goes out after the wheel rests for a moment, so a flick is one
+ * Apple Event rather than twenty. The readout stands in for the bars for a
+ * second, then the bars come back.
+ */
+function useVolumeWheel(live: LiveController) {
+  const { music } = live.state;
+  const [shown, setShown] = useState<number | null>(null);
+  const pending = useRef<number | null>(null);
+  const carry = useRef(0);
+  const send = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hide = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (send.current) clearTimeout(send.current); if (hide.current) clearTimeout(hide.current); }, []);
+  const onWheel = (e: { deltaY: number; preventDefault: () => void }) => {
+    if (music.status !== 'ready' || music.volume < 0) return;
+    e.preventDefault();
+    carry.current += e.deltaY;
+    const steps = Math.trunc(carry.current / 24);
+    if (!steps) return;
+    carry.current -= steps * 24;
+    const base = pending.current ?? music.volume;
+    const next = Math.max(0, Math.min(100, base - steps * 5));
+    pending.current = next;
+    setShown(next);
+    if (send.current) clearTimeout(send.current);
+    send.current = setTimeout(() => { const level = pending.current; pending.current = null; if (level !== null && level !== music.volume) void live.run(() => window.notchlight.controlSpotify('volume', level)); }, 160);
+    if (hide.current) clearTimeout(hide.current);
+    hide.current = setTimeout(() => setShown(null), 1100);
+  };
+  return { onWheel, shown };
+}
+function VolumeReadout({ level }: { level: number }) {
+  return <span className="mp-volume" role="status" aria-label={`Volume ${level}`}><i style={{ width: `${level}%` }}/><b>{level}</b></span>;
+}
+
+/**
  * Where playback is right now. Spotify is read every few seconds; between
  * reads the seek bar and the times advance on their own while a track plays,
  * four times a second, so they tick rather than jump. Paused, they hold.
@@ -207,6 +245,7 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const [dragging, setDragging] = useState(false);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preferences = live.state.preferences;
+  const volume = useVolumeWheel(live);
   const views = visibleViews(preferences.clipboardEnabled);
   const view: CompanionView = dragging ? 'tray' : live.state.view === 'clipboard' && !preferences.clipboardEnabled ? 'agents' : live.state.view;
   const expanded = open || dragging;
@@ -223,15 +262,15 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const selectProvider = (provider: 'claude' | 'codex') => { setFilter(provider); choose('agents'); };
   const agents = agentRestingParts(snapshot, { ...preferences, pulse: preferences.pulse && motion, codexPulse: preferences.codexPulse && motion }, selectProvider);
   const parts: RestingPart[] = [...agents,
-    ...(preferences.restMusic && music.status === 'ready' && music.track ? [{left:<LiveArtwork live={live} mini/>,right:<LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status}/>}]:[]),
+    ...(preferences.restMusic && music.status === 'ready' && music.track ? [{left:<span className="mp-volume-target" onWheel={volume.onWheel}><LiveArtwork live={live} mini/></span>,right:<span className="mp-volume-target" onWheel={volume.onWheel}>{volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status}/>}</span>}]:[]),
     ...(preferences.restTray && files.length || dragging ? [{left:<span className="mp-shelf-wing"><Icon name="tray" size={16}/>{files.length}</span>,right:<Icon name="file" size={16}/>}]:[]),
     ...(preferences.clipboardEnabled && preferences.restClipboard && clipboard.items.length ? [{left:<span className="mp-shelf-wing"><Icon name="clipboard" size={16}/>{clipboard.items.length}</span>,right:<span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : clipboard.items[0].kind === 'url' ? '@' : clipboard.items[0].kind === 'image' ? '▣' : 'T'}</span>}]:[])
   ];
   const resting = parts.length ? <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={parts}/> : snapshot.sessions.length ? (hovering ? <Stubs snap={snapshot}/> : <div style={{width:snapshot.notchW,height:snapshot.notchH}}/>) : undefined;
   const navigation = <>{tabs}{view === 'agents' && <AgentFilters snapshot={snapshot} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{view === 'agents' && <AgentConnection snapshot={snapshot} filter={filter}/>}<AgentAttention sessions={snapshot.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);choose('agents');}}/>{view === 'agents' && live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</>;
   const active = !snapshot.dormant || parts.length > 0 || keyboard;
-  const left = <div className="mp-left-wing">{view === 'music' ? <LiveArtwork live={live} mini/> : view === 'clipboard' ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/>{clipboard.items.length}</span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
-  const right = <div className="mp-right-wing">{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status}/> : view === 'clipboard' ? <span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : 'T'}</span> : <Icon name="file" size={16}/>}</div>;
+  const left = <div className="mp-left-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{view === 'music' ? <LiveArtwork live={live} mini/> : view === 'clipboard' ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/>{clipboard.items.length}</span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
+  const right = <div className="mp-right-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status}/> : view === 'clipboard' ? <span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : 'T'}</span> : <Icon name="file" size={16}/>}</div>;
   const wing = (full: boolean) => <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={full ? PANEL_W : undefined} left={left} right={right}/>;
   const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
   return <div className={`mp-surface ${preferences.density} ${preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!preferences.buddy ? 'mp-hide-buddy' : ''} ${!preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''} ${keyboard ? 'mp-keyboard' : ''}`}
