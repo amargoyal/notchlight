@@ -24,6 +24,22 @@ replays your own recorded Codex rollouts read-only, and `npm run smoke:codex liv
 runs real `codex exec` tasks in an isolated home to exercise hooks and
 approvals. Browser/gallery samples do not establish live behavior.
 
+### Install from the DMG
+
+Download `Notchlight-<version>-arm64.dmg` from the
+[latest release](https://github.com/amargoyal/notchlight/releases), drag
+Notchlight into Applications and open it. The build is not signed or notarized
+yet, so the first launch needs a right-click → **Open**, or:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Notchlight.app
+```
+
+The packaged app and the checkout's launchd service share one single-instance
+lock; stop the service (`npm run service:uninstall`) before switching to the
+app, or keep using the service and skip the DMG. Build your own with
+`npm run dist` (output under `release/`).
+
 Open **Customize Notchlight…** from the menu bar to choose its appearance.
 Settings and Tray references are saved on this Mac. See the
 [rename and migration notes](docs/rename.md) for existing installations.
