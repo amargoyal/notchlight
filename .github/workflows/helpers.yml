@@ -1,0 +1,64 @@
+name: helpers and app
+
+# The Swift helpers are built on a macOS runner so a user of the packaged app
+# never needs the Xcode command line tools. On a push that touches a helper
+# source the binaries are uploaded as an artifact to be committed; on a tag the
+# DMG is built with them inside and attached to the release.
+
+on:
+  push:
+    branches: [main]
+    paths: ['native/**', 'scripts/build-helpers.mjs', '.github/workflows/helpers.yml']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  helpers:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Swift toolchain
+        run: swiftc --version
+      - name: Build helpers
+        run: node scripts/build-helpers.mjs
+      - name: Check they are current
+        run: node scripts/build-helpers.mjs --check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helpers-${{ runner.arch }}
+          path: |
+            native/prebuilt/manifest.json
+            native/prebuilt/**/*
+          if-no-files-found: error
+
+  app:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: helpers
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: helpers-${{ runner.arch }}
+          path: native/prebuilt
+      - run: npm ci
+      - name: Build the DMG
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.dmg
+            native/prebuilt/manifest.json
