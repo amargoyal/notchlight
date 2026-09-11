@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { ApprovalDecision, HitRect, Snapshot } from '../shared/types';
 import type { CompanionPreferences, CompanionSnapshot, CompanionView, SpotifyCommand } from '../shared/companion';
+import type { UpdateInfo, UpdateResponse } from '../shared/updates';
 
 function subscribe<T>(channel: string, cb: (value: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, value: T) => cb(value);
@@ -44,5 +45,7 @@ contextBridge.exposeInMainWorld('notchlight', {
   pinClipboardItem: (id: string, pinned: boolean) => ipcRenderer.invoke('clipboard:pin', id, pinned),
   removeClipboardItem: (id: string) => ipcRenderer.invoke('clipboard:remove', id),
   clearClipboard: (includePinned: boolean) => ipcRenderer.invoke('clipboard:clear', includePinned),
-  pauseClipboard: (paused: boolean) => ipcRenderer.invoke('clipboard:pause', paused)
+  pauseClipboard: (paused: boolean) => ipcRenderer.invoke('clipboard:pause', paused),
+  onUpdate: (cb: (info: UpdateInfo) => void) => subscribe('update', cb),
+  respondToUpdate: (response: UpdateResponse) => ipcRenderer.send('update:respond', response)
 });
