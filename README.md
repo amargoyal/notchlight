@@ -43,6 +43,15 @@ architecture. Because the helpers then run as children of Notchlight.app, the
 Automation and audio capture prompts name Notchlight rather than Electron.
 **Start at login** is in the menu bar item of the packaged app.
 
+The packaged app checks GitHub for a newer release shortly after it starts and
+every six hours after that. When one exists, a small card offers **Download**,
+**Later** (a day) or **Skip this version**; **Check for updates…** in the menu
+bar item asks right away and ignores both holds. Nothing installs itself: the
+download opens in your browser, and the new copy is dragged into Applications
+like the first one. Decisions are kept in `~/.notchlight/updates.json`. A
+checkout never checks on its own; `npm run update-preview` opens the card with
+a sample release, and `npm run test:updates` covers the comparison and holds.
+
 The packaged app and the checkout's launchd service share one single-instance
 lock; stop the service (`npm run service:uninstall`) before switching to the
 app, or keep using the service and skip the DMG. Build your own with

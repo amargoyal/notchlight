@@ -361,6 +361,22 @@ The prototype-only documentation was corrected to distinguish the native app
 from browser/gallery samples. Signed app packaging and release materials
 remain in item 4; Claude's buddy and permission meanings are retained.
 
+### 19. Update check against GitHub releases — implemented September 11, 2026
+`src/main/updates.ts` asks `releases/latest` 45 s after boot and every six
+hours in the packaged app only (`app.isPackaged && !DEMO`), compares the tag
+to `app.getVersion()` numerically, and emits `update`; `index.ts` opens
+`createUpdateWindow` (frameless 460×520 card, `src/renderer/update.tsx`) with
+the release title, notes rendered from markdown by hand, and three answers.
+**Later** holds for 24 h, **Skip this version** for that version, both in
+`~/.notchlight/updates.json`; **Check for updates…** in the tray forces a
+check and reports "up to date" or the failure in a message box. The download
+button opens the arm64 DMG (or the release page) in the browser — the build is
+unsigned, so there is no in-place install. `npm run update-preview` shows the
+card with a sample release; `npm run test:updates` covers order, parsing and
+holds. Not yet verified on a packaged build against a real newer release:
+`package.json` says 0.2.0 and the newest tag is v0.1.0, so nothing shows
+until a v0.2.1 or later is tagged.
+
 ## Things to know before touching the music code
 
 - `SpotifyPlayer` serializes every command and status read through one promise
