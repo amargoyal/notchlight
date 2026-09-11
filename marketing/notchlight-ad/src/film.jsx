@@ -8,9 +8,10 @@ const out=x=>1-Math.pow(1-x,4);
 const progress=(t,s,d=.5,fn=out)=>fn(clamp((t-s)/d));
 function keys(k,t,p){if(t<=k[0].t)return k[0][p];for(let i=1;i<k.length;i++){if(t<k[i].t)return mix(k[i-1][p],k[i][p],smooth((t-k[i-1].t)/(k[i].t-k[i-1].t)));}return k.at(-1)[p];}
 function Pointer({press=0}){return <svg width="26" height="34" viewBox="0 0 26 34" style={{display:'block',transform:`scale(${1-.09*press})`,transformOrigin:'4px 3px',filter:'drop-shadow(0 2px 2px #0008)'}}><path d="M4 3V25L9.5 19.9L13.6 28.5L17.4 26.6L13.4 18.3L21 17.8Z" fill="#141210" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/></svg>}
+function Logo({size=44,color="#F2EDE7"}){return <svg width={size} height={size} viewBox="0 0 100 100" style={{display:"block",flex:"none"}}><rect x="0" y="28" width="100" height="4" rx="2" fill={color} opacity=".4"/><path d="M16 30H84V50A16 16 0 0 1 68 66H32A16 16 0 0 1 16 50Z" fill={color}/><circle cx="34" cy="50" r="6.5" fill="#5FBE86"/></svg>}
 const OPEN_FACES=new Set(['list','listAsk','panelAsk','panelOk','music','trayDrop','trayFull','clip','clipAfter']);
 const dimensions={void:{w:190,h:34,l:0},stubs:{w:242,h:34,l:26},list:{w:472,h:255,l:141},listAsk:{w:472,h:285,l:141},panelAsk:{w:472,h:366,l:141},panelOk:{w:472,h:240,l:141},music:{w:472,h:191,l:141},trayDrop:{w:472,h:287,l:141},trayFull:{w:472,h:287,l:141},clip:{w:472,h:390,l:141},clipAfter:{w:472,h:390,l:141},resting:{w:430,h:34,l:141}};
-const SEGMENTS=[{t:0,f:'void'},{t:K.stubs,f:'stubs'},{t:K.open,f:'list'},{t:K.ask,f:'listAsk'},{t:K.row+.06,f:'panelAsk'},{t:K.allow+.07,f:'panelOk'},{t:K.music+.06,f:'music'},{t:K.collapse1,f:'resting'},{t:K.over,f:'trayDrop'},{t:K.drop+.24,f:'trayFull'},{t:K.clip+.06,f:'clip'},{t:K.copy,f:'clipAfter'},{t:K.collapse2,f:'resting'}];
+const SEGMENTS=[{t:0,f:'resting'},{t:K.open,f:'list'},{t:K.ask,f:'listAsk'},{t:K.row+.06,f:'panelAsk'},{t:K.allow+.07,f:'panelOk'},{t:K.music+.06,f:'music'},{t:K.collapse1,f:'resting'},{t:K.over,f:'trayDrop'},{t:K.drop+.24,f:'trayFull'},{t:K.clip+.06,f:'clip'},{t:K.copy,f:'clipAfter'},{t:K.collapse2,f:'resting'}];
 const CAMERA=[{t:0,z:1.12,x:NX,y:640},{t:.75,z:1.12,x:NX,y:640},{t:2.85,z:1.78,x:NX,y:580},{t:5.8,z:1.78,x:NX,y:580},{t:6.8,z:1.84,x:NX,y:505},{t:10.6,z:1.84,x:NX,y:505},{t:12,z:1.86,x:NX,y:625},{t:17,z:1.86,x:NX,y:625},{t:18.8,z:1.26,x:NX+30,y:485},{t:19.3,z:1.26,x:NX+30,y:485},{t:21.75,z:1.78,x:NX,y:570},{t:23.6,z:1.78,x:NX,y:570},{t:24.75,z:1.82,x:NX,y:520},{t:28.8,z:1.82,x:NX,y:520},{t:30.3,z:1.5,x:NX,y:580}];
 const TITLES=[{s:0,e:2.1,lines:['Meet Notchlight.']},{s:2.5,e:10.65,lines:['Your agents.','At a glance.']},{s:11.4,e:17.2,lines:['Music, within reach.']},{s:18,e:23.6,lines:['A place between places.']},{s:24.3,e:29.2,lines:['Copy. Keep.','Find again.']}];
 function Film({T}){
@@ -41,17 +42,17 @@ function Film({T}){
  // Clipboard shares one list through the reorder instead of crossfading two copies.
  const copying=seg.f==='clipAfter';
  const incoming=progress(T,seg.t+.04,.24),outgoing=1-progress(T,seg.t,.12);
- const faceOpacity=name=>copying?(name==='clipAfter'?1:0):name===seg.f?(seg.f==='void'?0:incoming):name===prev.f?outgoing:0;
+ const faceOpacity=name=>si===0?(name===seg.f?1:0):copying?(name==='clipAfter'?1:0):name===seg.f?(seg.f==='void'?0:incoming):name===prev.f?outgoing:0;
  const z=keys(CAMERA,T,'z'),cx=keys(CAMERA,T,'x'),top=keys(CAMERA,T,'y');
  const veil=progress(T,K.veil,1.25);
  const focus=progress(T,1.6,.8)*(1-progress(T,17.15,.55))+progress(T,20,.8)*(1-progress(T,29,.65));
  const pointerOpacity=(1-progress(T,29.7,.5));
  const sheen=(T>=K.ask&&T<K.ask+.9)?Math.sin(Math.PI*(T-K.ask)/.9)*.6:0;
- window.__frame={T,face:seg.f,shell:{x:540+(NX-95-shell.l-cx)*z,y:top,w:shell.w*z,h:shell.h*z},cursor:{x:540+(cur.x-cx)*z,y:top+cur.y*z},target:cur};
+ window.__frame={T,face:seg.f,shell:{x:540+(NX-NL.NOTCH_W/2-shell.l-cx)*z,y:top,w:shell.w*z,h:shell.h*z},cursor:{x:540+(cur.x-cx)*z,y:top+cur.y*z},target:cur};
  return <div ref={root} style={{width:W,height:H,position:'relative',overflow:'hidden',background:'#0c0b0a'}}>
    <div style={{position:'absolute',left:0,top:0,transformOrigin:'0 0',transform:`translate(540px,${top}px) scale(${z}) translate(${-cx}px,0)`}}>
     <Display T={T} lifted={drag} focus={focus}>
-     <div style={{position:'absolute',left:NX-95-shell.l,top:0,width:shell.w,height:shell.h,borderRadius:`0 0 ${mix(OPEN_FACES.has(prev.f)?26:15,OPEN_FACES.has(seg.f)?26:15,p)}px ${mix(OPEN_FACES.has(prev.f)?26:15,OPEN_FACES.has(seg.f)?26:15,p)}px`,background:'#000',boxShadow:`0 22px 48px -16px #000c,0 0 0 ${sheen}px #e0b04a`,overflow:'hidden'}}>
+     <div style={{position:'absolute',left:NX-NL.NOTCH_W/2-shell.l,top:0,width:shell.w,height:shell.h,borderRadius:`0 0 ${mix(OPEN_FACES.has(prev.f)?26:15,OPEN_FACES.has(seg.f)?26:15,p)}px ${mix(OPEN_FACES.has(prev.f)?26:15,OPEN_FACES.has(seg.f)?26:15,p)}px`,background:'#000',boxShadow:`0 22px 48px -16px #000c,0 0 0 ${sheen}px #e0b04a`,overflow:'hidden'}}>
       {Object.entries(sceneFaces).map(([name,content])=>{const o=faceOpacity(name);const enter=name===seg.f&&OPEN_FACES.has(name)&&name!=='clipAfter'?(1-incoming)*7:0;return <div key={name} data-face={name} style={{position:'absolute',left:shell.l-dims[name].l,top:0,opacity:o,visibility:o>0?'visible':'hidden',transform:`translateY(${enter}px)`}}>{content}</div>})}
      </div>
      {drag&&(()=>{const settle=progress(T,K.drop,.24);const at=target('tray-brief');const lift=progress(T,K.pick,.22);const angle=T<K.over?-6*Math.sin(Math.PI*clamp((T-K.pick)/(K.over-K.pick))):0;return <div style={{position:'absolute',left:mix(cur.x+9,at.x-29,settle),top:mix(cur.y+10,at.y-31,settle),transform:`scale(${mix(.92,1.08,lift)*(1-.08*settle)}) rotate(${angle}deg)`,transformOrigin:'center',opacity:1,filter:'drop-shadow(0 10px 8px #0005)'}}><NLFileThumb kind="pdf"/></div>})()}
@@ -60,7 +61,7 @@ function Film({T}){
     </Display>
    </div>
    <div style={{position:'absolute',left:0,right:0,bottom:0,height:410,background:'linear-gradient(transparent,#0c0b0a 90%)',pointerEvents:'none'}}/>
-   <div style={{position:'absolute',left:80,right:80,top:200,display:'flex',alignItems:'center',gap:13,opacity:1-progress(T,K.veil,.5)}}><NLBuddy size={22}/><span style={{font:`500 25px/1 ${NL.SANS}`,color:'#b4aaa0'}}>Notchlight</span></div>
+   <div style={{position:'absolute',left:80,right:80,top:200,display:'flex',alignItems:'center',gap:13,opacity:1-progress(T,K.veil,.5)}}><Logo size={34} color="#b4aaa0"/><span style={{font:`500 25px/1 ${NL.SANS}`,color:'#b4aaa0'}}>Notchlight</span></div>
    {TITLES.map(title=>{const pin=progress(T,title.s,.65);const pout=progress(T,title.e-.35,.35);return <div key={title.s} style={{position:'absolute',left:80,right:80,top:293,opacity:pin*(1-pout),transform:`translateY(${(1-pin)*16-pout*8}px)`,font:`500 68px/1.08 ${NL.SANS}`,letterSpacing:'-.032em',color:NL.C.text}}>{title.lines.map(line=><div key={line}>{line}</div>)}</div>})}
    <div style={{position:'absolute',inset:0,background:'#0c0b0a',opacity:veil}}/>
    <EndCard T={T}/>
@@ -69,11 +70,7 @@ function Film({T}){
 function EndCard({T}){
  const p=progress(T,30.85,.9),word=progress(T,K.word,.85),tag=progress(T,31.85,.75);
  return <div style={{position:'absolute',inset:0,pointerEvents:'none',opacity:p}}>
-  <div style={{position:'absolute',top:655,left:540-mix(155,238,p),width:mix(310,476,p),height:88,borderRadius:'0 0 30px 30px',background:'#000',borderTop:'1px solid #37312b',boxShadow:'0 18px 38px -16px #000',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 25px',transform:`translateY(${(1-p)*35}px)`}}>
-    <span style={{display:'flex',alignItems:'center',gap:17}}><NLLight status="working" size={10} pulse T={T}/><NLBuddy size={36}/></span>
-    <span style={{width:140,height:28,background:'#000',borderRadius:12}}/>
-    <NLBuddy provider="codex" face="approved" size={36}/>
-  </div>
+  <div style={{position:'absolute',top:640,left:0,right:0,display:'flex',justifyContent:'center',opacity:word,transform:`translateY(${(1-word)*20}px)`}}><Logo size={170}/></div>
   <div style={{position:'absolute',top:845,left:0,right:0,textAlign:'center',font:`600 108px/1.1 ${NL.SANS}`,letterSpacing:'-.04em',color:NL.C.text,opacity:word,transform:`translateY(${(1-word)*20}px)`}}>Notchlight</div>
   <div style={{position:'absolute',top:1008,left:90,right:90,textAlign:'center',font:`400 37px/1.4 ${NL.SANS}`,color:'#b4aaa0',opacity:tag}}>Your notch, a little more useful.</div>
   <div style={{position:'absolute',top:1130,left:90,right:90,display:'flex',justifyContent:'center',gap:20,color:'#a69c93',font:`400 23px/1.5 ${NL.SANS}`,opacity:tag}}>{['Agents','Music','Tray','Clipboard'].map((s,i)=><React.Fragment key={s}>{i>0&&<span style={{color:'#544b43'}}>·</span>}<span>{s}</span></React.Fragment>)}</div>

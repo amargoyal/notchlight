@@ -224,12 +224,10 @@ function FaceClip({ T = 0, after, hoverId, files }) {
 
 // RestingWings with both providers: budget leaves no room for the other faces → "+3" overflow, Cx/Cl lights, buddies
 function FaceResting({ T, codexFace = 'working' }) {
-  const div = <i style={{ display: 'block', width: 1, height: 12, background: '#ffffff1f', flex: 'none' }} />;
-  const light = (status, label, pulse) => { const b = pulse ? NL.breath(T) : 0; return <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#e4ddd5', font: `500 9px/1 ${NSANS}` }}><i style={{ display: 'block', width: 7, height: 7, borderRadius: '50%', background: NL.lightColor(status), opacity: 1 - 0.6 * b, transform: `scale(${1 - 0.2 * b})` }} /><span>{label}</span></span>; };
-  const over = { color: '#b7afa6', font: `500 10px/1 ${NSANS}` };
-  const wing = { display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', minHeight: 30 };
+  const light = (status, pulse) => { const b = pulse ? NL.breath(T) : 0; return <i style={{ display: 'block', width: 7, height: 7, borderRadius: '50%', flex: 'none', background: NL.lightColor(status), boxShadow: NL.glow(NL.lightColor(status), .7), opacity: 1 - 0.6 * b, transform: `scale(${1 - 0.2 * b})` }} />; };
+  const wing = { display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', minHeight: 30 };
   return <NLWings
-    left={<div style={wing}><span style={over}>+3</span>{div}{light('working', 'Cx', false)}{div}{light('working', 'Cl', true)}</div>}
-    right={<div style={wing}><NLBuddy face="working" size={22} />{div}<NLBuddy provider="codex" face={codexFace} size={22} />{div}<span style={over}>···</span></div>} />;
+    left={<div style={wing}><NLArtwork mini />{light('working', false)}{light('working', true)}</div>}
+    right={<div style={wing}><NLBuddy face="working" size={20} /><NLBuddy provider="codex" face={codexFace} size={20} /><NLEqualizer T={T} /></div>} />;
 }
 Object.assign(window, { FaceStubs, FaceList, FacePanel, FaceMusic, FaceTray, FaceClip, FaceResting, NLFileThumb, NLArtwork, NLEqualizer, NL_SESS: SESS });
