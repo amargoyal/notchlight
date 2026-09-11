@@ -6,7 +6,7 @@
  * by the app, so every line here has a stable shape: an ISO timestamp, a
  * bracketed tag and a short message. `scripts/native-check.mjs` counts them.
  */
-export type LifecycleTag = 'power' | 'display' | 'levels' | 'spotify' | 'hooks' | 'island' | 'notchlight';
+export type LifecycleTag = 'power' | 'display' | 'levels' | 'spotify' | 'hooks' | 'island' | 'updates' | 'notchlight';
 
 export function logEvent(tag: LifecycleTag, message: string): void {
   console.log(`${new Date().toISOString()} [${tag}] ${message}`);
