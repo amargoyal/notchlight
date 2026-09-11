@@ -3,7 +3,7 @@ const NL = {};
 NL.C = { ink:'#000000', well:'#0A0A0A', text:'#F2EDE7', body:'#E4DDD5', muted:'#A69C93', dim:'#9E958C', faint:'#8A817A', ghost:'#7C736C', dead:'#4A443F', green:'#5FBE86', yellow:'#E0B04A', red:'#D46A5A', buddy:'#C97C5C', buddyInk:'#141210', hair:'rgba(255,255,255,.08)' };
 NL.MONO = "ui-monospace,'SF Mono',Menlo,monospace";
 NL.SANS = "-apple-system,'SF Pro Text','Helvetica Neue',Helvetica,sans-serif";
-NL.PANEL_W = 472; NL.NOTCH_W = 190; NL.NOTCH_H = 34;
+NL.PANEL_W = 472; NL.NOTCH_W = 150; NL.NOTCH_H = 34;
 NL.lightColor = (s) => s === 'working' ? NL.C.green : s === 'asking' ? NL.C.yellow : (s === 'done' || s === 'failed') ? NL.C.red : NL.C.dead;
 NL.glow = (color, strength = 0.85) => { const rgb = color === NL.C.green ? '95,190,134' : color === NL.C.yellow ? '224,176,74' : color === NL.C.red ? '212,106,90' : '0,0,0'; return `0 0 10px rgba(${rgb},${strength})`; };
 NL.fmtTokens = (n) => { if (!Number.isFinite(n) || n <= 0) return '0'; if (n < 1000) return String(Math.round(n)); const k = n / 1000; if (k < 100) return k.toFixed(1).replace(/\.0$/, '') + 'k'; if (k < 1000) return Math.round(k) + 'k'; return (k / 1000).toFixed(1).replace(/\.0$/, '') + 'M'; };

@@ -33,7 +33,7 @@
     "test:clipboard": "node scripts/test-clipboard.mjs",
     "test:updates": "node scripts/test-updates.mjs",
     "smoke:codex": "node scripts/smoke-codex.mjs",
-    "dist": "npm run build && electron-builder --mac dmg --arm64"
+    "dist": "npm run build && electron-builder --mac dmg --arm64 --publish never"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
