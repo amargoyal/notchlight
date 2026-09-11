@@ -4,7 +4,7 @@
  * Hooks and transcripts feed one live store and one notch overlay. The gallery
  * and customization preview are ordinary windows with a shared Dock lifecycle.
  */
-import { app, BrowserWindow, clipboard, ClipboardItem as ElectronClipboardItem, globalShortcut, ipcMain, Menu, nativeImage, powerMonitor, shell, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, ClipboardItem as ElectronClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, shell, Tray } from 'electron';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
@@ -22,7 +22,7 @@ import { AudioLevels, helperArguments, wantsLevels } from './audioLevels';
 import { fetchAppleArtwork } from './appleArtwork';
 import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
-import { createGalleryWindow, createCustomizeWindow, NotchWindow } from './notchWindow';
+import { createGalleryWindow, createCustomizeWindow, createUpdateWindow, NotchWindow } from './notchWindow';
 import { notchState, probeNotch } from './notchProbe';
 import { trayIcon } from './png';
 import { Store } from './store';
@@ -31,12 +31,16 @@ import { CodexApprovals } from './codexApprovals';
 import { AgentCoordinator } from './agentCoordinator';
 import { logEvent } from './lifecycle';
 import { Hover } from './hover';
+import { Updater, type Release } from './updates';
+import type { UpdateResponse } from '../shared/updates';
 import { jumpToProcess } from './terminal';
 import type { HitRect, Snapshot } from '../shared/types';
 
 const DEMO = process.argv.includes('--demo');
 const GALLERY_ONLY = process.argv.includes('--gallery');
 const CUSTOMIZE = process.argv.includes('--customize');
+/** Open the update card with a sample release, to look at it. */
+const UPDATE_PREVIEW = process.argv.includes('--update-preview');
 app.setName('Notchlight');
 
 /**
@@ -58,6 +62,10 @@ let notch: NotchWindow | null = null;
 let tray: Tray | null = null;
 let gallery: BrowserWindow | null = null;
 let customize: BrowserWindow | null = null;
+let updateWin: BrowserWindow | null = null;
+let updater: Updater;
+/** The release the open update window is about, so its answer knows the version. */
+let offered: Release | null = null;
 let companion: CompanionStore;
 let clips: ClipboardStore;
 let pasteboardWatch: LineHelper<PasteboardChange>;
@@ -137,6 +145,54 @@ function openCustomize(): void {
   });
 }
 
+/** The desktop theme, resolved: the window paints before its page can ask. */
+function desktopTheme(): 'light' | 'dark' {
+  const pref = companion?.current().preferences.theme ?? 'system';
+  return pref === 'system' ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light') : pref;
+}
+
+/**
+ * Show the update card. One at a time: a second release while the first is
+ * still on screen just replaces what the card says.
+ */
+function showUpdate(release: Release): void {
+  offered = release;
+  const info = updater.info(release, desktopTheme());
+  if (updateWin && !updateWin.isDestroyed()) {
+    send(updateWin, 'update', info);
+    updateWin.show();
+    updateWin.focus();
+    return;
+  }
+  updateWin = createUpdateWindow(info.theme);
+  updateWin.webContents.on('did-finish-load', () => send(updateWin, 'update', info));
+  updateWin.once('ready-to-show', () => {
+    app.focus({ steal: true });
+    updateWin?.show();
+    updateWin?.focus();
+  });
+  updateWin.on('closed', () => { updateWin = null; offered = null; });
+}
+
+function answerUpdate(response: UpdateResponse): void {
+  const release = offered;
+  if (release) {
+    if (response === 'download') { updater.downloaded(release.version); void shell.openExternal(release.download); }
+    else if (response === 'skip') updater.skip(release.version);
+    else updater.later();
+  }
+  updateWin?.close();
+}
+
+/** The menu item: ask now, and say what came back. */
+async function checkForUpdates(): Promise<void> {
+  const outcome = await updater.check(true);
+  if (outcome.kind === 'update') return;
+  const box = (message: string, detail: string) => { app.focus({ steal: true }); void dialog.showMessageBox({ type: outcome.kind === 'failed' ? 'warning' : 'info', message, detail, buttons: ['OK'] }); };
+  if (outcome.kind === 'failed') box('Could not check for updates.', `GitHub did not answer: ${outcome.error}.`);
+  else box("You're up to date.", `Notchlight ${updater.current} is the newest release.`);
+}
+
 function installHooks(): void {
   const script = path.join(__dirname, '..', '..', 'bin', 'install-hooks.mjs');
   execFile(process.execPath, [script], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }, (err, out, errOut) => {
@@ -198,6 +254,9 @@ function refreshTray(): void {
         : { label: 'Install Claude Code hooks…', click: () => installHooks() },
       ...(app.isPackaged ? [{ label: 'Start at login', type: 'checkbox' as const, checked: app.getLoginItemSettings().openAtLogin, click: (item: Electron.MenuItem) => { app.setLoginItemSettings({ openAtLogin: item.checked }); logEvent('notchlight', `start at login ${item.checked ? 'on' : 'off'}`); } }] : []),
       { label: 'Reveal config folder', click: () => shell.openPath(APP_DIR) },
+      { type: 'separator' },
+      { label: `Notchlight ${app.getVersion()}`, enabled: false },
+      { label: 'Check for updates…', click: () => { void checkForUpdates(); } },
       { type: 'separator' },
       { label: 'Quit Notchlight', click: () => app.quit() }
     ])
@@ -359,6 +418,10 @@ async function boot(): Promise<void> {
   registerShortcut();
   store.start();
   startTray();
+  updater = new Updater({ current: app.getVersion(), automatic: app.isPackaged && !DEMO });
+  updater.on('update', (release: Release) => showUpdate(release));
+  updater.start();
+  if (UPDATE_PREVIEW) showUpdate(sampleRelease());
   ready = true;
   logEvent('notchlight', `ready pid ${process.pid} electron ${process.versions.electron} ${app.getVersion()} ${app.isPackaged ? 'packaged' : 'checkout'} ${DEMO ? 'demo' : 'live'}`);
   if (GALLERY_ONLY || pendingWindow === 'gallery') openGallery();
@@ -527,6 +590,25 @@ ipcMain.on('dismiss', (event, id) => {
   if (trustedAgentWindow(event) && typeof id === 'string') store.dismiss(id);
 });
 
+ipcMain.on('update:respond', (event, response: UpdateResponse) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (event.senderFrame !== event.sender.mainFrame || !win || win !== updateWin) return;
+  if (response !== 'download' && response !== 'later' && response !== 'skip') return;
+  answerUpdate(response);
+});
+
+/** What the card looks like with something in it, for `--update-preview`. */
+function sampleRelease(): Release {
+  return {
+    version: '9.9.9',
+    title: 'Notchlight 9.9.9 — a sample release',
+    notes: '## What changed\n- A newer Notchlight is offered from the menu bar when GitHub has one.\n- `Check for updates…` in the menu asks right away.\n- **Later** waits a day; **Skip this version** waits for the next one.\n\nNothing installs itself: the build is unsigned, so the DMG opens in your browser.',
+    url: 'https://github.com/amargoyal/notchlight/releases',
+    download: 'https://github.com/amargoyal/notchlight/releases',
+    publishedAt: new Date().toISOString()
+  };
+}
+
 ipcMain.on('open-customize', (event) => {
   const sender = BrowserWindow.fromWebContents(event.sender);
   if (sender === gallery || sender === customize || sender === notch?.win) openCustomize();
@@ -566,5 +648,6 @@ app.on('before-quit', () => {
   levels?.stop();
   store?.stop();
   hooks?.stop();
+  updater?.stop();
   notch?.destroy();
 });

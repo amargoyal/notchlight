@@ -18,6 +18,7 @@
     "demo": "npm run build && electron . --demo",
     "customize": "npm run build && electron . --customize",
     "gallery": "npm run build && electron . --gallery",
+    "update-preview": "npm run build && electron . --demo --update-preview",
     "service": "node bin/service.mjs install",
     "service:restart": "node bin/service.mjs restart",
     "service:status": "node bin/service.mjs status",
@@ -30,6 +31,7 @@
     "test:liveness": "node scripts/test-liveness.mjs",
     "test:codex": "node scripts/test-codex.mjs",
     "test:clipboard": "node scripts/test-clipboard.mjs",
+    "test:updates": "node scripts/test-updates.mjs",
     "smoke:codex": "node scripts/smoke-codex.mjs",
     "dist": "npm run build && electron-builder --mac dmg --arm64"
   },

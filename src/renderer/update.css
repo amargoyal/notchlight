@@ -1,0 +1,41 @@
+/* The update card. Same desk as the customize window: warm paper, one accent. */
+html, body, #root { height: 100%; margin: 0; overflow: hidden; }
+body { background: #f5f2ed; }
+.update-app { --ui-bg: #f5f2ed; --ui-panel: #ffffff; --ui-text: #302922; --ui-muted: #776e63; --ui-line: #ded7cd; --ui-control: #eee8df; --ui-accent: #c97c5c; --ui-accent-ink: #1b120d; --ui-accent-soft: #f3e2d8; --ui-hover: #e6dfd5;
+  height: 100%; box-sizing: border-box; display: flex; flex-direction: column; padding: 28px 30px 24px; background: var(--ui-bg); color: var(--ui-text); font: 13px/1.5 -apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif; -webkit-font-smoothing: antialiased; user-select: none; }
+.update-app.theme-dark { --ui-bg: #211f1d; --ui-panel: #2a2724; --ui-text: #f0e7dc; --ui-muted: #b3a79a; --ui-line: #3b352e; --ui-control: #2b2722; --ui-accent: #d08a6a; --ui-accent-ink: #1b120d; --ui-accent-soft: #3a2c25; --ui-hover: #36302a; color-scheme: dark; }
+.update-app button { font: inherit; }
+.update-app button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
+.update-drag { position: absolute; inset: 0 0 auto 0; height: 40px; -webkit-app-region: drag; }
+.update-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+.update-head > span { display: flex; flex-direction: column; }
+.update-head b { font-size: 13px; font-weight: 600; }
+.update-head small { font-size: 11px; color: var(--ui-muted); margin-top: 1px; }
+.update-app h1 { margin: 0 0 14px; font-size: 24px; font-weight: 550; line-height: 1.2; letter-spacing: -.03em; }
+.update-versions { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.update-versions code { font: 12px/1 ui-monospace,'SF Mono',Menlo,monospace; padding: 6px 9px; border-radius: 6px; background: var(--ui-control); color: var(--ui-muted); border: 1px solid var(--ui-line); }
+.update-versions code.latest { background: var(--ui-accent-soft); color: var(--ui-text); border-color: transparent; font-weight: 600; }
+.update-versions svg { color: var(--ui-muted); flex: none; }
+.update-versions time { margin-left: auto; font-size: 11px; color: var(--ui-muted); }
+.update-notes { flex: 1; min-height: 0; overflow: auto; user-select: text; border: 1px solid var(--ui-line); border-radius: 9px; background: var(--ui-panel); padding: 14px 16px; font-size: 12px; line-height: 1.6; }
+.update-notes h2 { font-size: 12px; font-weight: 600; margin: 0 0 8px; }
+.update-notes h3 { font-size: 11px; font-weight: 600; margin: 12px 0 4px; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .04em; }
+.update-notes p { margin: 0 0 8px; }
+.update-notes ul { margin: 0 0 8px; padding-left: 18px; }
+.update-notes li { margin: 2px 0; }
+.update-notes code { font: 11px/1 ui-monospace,'SF Mono',Menlo,monospace; background: var(--ui-control); padding: 1px 4px; border-radius: 4px; }
+.update-notes .empty { color: var(--ui-muted); margin: 0; }
+.update-notes::-webkit-scrollbar { width: 8px; }
+.update-notes::-webkit-scrollbar-thumb { background: var(--ui-line); border-radius: 8px; }
+.update-hint { margin: 14px 0 0; font-size: 11px; color: var(--ui-muted); line-height: 1.55; }
+.update-actions { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.update-actions .spacer { flex: 1; }
+.update-actions button { border: 1px solid var(--ui-line); background: var(--ui-control); color: var(--ui-text); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500; }
+.update-actions button:hover { background: var(--ui-hover); }
+.update-actions button.text { border-color: transparent; background: transparent; color: var(--ui-muted); padding-left: 4px; }
+.update-actions button.text:hover { color: var(--ui-text); background: transparent; }
+.update-actions button.primary { background: var(--ui-accent); border-color: var(--ui-accent); color: var(--ui-accent-ink); font-weight: 600; }
+.update-actions button.primary:hover { filter: brightness(1.06); }
+.update-actions button.primary:active { filter: brightness(.96); }
+.update-actions kbd { font: inherit; opacity: .55; margin-left: 6px; }
+@media (prefers-reduced-motion: no-preference) { .update-app { animation: update-in .26s ease-out; } @keyframes update-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } } }

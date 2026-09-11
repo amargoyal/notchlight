@@ -1,4 +1,5 @@
 import type { CompanionBridge } from './companion';
+import type { UpdateBridge } from './updates';
 /**
  * The contract between the daemon and the island.
  *
@@ -134,7 +135,7 @@ export interface HitRect {
   h: number;
 }
 
-export interface IslandBridge extends CompanionBridge {
+export interface IslandBridge extends CompanionBridge, UpdateBridge {
   getSnapshot(): Promise<Snapshot>;
   /** Open the separate sample-data customization window. */
   openCustomize(): void;

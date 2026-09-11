@@ -335,3 +335,41 @@ export function createCustomizeWindow(): BrowserWindow {
   win.loadFile(path.join(__dirname, '../renderer/customize.html'));
   return win;
 }
+
+/**
+ * The update window: a small card, centred on the display with the cutout,
+ * above other windows but not the island. Frameless, so the card can be the
+ * whole thing — macOS still gives it rounded corners and a shadow.
+ */
+export function createUpdateWindow(theme: 'light' | 'dark'): BrowserWindow {
+  const d = screen.getPrimaryDisplay();
+  const width = 460;
+  const height = 520;
+  const win = new BrowserWindow({
+    width,
+    height,
+    x: Math.round(d.workArea.x + (d.workArea.width - width) / 2),
+    y: Math.round(d.workArea.y + Math.max(48, (d.workArea.height - height) / 3)),
+    show: false,
+    frame: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    title: 'Notchlight — Update',
+    backgroundColor: theme === 'dark' ? '#211f1d' : '#f5f2ed',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  win.setAlwaysOnTop(true, 'floating');
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
+  win.webContents.on('console-message', (e) => {
+    if (e.level === 'error' || e.level === 'warning') logEvent('updates', e.message);
+  });
+  win.loadFile(path.join(__dirname, '../renderer/update.html'));
+  return win;
+}
