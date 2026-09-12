@@ -221,18 +221,28 @@ signal, so its transcript simply stops — which is byte for byte what an idle
 session waiting for you to type looks like. No timing threshold can separate
 them, and a session shut an hour ago went on burning a light on the notch.
 
-So Notchlight asks the process table instead, every five seconds: `claude`
+So Notchlight asks the process table instead, every three seconds: `claude`
 runs as a process of that name, and its working directory is the project
-directory its session belongs to. That gives a count per directory — two live
-processes in `~/dev/thing` means at most the two newest session files there are
-still open, and anything older is closed.
+directory its session belongs to.
 
-It is a count, not an identity: the process does not carry its session id
-anywhere readable, so closing the older of two sessions in one directory keeps
-the wrong one until the other moves. Everything else fails open — if the scan
-cannot run, or finds no processes while transcripts are plainly being written
-(a wrapper, a container, a different name), it hides nothing. Set
-`watchProcesses: false` to turn it off entirely.
+Where hooks are installed that is an exact answer. The hook client runs as a
+child of `claude`, so it reports the session's own process id; once a scan has
+confirmed that pid really is a `claude`, the session is alive precisely while
+the pid is. Close the window and the row leaves the process table, and the
+light goes out on the next scan — no grace period, no waiting for a sibling
+session to move.
+
+Without a hook there is only the count per directory: two live processes in
+`~/dev/thing` means at most the two newest session files there are still open,
+and anything older is closed. That is a count, not an identity, so closing the
+older of two sessions in one directory keeps the wrong one until the other
+moves.
+
+Uncertainty fails open. If the scan cannot run, nothing is hidden. Finding no
+processes at all is only treated as a blind spot — a wrapper, a container, a
+different name — until the probe has resolved its first `claude`; after that it
+is known to work on this machine, and zero processes means every session really
+did close. Set `watchProcesses: false` to turn it off entirely.
 
 **Tokens** are input + output + cache creation, counted once per API turn.
 
@@ -287,7 +297,7 @@ has to exist.
 | `doneLingerSec` | `0` | how long a red light stays; 0 keeps it until stale or dismissed |
 | `staleSec` | `10800` | forget a session quieter than this |
 | `watchProcesses` | `true` | check `ps`/`lsof` so closed sessions drop off |
-| `processGraceSec` | `8` | how long a process must be missing before its session goes |
+| `processGraceSec` | `8` | how long a process must be missing before its session goes, when only the directory count can answer |
 
 ## How it is put together
 
