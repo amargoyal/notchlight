@@ -53,6 +53,16 @@ interface Live {
   cwd?: string;
   /** The session's own `claude` process, when a hook has said. */
   pid?: number;
+  /**
+   * Whether that pid was ever confirmed live in the process table.
+   *
+   * A hook reports its own parent, which is `claude` only if the shell that
+   * ran the hook exec'd rather than forked. Confirming the pid once turns it
+   * from a claim into a fact, and only a confirmed pid is allowed to be the
+   * reason a session disappears — otherwise a shell pid nobody can find would
+   * hide a session that is still very much open.
+   */
+  pidSeen: boolean;
 }
 
 /**
@@ -141,6 +151,7 @@ export class Store extends EventEmitter {
         doneAt: 0,
         endedAt: 0,
         deadSince: 0,
+        pidSeen: false,
         cwd
       };
       this.live.set(id, s);
@@ -153,7 +164,12 @@ export class Store extends EventEmitter {
   onHook(e: HookEvent): void {
     const s = this.ensure(e.sessionId, e.cwd);
     s.lastHookAt = Date.now();
-    if (e.pid) s.pid = e.pid;
+    // A `--resume` runs under a new process, so a changed pid is a fresh claim
+    // that has to earn its confirmation over again.
+    if (e.pid && e.pid !== s.pid) {
+      s.pid = e.pid;
+      s.pidSeen = false;
+    }
     switch (e.event) {
       case 'SessionStart':
         if (s.phase === null) s.phase = 'idle';
@@ -310,9 +326,16 @@ export class Store extends EventEmitter {
   /**
    * Work out which sessions the process table can no longer account for.
    *
-   * The count per directory is the budget: with one live `claude` in
-   * ~/dev/thing, the newest session file there is the one it belongs to and
-   * anything older in that directory is closed. Sessions with no directory
+   * Two questions, and the first one is exact. A session whose pid a hook
+   * named, and which a scan has since confirmed is really a `claude`, is alive
+   * precisely while that pid is: closing its terminal window takes the row out
+   * of the process table and the light goes out on the next scan, with no
+   * guessing and nothing to wait for.
+   *
+   * The count per directory answers for everyone else — sessions from a machine
+   * with no hooks installed, or whose hook has not fired yet. With one live
+   * `claude` in ~/dev/thing, the newest session file there is the one it
+   * belongs to and anything older is closed. Sessions with no directory
    * recorded, and every session at all when the scan could not run, are left
    * alone — hiding a session you still have open is the worse mistake, so every
    * uncertainty resolves towards showing it.
@@ -327,13 +350,18 @@ export class Store extends EventEmitter {
     if (!this.liveness.reliable()) return;
 
     const now = Date.now();
-    const recent = [...this.facts.values()].some((f) => now - f.lastAt < 60_000);
-    // Something is plainly being written and yet no `claude` process can be
-    // seen. That is not "everything closed", that is the probe being blind —
-    // a wrapper, a container, a different name — so it gets no vote.
-    if (this.liveness.total() === 0 && recent) {
-      this.closed.clear();
-      return;
+    // Nothing in the process table while transcripts are plainly being written.
+    // That reads as a blind probe — a wrapper, a container, a different name —
+    // but only until the probe has resolved a single `claude` of its own. After
+    // that it demonstrably works on this machine, and zero is zero: the last
+    // session you had open closing is the ordinary way to reach it, and it used
+    // to be the one case where the light stayed on.
+    if (this.liveness.total() === 0 && !this.liveness.sawAgents()) {
+      const recent = [...this.facts.values()].some((f) => now - f.lastAt < 60_000);
+      if (recent) {
+        this.closed.clear();
+        return;
+      }
     }
 
     // Shell aliases and renamed checkout paths must share the same process
@@ -346,28 +374,52 @@ export class Store extends EventEmitter {
       if (list) list.push(f);
       else byDir.set(key, [f]);
     }
-    const budgets = new Map<string, number>();
-    for (const key of byDir.keys()) {
-      budgets.set(key, this.liveness.countFor(key));
-    }
 
     const alive = new Set<string>();
+    /** Sessions proved gone by their own pid, which no grace period applies to. */
+    const departed = new Set<string>();
     for (const [key, list] of byDir) {
       list.sort((a, b) => b.lastAt - a.lastAt);
-      const keep = budgets.get(key) ?? 0;
-      for (let i = 0; i < list.length && i < keep; i++) alive.add(list[i].sessionId);
+      let keep = this.liveness.countFor(key);
+      const unnamed: SessionFacts[] = [];
+      for (const f of list) {
+        const s = this.live.get(f.sessionId);
+        const pid = s?.pid;
+        if (pid && this.liveness.hasPid(pid)) {
+          // Identified, and it holds one of this directory's processes — so it
+          // must not also be counted against the sessions that have no pid.
+          if (s) s.pidSeen = true;
+          alive.add(f.sessionId);
+          keep--;
+          continue;
+        }
+        if (pid && s?.pidSeen) {
+          departed.add(f.sessionId);
+          continue;
+        }
+        unnamed.push(f);
+      }
+      for (let i = 0; i < unnamed.length && i < keep; i++) alive.add(unnamed[i].sessionId);
     }
 
     for (const f of this.facts.values()) {
       const s = this.live.get(f.sessionId);
       if (!s) continue;
+      if (departed.has(f.sessionId)) {
+        // Its own process is gone. Nothing can still be holding a tool call
+        // open, and there is nothing a longer look would tell us.
+        this.clearAsk(s);
+        s.deadSince = s.deadSince || now;
+        this.closed.add(f.sessionId);
+        continue;
+      }
       // A held tool call proves there is a process on the other end of it.
       if (!f.cwd || alive.has(f.sessionId) || s.gates.size) {
         s.deadSince = 0;
         this.closed.delete(f.sessionId);
         continue;
       }
-      // A grace period, because a scan can miss a process that is mid-exec and
+      // A grace period, because a count can miss a process that is mid-exec and
       // a light that blinks out and back is worse than one that lingers.
       if (!s.deadSince) s.deadSince = now;
       if (now - s.deadSince >= cfg.processGraceSec * 1000) this.closed.add(f.sessionId);

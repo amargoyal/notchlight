@@ -54,7 +54,13 @@ export interface Config {
    * few seconds; sessions will then linger until `staleSec`.
    */
   watchProcesses: boolean;
-  /** A session whose process has been missing this long is gone. */
+  /**
+   * A session whose process has been missing this long is gone.
+   *
+   * Only for sessions the directory count has to guess at. A session whose own
+   * process id a hook named, and a scan confirmed, closes the moment that pid
+   * leaves the process table — there is nothing there to wait out.
+   */
   processGraceSec: number;
   /**
    * Global shortcut that opens the island for the keyboard, in Electron's
