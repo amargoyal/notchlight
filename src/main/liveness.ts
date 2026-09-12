@@ -13,14 +13,17 @@
  * two live processes in ~/dev/thing means at most two of the session files
  * there are still open, newest first.
  *
- * It is a count, not an identity — the process does not carry its session id
- * anywhere readable. Two sessions in one directory and you close the older one,
- * and this keeps the wrong one for a while. That is the residual error, and it
- * is far smaller than the one it replaces.
+ * The count is the fallback, not the whole story. The process does not carry
+ * its session id, but the hook client does carry its own parent — the `claude`
+ * that ran it — so any session that has been heard from over a hook can be
+ * matched to a pid exactly. `hasPid` answers that, and the count only decides
+ * the sessions no hook has ever named.
  *
- * Everything here fails open. If the scan cannot run, or finds nothing while
- * transcripts are plainly being written, it reports that it could not tell and
- * the caller hides nothing.
+ * Everything here fails open. If the scan cannot run it reports that it could
+ * not tell and the caller hides nothing. Finding nothing is different: it only
+ * means the probe is blind if no `claude` has ever been resolved during this
+ * run, which is what `sawAgents` is for. Once one has been seen the probe is
+ * known to work on this machine, and a later zero is simply zero.
  */
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
@@ -42,10 +45,14 @@ export class Liveness {
   private pids = new Map<string, { pid: number; name: string }[]>();
   private names = new Map<string, string>();
   private known = false;
+  /** True once a scan has resolved at least one `claude` process this run. */
+  private seen = false;
   private timer: NodeJS.Timeout | null = null;
   private scanning = false;
 
-  start(intervalMs = 5000): void {
+  // Three seconds, not five: with `hasPid` the scan is the whole latency of a
+  // closed window going dark, so the interval is what the delay feels like.
+  start(intervalMs = 3000): void {
     this.scan();
     this.timer = setInterval(() => this.scan(), intervalMs);
     this.timer.unref?.();
@@ -64,6 +71,31 @@ export class Liveness {
   /** The pids of `name` processes in this directory, highest (newest) first. */
   pidsFor(cwd: string, name: 'claude' | 'codex'): number[] {
     return (this.pids.get(directoryKey(cwd)) ?? []).filter(p => p.name === name).map(p => p.pid).sort((a, b) => b - a);
+  }
+
+  /**
+   * Is this pid a live `claude` right now?
+   *
+   * The one piece of real identity available. The process does not carry its
+   * session id, but a hook does carry its process id — `process.ppid` of the
+   * hook client is the `claude` that ran it — so a session that has been heard
+   * from over a hook can be matched to a row in the process table exactly,
+   * rather than through the count for its directory.
+   */
+  hasPid(pid: number): boolean {
+    return this.names.get(String(pid)) === 'claude';
+  }
+
+  /**
+   * Has a `claude` process ever been resolved during this run?
+   *
+   * This is what separates "you closed everything" from "this probe cannot see
+   * `claude` on this machine at all" — a wrapper script, a container, a rename.
+   * Once one has been seen, the probe is known to work here and a later total
+   * of zero is a fact rather than a blind spot.
+   */
+  sawAgents(): boolean {
+    return this.seen;
   }
 
   /** Total live processes seen. Zero with `reliable()` means everything closed. */
@@ -107,6 +139,11 @@ export class Liveness {
         names.set(m[1], name);
       }
       this.names = names;
+      for (const n of names.values()) {
+        if (n !== 'claude') continue;
+        this.seen = true;
+        break;
+      }
       if (!pids.length) {
         this.counts.clear();
         this.pids.clear();
@@ -143,7 +180,10 @@ export class Liveness {
             if (dir) {
               const key = directoryKey(dir);
               const name = this.names.get(String(current)) ?? 'claude';
-              if (name === 'claude') next.set(key, (next.get(key) ?? 0) + 1);
+              if (name === 'claude') {
+                next.set(key, (next.get(key) ?? 0) + 1);
+                this.seen = true;
+              }
               located.set(key, [...(located.get(key) ?? []), { pid: current, name }]);
             }
           }
