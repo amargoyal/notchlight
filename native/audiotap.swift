@@ -61,6 +61,10 @@ let loudnessRange: Float = 26
 let peakDecay: Float = Float(1.2 / framesPerSecond)
 /// Below this, the tap is hearing nothing worth drawing.
 let silenceFloor: Float = -66
+/// What a finished level costs after the FFT: the pipe to the app, the IPC hop
+/// into the overlay, and the compositor frame that draws it. An estimate, and
+/// small enough that being a few ms out does not read.
+let renderSeconds = 0.020
 
 func emit(_ line: String) {
     print(line)
@@ -154,8 +158,16 @@ do {
     }
 }
 let latencySeconds = Double(latencyFrames) / outputRate
+// The device's latency is a head start for the sound, not for the bars: by the
+// time a level is on screen we have already spent some of it ourselves. Hold
+// only the difference, or the bars land behind the beat they are drawing.
+/// A Hann window's energy sits in its middle, so a window ending now describes
+/// a moment half a window ago.
+let windowSeconds = Double(fftSize) / 2 / sampleRate
+/// Everything between a sample reaching the tap and its bar reaching the screen.
+let pipelineSeconds = windowSeconds + 0.5 / framesPerSecond + renderSeconds
 /// How far back in the music the bars are drawn, in seconds.
-let holdSeconds = max(0, min(1, latencySeconds + offsetSeconds))
+let holdSeconds = max(0, min(1, latencySeconds + offsetSeconds - pipelineSeconds))
 /// The hold as tap samples. Holding samples rather than finished frames keeps
 /// the correction exact: a queue of output frames can only ever be right to
 /// within one frame, which at 24 fps is 42 ms — most of what it was correcting.
@@ -321,7 +333,7 @@ func analyze() -> [Float] {
 
 // MARK: - Run
 
-emit("{\"ok\":true,\"rate\":\(Int(sampleRate)),\"fps\":\(Int(framesPerSecond)),\"latencyMs\":\(Int(latencySeconds * 1000)),\"offsetMs\":\(Int(offsetSeconds * 1000)),\"holdMs\":\(Int(holdSeconds * 1000))}")
+emit("{\"ok\":true,\"rate\":\(Int(sampleRate)),\"fps\":\(Int(framesPerSecond)),\"latencyMs\":\(Int(latencySeconds * 1000)),\"offsetMs\":\(Int(offsetSeconds * 1000)),\"pipelineMs\":\(Int(pipelineSeconds * 1000)),\"holdMs\":\(Int(holdSeconds * 1000))}")
 
 // The aggregate is pinned to one output device. When the default output moves
 // (headphones in, AirPods on) the tap goes quiet, so leave and let the app
