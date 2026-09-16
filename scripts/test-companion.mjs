@@ -14,9 +14,11 @@ try {
   const { CompanionStore } = await import(pathToFileURL(path.join(root,'companionStore.js')).href);
   const { SpotifyPlayer, normalizeSpotify, validArtwork, artistsFromPage } = await import(pathToFileURL(path.join(root,'spotify.js')).href);
   const { AudioLevels, wantsLevels, captureReason, helperArguments } = await import(pathToFileURL(path.join(root,'audioLevels.js')).href);
-  assert.deepEqual(helperArguments({levelsOffsetMs:0}),['--fps','24'],'no correction by default');
-  assert.deepEqual(helperArguments({levelsOffsetMs:0},'apple'),['--fps','24','--bundle','com.apple.Music'],'Apple Music is tapped by bundle id');
-  assert.deepEqual(helperArguments({levelsOffsetMs:-80}),['--fps','24','--offset-ms','-80'],'a latency correction reaches the helper');
+  assert.deepEqual(helperArguments({levelsOffsetMs:0}),['--fps','60'],'no correction by default');
+  assert.deepEqual(helperArguments({levelsOffsetMs:0},'apple'),['--fps','60','--bundle','com.apple.Music'],'Apple Music is tapped by bundle id');
+  assert.deepEqual(helperArguments({levelsOffsetMs:-80}),['--fps','60','--offset-ms','-80'],'a latency correction reaches the helper');
+  assert.deepEqual(helperArguments({levelsOffsetMs:0,levelsFps:24}),['--fps','24'],'a slower bar rate reaches the helper');
+  assert.deepEqual(helperArguments({levelsOffsetMs:0,levelsFps:0}),['--fps','60'],'a missing rate falls back rather than asking for none');
   const { SpotifyWatcher, parsePlaybackChange } = await import(pathToFileURL(path.join(root,'spotifyWatch.js')).href);
   const { playhead } = await import(pathToFileURL(path.join(root,'companion.js')).href);
   const { Hover } = await import(pathToFileURL(path.join(root,'hover.js')).href);
