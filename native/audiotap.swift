@@ -1,5 +1,5 @@
 // audiotap — listens to Spotify's audio output and prints five band levels,
-// thirty times a second, one line each.
+// sixty times a second, one line each.
 //
 // The bars in the collapsed wing used to loop a canned animation. This is the
 // real thing: a Core Audio process tap (macOS 14.2+) on Spotify's own output,
@@ -7,18 +7,24 @@
 // recorded — samples are reduced to five numbers and dropped.
 //
 // Protocol on stdout:
-//   first line   {"ok":true,"rate":48000}  or  {"ok":false,"reason":"..."}
+//   first line   {"ok":true,"rate":48000,"fps":60,"latencyMs":170,"offsetMs":0,
+//                 "pipelineMs":49,"holdMs":121}   or  {"ok":false,"reason":"..."}
 //   then         0.42 0.31 0.18 0.09 0.05   (bass → treble, each 0…1)
 // Exits 0 when stdin closes (the parent went away), when Spotify quits, or
 // when the tap cannot be built. `ok:false` is a fallback signal, not an error.
 //
 //   swiftc -O -o audiotap audiotap.swift
-//   audiotap [--fps 24] [--offset-ms 0] [--bundle com.spotify.client]
-//     --fps        frames per second on stdout; 24 by default
+//   audiotap [--fps 60] [--offset-ms 0] [--bundle com.spotify.client]
+//     --fps        frames per second on stdout; 60 by default
 //     --bundle     the app to tap; Spotify by default, com.apple.Music for Apple Music
 //     --offset-ms  extra delay added to the output device's reported latency,
 //                  for a Bluetooth output whose figure is an estimate; negative
 //                  values pull the bars earlier, down to no delay at all
+//
+// An output device plays what it is handed a little later — on AirPods, about
+// 170 ms later. The levels are held back to match, minus what this side spends
+// getting a level onto the screen, so the bars land on the beat the ear hears
+// rather than a little after it. `holdMs` on the ready line is the difference.
 
 import AppKit
 import Accelerate
@@ -33,16 +39,18 @@ let bundleID: String = {
 }()
 /// Band edges in Hz. Five bars, bass on the left.
 let bandEdges: [Double] = [40, 130, 400, 1200, 3500, 11000]
-/// Every frame is a composite of the whole overlay window on the other side, so
-/// fewer frames is directly less GPU. 24 reads as continuous on 14 px bars.
 func argument(_ name: String) -> Double? {
     let args = CommandLine.arguments
     guard let index = args.firstIndex(of: name), index + 1 < args.count else { return nil }
     return Double(args[index + 1])
 }
+/// Every frame is a composite of the whole overlay window on the other side, so
+/// fewer frames is directly less GPU — and also a floor under how late a bar
+/// can be, since it cannot move until its turn comes round. 60 by default;
+/// `levelsFps` in config.json buys the GPU back.
 let framesPerSecond: Double = {
     if let fps = argument("--fps"), fps >= 5, fps <= 60 { return fps }
-    return 24
+    return 60
 }()
 /// Seconds added to (or taken from) the measured output latency. See --offset-ms.
 let offsetSeconds: Double = {
@@ -61,6 +69,10 @@ let loudnessRange: Float = 26
 let peakDecay: Float = Float(1.2 / framesPerSecond)
 /// Below this, the tap is hearing nothing worth drawing.
 let silenceFloor: Float = -66
+/// What a finished level costs after the FFT: the pipe to the app, the IPC hop
+/// into the overlay, and the compositor frame that draws it. An estimate, and
+/// small enough that being a few ms out does not read.
+let renderSeconds = 0.020
 
 func emit(_ line: String) {
     print(line)
@@ -154,7 +166,22 @@ do {
     }
 }
 let latencySeconds = Double(latencyFrames) / outputRate
-let delayFrames = max(0, Int(((latencySeconds + offsetSeconds) * framesPerSecond).rounded()))
+// The device's latency is a head start for the sound, not for the bars: by the
+// time a level is on screen we have already spent some of it ourselves. Hold
+// only the difference, or the bars land behind the beat they are drawing.
+/// A Hann window's energy sits in its middle, so a window ending now describes
+/// a moment half a window ago.
+let windowSeconds = Double(fftSize) / 2 / sampleRate
+/// Everything between a sample reaching the tap and its bar reaching the screen.
+let pipelineSeconds = windowSeconds + 0.5 / framesPerSecond + renderSeconds
+/// How far back in the music the bars are drawn, in seconds.
+let holdSeconds = max(0, min(1, latencySeconds + offsetSeconds - pipelineSeconds))
+/// The hold as tap samples. Holding samples rather than finished frames keeps
+/// the correction exact: a queue of output frames can only ever be right to
+/// within one frame, which at 24 fps is 42 ms — most of what it was correcting.
+let delaySamples = Int((holdSeconds * sampleRate).rounded())
+/// Room for the analysis window, the hold, and a couple of device buffers on top.
+let ringCapacity = fftSize + delaySamples + Int(sampleRate / framesPerSecond) * 2
 
 let aggregateDescription: [String: Any] = [
     kAudioAggregateDeviceNameKey: "Notchlight levels",
@@ -176,7 +203,7 @@ if aggregateStatus != noErr || aggregateID == kAudioObjectUnknown {
 // MARK: - Sample ring, filled from the realtime thread
 
 final class Ring {
-    private var samples = [Float](repeating: 0, count: fftSize)
+    private var samples = [Float](repeating: 0, count: ringCapacity)
     private var head = 0
     private var lock = os_unfair_lock()
 
@@ -193,7 +220,7 @@ final class Ring {
                 var sum: Float = 0
                 for channel in 0..<channels { sum += data[frame * channels + channel] }
                 samples[head] = sum / Float(channels)
-                head = (head + 1) % fftSize
+                head = (head + 1) % ringCapacity
             }
         } else {
             let frames = Int(buffers[0].mDataByteSize) / MemoryLayout<Float>.size
@@ -203,18 +230,22 @@ final class Ring {
                 var sum: Float = 0
                 for data in channelData { sum += data[frame] }
                 samples[head] = sum / Float(channelData.count)
-                head = (head + 1) % fftSize
+                head = (head + 1) % ringCapacity
             }
         }
     }
 
-    /// Oldest sample first, so the window lines up with time.
-    func snapshot(into out: inout [Float]) {
+    /// The window that ended `back` samples ago, oldest sample first, so the
+    /// window lines up with time. `back` is the hold: with headphones that play
+    /// late, the bars draw the moment the ear is hearing rather than the one
+    /// Spotify just handed over.
+    func snapshot(into out: inout [Float], back: Int) {
         os_unfair_lock_lock(&lock)
         defer { os_unfair_lock_unlock(&lock) }
-        let tail = fftSize - head
-        out.replaceSubrange(0..<tail, with: samples[head..<fftSize])
-        out.replaceSubrange(tail..<fftSize, with: samples[0..<head])
+        let start = ((head - back - fftSize) % ringCapacity + ringCapacity) % ringCapacity
+        let tail = min(fftSize, ringCapacity - start)
+        out.replaceSubrange(0..<tail, with: samples[start..<(start + tail)])
+        if tail < fftSize { out.replaceSubrange(tail..<fftSize, with: samples[0..<(fftSize - tail)]) }
     }
 }
 
@@ -264,7 +295,7 @@ let release = Float(pow(0.5, 1 / (0.084 * framesPerSecond)))
 var heard = 0
 
 func analyze() -> [Float] {
-    ring.snapshot(into: &frame)
+    ring.snapshot(into: &frame, back: delaySamples)
     var rms: Float = 0
     vDSP_rmsqv(frame, 1, &rms, vDSP_Length(fftSize))
     let loudness = 20 * log10(max(rms, 1e-9))
@@ -310,8 +341,7 @@ func analyze() -> [Float] {
 
 // MARK: - Run
 
-emit("{\"ok\":true,\"rate\":\(Int(sampleRate)),\"latencyMs\":\(Int(latencySeconds * 1000)),\"offsetMs\":\(Int(offsetSeconds * 1000)),\"delayFrames\":\(delayFrames)}")
-var held: [String] = []
+emit("{\"ok\":true,\"rate\":\(Int(sampleRate)),\"fps\":\(Int(framesPerSecond)),\"latencyMs\":\(Int(latencySeconds * 1000)),\"offsetMs\":\(Int(offsetSeconds * 1000)),\"pipelineMs\":\(Int(pipelineSeconds * 1000)),\"holdMs\":\(Int(holdSeconds * 1000))}")
 
 // The aggregate is pinned to one output device. When the default output moves
 // (headphones in, AirPods on) the tap goes quiet, so leave and let the app
@@ -330,8 +360,7 @@ Thread.detachNewThread {
 
 let timer = Timer(timeInterval: 1 / framesPerSecond, repeats: true) { _ in
     if kill(pid, 0) != 0 { teardown(); exit(0) }
-    held.append(analyze().map { String(format: "%.2f", $0) }.joined(separator: " "))
-    if held.count > delayFrames { emit(held.removeFirst()) }
+    emit(analyze().map { String(format: "%.2f", $0) }.joined(separator: " "))
 }
 RunLoop.main.add(timer, forMode: .common)
 RunLoop.main.run()

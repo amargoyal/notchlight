@@ -94,8 +94,9 @@ Customize → Agents to see real tasks.
   comes from the track's public page (`music:musician_description`), cached
   per track; the lead artist stands until it arrives.
 - **Live equalizer**: `native/audiotap.swift` opens a Core Audio process tap on
-  Spotify (macOS 14.2+), FFT at 30 fps, five band levels on stdout, delayed by
-  the output device's reported latency (about 170 ms on AirPods).
+  Spotify (macOS 14.2+), FFT at 60 fps, five band levels on stdout, held back
+  by what the output device's reported latency (about 170 ms on AirPods) gives
+  the sound as a head start, less what this side spends drawing a level.
   `src/main/audioLevels.ts` compiles it on first use into `~/.notchlight/bin`
   and runs it only while wanted (`wantsLevels`). Levels reach the renderer over
   the `music:levels` channel; `LiveEqualizer` writes them straight to the DOM.
@@ -245,9 +246,10 @@ Synchronization was not judged by ear in this session, so no correction is
 applied: `levelsOffsetMs` in `src/main/config.ts` defaults to 0 and is
 clamped to ±2000. `helperArguments()` in `src/main/audioLevels.ts` passes it
 as `audiotap --offset-ms`, which adds to (or subtracts from, down to zero)
-the measured latency before `delayFrames`. The helper's ready line now
-reports `latencyMs`, `offsetMs` and `delayFrames` and is logged. Tune only if
-listening shows the bars persistently early or late.
+the measured latency before the hold. The helper's ready line reports
+`latencyMs`, `offsetMs`, `pipelineMs` and `holdMs` and is logged. Tune only if
+listening shows the bars persistently early or late. See item 20 for what the
+hold covers now.
 
 ### 12. Clipboard manager (a fourth face) — implemented September 9, 2026
 `src/main/clipboardStore.ts` polls every 500 ms while `clipboardEnabled`
@@ -287,8 +289,9 @@ listening it writes levels to the DOM and skips unchanged frames, so real
 silence costs nothing; when capture is not listening, or nothing has been
 heard for 1.5 s (music on another speaker), the bars hold a quiet static
 shape. Reduced motion is followed as the system setting changes
-(`useReducedMotion` in `src/renderer/pulse.ts`). The helper runs at 24 fps
-(`audiotap --fps`) with smoothing expressed in seconds. Measured while
+(`useReducedMotion` in `src/renderer/pulse.ts`). The helper runs at 60 fps
+(`audiotap --fps`, `levelsFps` in config.json) with smoothing expressed in
+seconds. Measured while
 playing with Agents selected: 23 % of a core across the tree, from 38–45 %.
 The gallery keeps `mp-wave` for its sample data.
 
@@ -376,6 +379,28 @@ card with a sample release; `npm run test:updates` covers order, parsing and
 holds. Not yet verified on a packaged build against a real newer release:
 `package.json` says 0.2.0 and the newest tag is v0.1.0, so nothing shows
 until a v0.2.1 or later is tagged.
+
+### 20. Bars on the beat, not behind it — implemented September 16, 2026
+Three things put the equalizer about 60 ms behind what the ear heard, on top
+of the deliberate hold. The hold was a queue of finished frames, so it could
+only ever be right to within one frame (42 ms at 24 fps); it covered the whole
+of the device's reported latency, as though a level reached the screen the
+instant it was measured; and the frame rate itself was a floor under how late
+a bar could be.
+
+`native/audiotap.swift` now holds the *analysis window* instead of the output:
+the ring grows to `fftSize + delaySamples` plus two device buffers, and
+`snapshot(into:back:)` reads the window that ended `delaySamples` ago, so the
+correction is exact at any frame rate. The hold is `latencyMs + offsetMs`
+less `pipelineMs` — half the Hann window (21 ms at 48 kHz), half a frame, and
+20 ms for the pipe, the IPC hop and the compositor frame. On AirPods that is
+170 − 49 ≈ 121 ms held rather than 167 ms. Both figures are on the ready line.
+`levelsFps` in `src/main/config.ts` (default 60, clamped 12…60) reaches the
+helper as `--fps`; drop it to 24 to spend less of the overlay's GPU.
+
+Not judged by ear in this session — the owner's check is **Bars in time** in
+[Native checks](native-checks.md), and `levelsOffsetMs` is still the knob if
+Core Audio's Bluetooth estimate is wrong on a particular pair.
 
 ## Things to know before touching the music code
 

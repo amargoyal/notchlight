@@ -346,15 +346,21 @@ asks once to allow audio capture. The bars run wherever they are showing:
 on the Music face, and on the resting bar whichever face is selected. Say no,
 run without `swiftc`, or send the music to another speaker, and the bars hold
 a quiet shape instead — never a fake rhythm, which on a transparent overlay
-costs a quarter of a core. Real silence settles them. The levels are held back
-by the output device's reported latency, so over AirPods the bars land with
-the sound rather than a beat ahead of it.
+costs a quarter of a core. Real silence settles them.
+
+An output device plays what it is handed a little later — on AirPods, about
+170 ms later — so the levels are held back to land with the sound rather than
+a beat ahead of it. The hold is the device's own figure minus what this side
+spends getting a level onto the screen, and it is held in samples, so it is
+exact rather than rounded to the nearest frame. The bars move sixty times a
+second; `levelsFps` in `~/.notchlight/config.json` takes that down to 24 for
+a machine that would rather spend the GPU elsewhere.
 
 Core Audio's latency figure for Bluetooth outputs is an estimate. If the bars
 still run early or late over AirPods, set `levelsOffsetMs` in
 `~/.notchlight/config.json` — try 80 if they are early, -80 if they are late —
 and restart; the helper's first log line shows the offset and the resulting
-delay in frames.
+hold in milliseconds.
 
 Capture is separate from the Spotify connection. Track details and the
 transport come over Apple Events; the bars come from the tap, which has its

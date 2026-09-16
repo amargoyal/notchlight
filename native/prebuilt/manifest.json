@@ -1,10 +1,10 @@
 {
   "audiotap": {
     "arm64": {
-      "sha256": "4eeb3f2978e7b639a3646b7d53068ac4267a13ac1ca7376e13191bb98ded7963",
-      "builtAt": "2026-09-10T02:03:53.725Z",
+      "sha256": "894bc1b6b9a412e8369af8545abf90d98380d5b5a2ef52eae5701ac4992395b8",
+      "builtAt": "2026-09-16T15:38:10.785Z",
       "host": "Darwin 27.0.0",
-      "swift": "Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)"
+      "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)"
     }
   },
   "notchprobe": {
