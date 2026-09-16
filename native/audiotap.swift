@@ -1,5 +1,5 @@
 // audiotap — listens to Spotify's audio output and prints five band levels,
-// thirty times a second, one line each.
+// sixty times a second, one line each.
 //
 // The bars in the collapsed wing used to loop a canned animation. This is the
 // real thing: a Core Audio process tap (macOS 14.2+) on Spotify's own output,
@@ -7,18 +7,24 @@
 // recorded — samples are reduced to five numbers and dropped.
 //
 // Protocol on stdout:
-//   first line   {"ok":true,"rate":48000}  or  {"ok":false,"reason":"..."}
+//   first line   {"ok":true,"rate":48000,"fps":60,"latencyMs":170,"offsetMs":0,
+//                 "pipelineMs":37,"holdMs":133}   or  {"ok":false,"reason":"..."}
 //   then         0.42 0.31 0.18 0.09 0.05   (bass → treble, each 0…1)
 // Exits 0 when stdin closes (the parent went away), when Spotify quits, or
 // when the tap cannot be built. `ok:false` is a fallback signal, not an error.
 //
 //   swiftc -O -o audiotap audiotap.swift
-//   audiotap [--fps 24] [--offset-ms 0] [--bundle com.spotify.client]
-//     --fps        frames per second on stdout; 24 by default
+//   audiotap [--fps 60] [--offset-ms 0] [--bundle com.spotify.client]
+//     --fps        frames per second on stdout; 60 by default
 //     --bundle     the app to tap; Spotify by default, com.apple.Music for Apple Music
 //     --offset-ms  extra delay added to the output device's reported latency,
 //                  for a Bluetooth output whose figure is an estimate; negative
 //                  values pull the bars earlier, down to no delay at all
+//
+// An output device plays what it is handed a little later — on AirPods, about
+// 170 ms later. The levels are held back to match, minus what this side spends
+// getting a level onto the screen, so the bars land on the beat the ear hears
+// rather than a little after it. `holdMs` on the ready line is the difference.
 
 import AppKit
 import Accelerate
