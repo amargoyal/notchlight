@@ -74,6 +74,14 @@ export interface Config {
    * an estimate; if the bars run early, try 80; if late, try -80.
    */
   levelsOffsetMs: number;
+  /**
+   * How many times a second the equalizer helper prints a level, and so how
+   * often the bars move. Higher reacts sooner — at 24 a bar could be up to
+   * 42 ms behind the beat purely from waiting its turn — but every frame
+   * recomposites the transparent overlay, so it is also directly more GPU.
+   * 60 by default; drop it to 24 to spend less.
+   */
+  levelsFps: number;
 }
 
 const DEFAULTS: Config = {
@@ -103,7 +111,8 @@ const DEFAULTS: Config = {
   watchProcesses: true,
   processGraceSec: 8,
   shortcut: 'Alt+Shift+N',
-  levelsOffsetMs: 0
+  levelsOffsetMs: 0,
+  levelsFps: 60
 };
 
 let cached: Config | null = null;
@@ -127,6 +136,10 @@ export function config(): Config {
   if (typeof cached.shortcut !== 'string') cached.shortcut = DEFAULTS.shortcut;
   if (typeof cached.levelsOffsetMs !== 'number' || !Number.isFinite(cached.levelsOffsetMs)) cached.levelsOffsetMs = 0;
   cached.levelsOffsetMs = Math.max(-2000, Math.min(2000, Math.round(cached.levelsOffsetMs)));
+  if (typeof cached.levelsFps !== 'number' || !Number.isFinite(cached.levelsFps)) cached.levelsFps = DEFAULTS.levelsFps;
+  // The helper refuses anything outside 5…60 and would fall back to its own
+  // default, so clamp here rather than hand it a figure it will ignore.
+  cached.levelsFps = Math.max(12, Math.min(60, Math.round(cached.levelsFps)));
   return cached;
 }
 
