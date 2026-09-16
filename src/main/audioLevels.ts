@@ -2,7 +2,7 @@
  * Real levels for the music wing.
  *
  * A Swift helper taps Spotify's own audio output through Core Audio and streams
- * five band levels a couple of dozen times a second. It is compiled on first
+ * five band levels sixty times a second. It is compiled on first
  * use into ~/.notchlight/bin (see helpers.ts) and runs only while something is
  * actually playing and the bars are on screen.
  *

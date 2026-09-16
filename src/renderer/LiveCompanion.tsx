@@ -56,7 +56,7 @@ function LiveArtwork({ live, mini = false }: { live: LiveController; mini?: bool
 }
 /**
  * Five band levels as bars that follow Spotify's actual output. Levels arrive
- * ~24 times a second and are written straight to the DOM — re-rendering the
+ * ~60 times a second and are written straight to the DOM — re-rendering the
  * whole surface at that rate would be silly, and a frame identical to the last
  * one is not written at all, so real silence costs nothing.
  *
