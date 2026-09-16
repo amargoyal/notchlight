@@ -246,9 +246,10 @@ Synchronization was not judged by ear in this session, so no correction is
 applied: `levelsOffsetMs` in `src/main/config.ts` defaults to 0 and is
 clamped to ±2000. `helperArguments()` in `src/main/audioLevels.ts` passes it
 as `audiotap --offset-ms`, which adds to (or subtracts from, down to zero)
-the measured latency before `delayFrames`. The helper's ready line now
-reports `latencyMs`, `offsetMs` and `delayFrames` and is logged. Tune only if
-listening shows the bars persistently early or late.
+the measured latency before the hold. The helper's ready line reports
+`latencyMs`, `offsetMs`, `pipelineMs` and `holdMs` and is logged. Tune only if
+listening shows the bars persistently early or late. See item 20 for what the
+hold covers now.
 
 ### 12. Clipboard manager (a fourth face) — implemented September 9, 2026
 `src/main/clipboardStore.ts` polls every 500 ms while `clipboardEnabled`
@@ -378,6 +379,28 @@ card with a sample release; `npm run test:updates` covers order, parsing and
 holds. Not yet verified on a packaged build against a real newer release:
 `package.json` says 0.2.0 and the newest tag is v0.1.0, so nothing shows
 until a v0.2.1 or later is tagged.
+
+### 20. Bars on the beat, not behind it — implemented September 16, 2026
+Three things put the equalizer about 60 ms behind what the ear heard, on top
+of the deliberate hold. The hold was a queue of finished frames, so it could
+only ever be right to within one frame (42 ms at 24 fps); it covered the whole
+of the device's reported latency, as though a level reached the screen the
+instant it was measured; and the frame rate itself was a floor under how late
+a bar could be.
+
+`native/audiotap.swift` now holds the *analysis window* instead of the output:
+the ring grows to `fftSize + delaySamples` plus two device buffers, and
+`snapshot(into:back:)` reads the window that ended `delaySamples` ago, so the
+correction is exact at any frame rate. The hold is `latencyMs + offsetMs`
+less `pipelineMs` — half the Hann window (21 ms at 48 kHz), half a frame, and
+20 ms for the pipe, the IPC hop and the compositor frame. On AirPods that is
+170 − 49 ≈ 121 ms held rather than 167 ms. Both figures are on the ready line.
+`levelsFps` in `src/main/config.ts` (default 60, clamped 12…60) reaches the
+helper as `--fps`; drop it to 24 to spend less of the overlay's GPU.
+
+Not judged by ear in this session — the owner's check is **Bars in time** in
+[Native checks](native-checks.md), and `levelsOffsetMs` is still the knob if
+Core Audio's Bluetooth estimate is wrong on a particular pair.
 
 ## Things to know before touching the music code
 
