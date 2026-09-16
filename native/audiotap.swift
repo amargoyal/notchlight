@@ -8,7 +8,7 @@
 //
 // Protocol on stdout:
 //   first line   {"ok":true,"rate":48000,"fps":60,"latencyMs":170,"offsetMs":0,
-//                 "pipelineMs":37,"holdMs":133}   or  {"ok":false,"reason":"..."}
+//                 "pipelineMs":49,"holdMs":121}   or  {"ok":false,"reason":"..."}
 //   then         0.42 0.31 0.18 0.09 0.05   (bass → treble, each 0…1)
 // Exits 0 when stdin closes (the parent went away), when Spotify quits, or
 // when the tap cannot be built. `ok:false` is a fallback signal, not an error.
@@ -39,15 +39,15 @@ let bundleID: String = {
 }()
 /// Band edges in Hz. Five bars, bass on the left.
 let bandEdges: [Double] = [40, 130, 400, 1200, 3500, 11000]
-/// Every frame is a composite of the whole overlay window on the other side, so
-/// fewer frames is directly less GPU — and also a floor under how late a bar
-/// can be, since it cannot move until its turn comes round. 60 by default;
-/// `levelsFps` in config.json buys the GPU back.
 func argument(_ name: String) -> Double? {
     let args = CommandLine.arguments
     guard let index = args.firstIndex(of: name), index + 1 < args.count else { return nil }
     return Double(args[index + 1])
 }
+/// Every frame is a composite of the whole overlay window on the other side, so
+/// fewer frames is directly less GPU — and also a floor under how late a bar
+/// can be, since it cannot move until its turn comes round. 60 by default;
+/// `levelsFps` in config.json buys the GPU back.
 let framesPerSecond: Double = {
     if let fps = argument("--fps"), fps >= 5, fps <= 60 { return fps }
     return 60

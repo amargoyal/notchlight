@@ -1,8 +1,8 @@
 {
   "audiotap": {
     "arm64": {
-      "sha256": "7aae49b7f672a6b985a42665b594bb35ff814bc04e4efbf3a597ff495d5aff16",
-      "builtAt": "2026-09-16T15:37:56.335Z",
+      "sha256": "894bc1b6b9a412e8369af8545abf90d98380d5b5a2ef52eae5701ac4992395b8",
+      "builtAt": "2026-09-16T15:38:10.785Z",
       "host": "Darwin 27.0.0",
       "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)"
     }
