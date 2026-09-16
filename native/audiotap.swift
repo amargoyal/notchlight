@@ -34,7 +34,9 @@ let bundleID: String = {
 /// Band edges in Hz. Five bars, bass on the left.
 let bandEdges: [Double] = [40, 130, 400, 1200, 3500, 11000]
 /// Every frame is a composite of the whole overlay window on the other side, so
-/// fewer frames is directly less GPU. 24 reads as continuous on 14 px bars.
+/// fewer frames is directly less GPU — and also a floor under how late a bar
+/// can be, since it cannot move until its turn comes round. 60 by default;
+/// `levelsFps` in config.json buys the GPU back.
 func argument(_ name: String) -> Double? {
     let args = CommandLine.arguments
     guard let index = args.firstIndex(of: name), index + 1 < args.count else { return nil }
@@ -42,7 +44,7 @@ func argument(_ name: String) -> Double? {
 }
 let framesPerSecond: Double = {
     if let fps = argument("--fps"), fps >= 5, fps <= 60 { return fps }
-    return 24
+    return 60
 }()
 /// Seconds added to (or taken from) the measured output latency. See --offset-ms.
 let offsetSeconds: Double = {

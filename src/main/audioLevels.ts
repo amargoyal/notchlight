@@ -19,6 +19,14 @@ import { config } from './config';
 import { PLAYER_BUNDLES, type MusicPlayer } from '../shared/companion';
 
 const BARS = 5;
+/**
+ * Frames a second from the helper, when config.json does not say.
+ *
+ * A bar waits its turn before it moves, so the rate is a floor under how late
+ * it can be: 42 ms at 24, 17 ms at 60. Sixty costs more of the overlay, and
+ * `levelsFps` takes it back down for anyone who would rather have the GPU.
+ */
+const DEFAULT_FPS = 60;
 
 export type AudioLevelsStatus = 'idle' | 'starting' | 'listening' | 'unavailable';
 /**
@@ -40,9 +48,10 @@ export function captureReason(head: string | undefined): AudioLevelsReason {
 }
 
 /** What the helper is started with: the frame rate, the app to tap, and the owner's latency correction from config.json. */
-export function helperArguments(cfg: { levelsOffsetMs: number } = config(), player: MusicPlayer = 'spotify'): string[] {
+export function helperArguments(cfg: { levelsOffsetMs: number; levelsFps?: number } = config(), player: MusicPlayer = 'spotify'): string[] {
   const offset = Math.round(cfg.levelsOffsetMs || 0);
-  return ['--fps', '24', ...(player !== 'spotify' ? ['--bundle', PLAYER_BUNDLES[player]] : []), ...(offset ? ['--offset-ms', String(offset)] : [])];
+  const fps = Math.round(cfg.levelsFps || DEFAULT_FPS);
+  return ['--fps', String(fps), ...(player !== 'spotify' ? ['--bundle', PLAYER_BUNDLES[player]] : []), ...(offset ? ['--offset-ms', String(offset)] : [])];
 }
 
 export class AudioLevels extends EventEmitter {
