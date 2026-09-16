@@ -154,7 +154,14 @@ do {
     }
 }
 let latencySeconds = Double(latencyFrames) / outputRate
-let delayFrames = max(0, Int(((latencySeconds + offsetSeconds) * framesPerSecond).rounded()))
+/// How far back in the music the bars are drawn, in seconds.
+let holdSeconds = max(0, min(1, latencySeconds + offsetSeconds))
+/// The hold as tap samples. Holding samples rather than finished frames keeps
+/// the correction exact: a queue of output frames can only ever be right to
+/// within one frame, which at 24 fps is 42 ms — most of what it was correcting.
+let delaySamples = Int((holdSeconds * sampleRate).rounded())
+/// Room for the analysis window, the hold, and a couple of device buffers on top.
+let ringCapacity = fftSize + delaySamples + Int(sampleRate / framesPerSecond) * 2
 
 let aggregateDescription: [String: Any] = [
     kAudioAggregateDeviceNameKey: "Notchlight levels",
@@ -176,7 +183,7 @@ if aggregateStatus != noErr || aggregateID == kAudioObjectUnknown {
 // MARK: - Sample ring, filled from the realtime thread
 
 final class Ring {
-    private var samples = [Float](repeating: 0, count: fftSize)
+    private var samples = [Float](repeating: 0, count: ringCapacity)
     private var head = 0
     private var lock = os_unfair_lock()
 
@@ -193,7 +200,7 @@ final class Ring {
                 var sum: Float = 0
                 for channel in 0..<channels { sum += data[frame * channels + channel] }
                 samples[head] = sum / Float(channels)
-                head = (head + 1) % fftSize
+                head = (head + 1) % ringCapacity
             }
         } else {
             let frames = Int(buffers[0].mDataByteSize) / MemoryLayout<Float>.size
@@ -203,18 +210,22 @@ final class Ring {
                 var sum: Float = 0
                 for data in channelData { sum += data[frame] }
                 samples[head] = sum / Float(channelData.count)
-                head = (head + 1) % fftSize
+                head = (head + 1) % ringCapacity
             }
         }
     }
 
-    /// Oldest sample first, so the window lines up with time.
-    func snapshot(into out: inout [Float]) {
+    /// The window that ended `back` samples ago, oldest sample first, so the
+    /// window lines up with time. `back` is the hold: with headphones that play
+    /// late, the bars draw the moment the ear is hearing rather than the one
+    /// Spotify just handed over.
+    func snapshot(into out: inout [Float], back: Int) {
         os_unfair_lock_lock(&lock)
         defer { os_unfair_lock_unlock(&lock) }
-        let tail = fftSize - head
-        out.replaceSubrange(0..<tail, with: samples[head..<fftSize])
-        out.replaceSubrange(tail..<fftSize, with: samples[0..<head])
+        let start = ((head - back - fftSize) % ringCapacity + ringCapacity) % ringCapacity
+        let tail = min(fftSize, ringCapacity - start)
+        out.replaceSubrange(0..<tail, with: samples[start..<(start + tail)])
+        if tail < fftSize { out.replaceSubrange(tail..<fftSize, with: samples[0..<(fftSize - tail)]) }
     }
 }
 
@@ -264,7 +275,7 @@ let release = Float(pow(0.5, 1 / (0.084 * framesPerSecond)))
 var heard = 0
 
 func analyze() -> [Float] {
-    ring.snapshot(into: &frame)
+    ring.snapshot(into: &frame, back: delaySamples)
     var rms: Float = 0
     vDSP_rmsqv(frame, 1, &rms, vDSP_Length(fftSize))
     let loudness = 20 * log10(max(rms, 1e-9))
@@ -310,8 +321,7 @@ func analyze() -> [Float] {
 
 // MARK: - Run
 
-emit("{\"ok\":true,\"rate\":\(Int(sampleRate)),\"latencyMs\":\(Int(latencySeconds * 1000)),\"offsetMs\":\(Int(offsetSeconds * 1000)),\"delayFrames\":\(delayFrames)}")
-var held: [String] = []
+emit("{\"ok\":true,\"rate\":\(Int(sampleRate)),\"fps\":\(Int(framesPerSecond)),\"latencyMs\":\(Int(latencySeconds * 1000)),\"offsetMs\":\(Int(offsetSeconds * 1000)),\"holdMs\":\(Int(holdSeconds * 1000))}")
 
 // The aggregate is pinned to one output device. When the default output moves
 // (headphones in, AirPods on) the tap goes quiet, so leave and let the app
@@ -330,8 +340,7 @@ Thread.detachNewThread {
 
 let timer = Timer(timeInterval: 1 / framesPerSecond, repeats: true) { _ in
     if kill(pid, 0) != 0 { teardown(); exit(0) }
-    held.append(analyze().map { String(format: "%.2f", $0) }.joined(separator: " "))
-    if held.count > delayFrames { emit(held.removeFirst()) }
+    emit(analyze().map { String(format: "%.2f", $0) }.joined(separator: " "))
 }
 RunLoop.main.add(timer, forMode: .common)
 RunLoop.main.run()
