@@ -94,8 +94,9 @@ Customize → Agents to see real tasks.
   comes from the track's public page (`music:musician_description`), cached
   per track; the lead artist stands until it arrives.
 - **Live equalizer**: `native/audiotap.swift` opens a Core Audio process tap on
-  Spotify (macOS 14.2+), FFT at 30 fps, five band levels on stdout, delayed by
-  the output device's reported latency (about 170 ms on AirPods).
+  Spotify (macOS 14.2+), FFT at 60 fps, five band levels on stdout, held back
+  by what the output device's reported latency (about 170 ms on AirPods) gives
+  the sound as a head start, less what this side spends drawing a level.
   `src/main/audioLevels.ts` compiles it on first use into `~/.notchlight/bin`
   and runs it only while wanted (`wantsLevels`). Levels reach the renderer over
   the `music:levels` channel; `LiveEqualizer` writes them straight to the DOM.
@@ -287,8 +288,9 @@ listening it writes levels to the DOM and skips unchanged frames, so real
 silence costs nothing; when capture is not listening, or nothing has been
 heard for 1.5 s (music on another speaker), the bars hold a quiet static
 shape. Reduced motion is followed as the system setting changes
-(`useReducedMotion` in `src/renderer/pulse.ts`). The helper runs at 24 fps
-(`audiotap --fps`) with smoothing expressed in seconds. Measured while
+(`useReducedMotion` in `src/renderer/pulse.ts`). The helper runs at 60 fps
+(`audiotap --fps`, `levelsFps` in config.json) with smoothing expressed in
+seconds. Measured while
 playing with Agents selected: 23 % of a core across the tree, from 38–45 %.
 The gallery keeps `mp-wave` for its sample data.
 
