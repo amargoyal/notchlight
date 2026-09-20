@@ -151,3 +151,24 @@ function PreviewStrip({ live, state, dispatch, onCustomize }: { live: LiveContro
 /* ---- panes ---- */
 interface PaneProps { live: LiveController; state: PreviewState; dispatch: Dispatch<PreviewAction>; prefs: PreviewPreferences; pref: <K extends keyof PreviewPreferences>(key: K, value: PreviewPreferences[K]) => void; app: AppSettingsController; showView: (view: View) => void }
 
+function GeneralPane({ live, app }: PaneProps) {
+  const s = app.settings;
+  const noLogin = live.available && !s.packaged;
+  return <>
+    <Group title="Startup" footer={live.available ? (noLogin ? 'Launch at login is available in the packaged app.' : undefined) : 'These apply in the desktop app. Here they only change the preview.'}>
+      <Toggle title="Launch at login" description="Open Notchlight when you sign in to this Mac." value={s.loginItem} disabled={noLogin} onChange={v => app.update({ loginItem: v })}/>
+      <Row title="Updates" description={`Notchlight ${s.version}. New releases are offered from the menu bar; nothing installs itself.`}><Button disabled={!live.available} onClick={() => void live.run(() => window.notchlight.checkForUpdates())}>Check Now</Button></Row>
+    </Group>
+    <Group title="Opening the notch">
+      <Row title="Hover delay" description="How long the pointer rests on the notch before it opens."><Popup label="Hover delay" value={s.hoverDelay} options={withCurrent(HOVER_DELAYS, s.hoverDelay, v => `${(v / 1000).toFixed(2)} seconds`)} onChange={v => app.update({ hoverDelay: v })}/></Row>
+      <Row title="Keyboard shortcut" description="Opens the notch for the keyboard. Escape hands focus back to the app you were in."><ShortcutRecorder value={s.shortcut} onSave={v => app.update({ shortcut: v })}/></Row>
+      <Toggle title="Show on a Mac without a notch" description="The island hangs off the menu bar instead of a cutout. Takes effect the next time Notchlight starts." value={s.allowWithoutNotch} onChange={v => app.update({ allowWithoutNotch: v })}/>
+    </Group>
+    <Group title="Sessions" footer="With the Claude Code hooks installed, a session leaves the moment it really ends.">
+      <Row title="Forget a quiet session after" description="A session that has said nothing for this long leaves the bar."><Popup label="Forget a quiet session after" value={s.staleSec} options={withCurrent(STALE_CHOICES, s.staleSec, v => `${Math.round(v / 60)} minutes`)} onChange={v => app.update({ staleSec: v })}/></Row>
+      <Toggle title="Watch for closed terminals" description="Checks for live claude processes so a closed window clears its light. Off skips the periodic scan." value={s.watchProcesses} onChange={v => app.update({ watchProcesses: v })}/>
+      <Row title="Keep a finished light" description="Red means finished, not gone. Choose how long it stays."><Popup label="Keep a finished light" value={s.doneLingerSec} options={withCurrent(LINGER_CHOICES, s.doneLingerSec, v => `${Math.round(v / 60)} minutes`)} onChange={v => app.update({ doneLingerSec: v })}/></Row>
+    </Group>
+  </>;
+}
+
