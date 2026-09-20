@@ -4,17 +4,18 @@ import './island.css';
 import './customize.css';
 import { Buddy } from './Buddy';
 import { CompanionSurface, useCompanion, type LiveController } from './LiveCompanion';
-import { DEFAULT_PREFERENCES, SAMPLE_FILES } from './previewModel';
+import { DEFAULT_PREFERENCES, HUD_SAMPLES, SAMPLE_FILES } from './previewModel';
 import { Icon, PreviewSurface, usePreview } from './Preview';
 import type { PreviewAction, PreviewPreferences, PreviewState } from './previewModel';
-import { describeAccount, describeCapture, PLAYER_NAMES, SPOTIFY_REDIRECT_URI } from '../shared/companion';
+import { describeAccount, describeCapture, describeHud, HUD_NAMES, PLAYER_NAMES, SPOTIFY_REDIRECT_URI, type HudChannel } from '../shared/companion';
 import { HOVER_DELAYS, LINGER_CHOICES, SAMPLE_APP_SETTINGS, STALE_CHOICES, shortcutLabel, withCurrent, type AppSettings, type AppSettingsPatch } from '../shared/settings';
 
 /* ---- sections ---- */
-type Section = 'general' | 'appearance' | 'agents' | 'music' | 'tray' | 'clipboard' | 'about';
+type Section = 'general' | 'appearance' | 'hud' | 'agents' | 'music' | 'tray' | 'clipboard' | 'about';
 const SECTIONS: { id: Section; label: string; description: string; icon: string; tile: string; keywords: string }[] = [
   { id: 'general', label: 'General', description: 'Startup, how the notch opens, and how long sessions stay on the bar.', icon: 'settings', tile: '#8d8a84', keywords: 'login startup updates hover delay shortcut keyboard sessions forget stale terminal finished' },
   { id: 'appearance', label: 'Appearance', description: 'How this window and the notch look. The notch stays black, like the hardware.', icon: 'appearance', tile: '#5f83a8', keywords: 'theme light dark system spacing compact comfortable motion resting bar collapsed' },
+  { id: 'hud', label: 'HUD', description: 'The volume and brightness keys, answered in the notch instead of the middle of the screen.', icon: 'volume', tile: '#6f7f8c', keywords: 'volume brightness hud overlay osd keys media accessibility mute percentage' },
   { id: 'agents', label: 'Agents', description: 'Claude Code and Codex sessions on this Mac, and how each one shows up.', icon: 'face', tile: '#c97c5c', keywords: 'claude codex buddy robot pulse tokens hooks approvals home' },
   { id: 'music', label: 'Music', description: 'Which player the notch follows, and what the Music face shows.', icon: 'music', tile: '#c2606c', keywords: 'spotify apple player artwork glow bars visualizer capture smart shuffle client id' },
   { id: 'tray', label: 'Tray', description: 'A temporary shelf for files on their way somewhere.', icon: 'tray', tile: '#7f9a6b', keywords: 'shelf files thumbnails drag drop copy' },
@@ -197,6 +198,36 @@ function AppearancePane({ prefs, pref }: PaneProps) {
   </>;
 }
 
+function HudPane({ live, state, dispatch, prefs, pref }: PaneProps) {
+  const hud = live.state.hud;
+  const missing = (['volume', 'brightness'] as HudChannel[]).filter(channel => !hud.can.includes(channel));
+  const level = (value: number | null) => value === null ? '—' : `${Math.round(value * 100)}%`;
+  const sample = HUD_SAMPLES.find(item => state.hud && item.hud.kind === state.hud.kind && item.hud.value === state.hud.value)?.id ?? 'off';
+  return <>
+    <Group title="Replace the system HUD" footer={live.available ? 'Notchlight has to see the key before macOS does, which is what Accessibility allows. Nothing else is read: the helper acts on the volume and brightness keys and passes every other key straight through.' : 'This applies in the desktop app. Here it only changes the preview.'}>
+      <Toggle title="Answer the keys in the notch" description="The volume and brightness keys show a bar in the notch, and the grey square in the middle of the screen never appears." value={prefs.hudEnabled} onChange={v => pref('hudEnabled', v)}/>
+      {live.available && <Row title="Permission" description={describeHud(hud, prefs.hudEnabled)}>
+        <Status tone={hud.status === 'listening' ? 'good' : hud.status === 'unavailable' ? 'bad' : hud.status === 'starting' ? 'wait' : 'off'}>{hud.status === 'listening' ? 'Replacing' : hud.status === 'starting' ? 'Starting' : hud.status === 'unavailable' ? (hud.reason === 'accessibility' ? 'Needs permission' : 'Unavailable') : 'Off'}</Status>
+        <Button onClick={() => void live.run(() => window.notchlight.openAccessibility())}>Open Accessibility…</Button>
+      </Row>}
+      <Row title="Option key" description="macOS opens the matching settings pane when Option is held. Keep that, or let Option move the level like any other press."><Segmented label="Option key" value={prefs.hudOptionKey} options={[{ value: 'settings', label: 'Opens Settings' }, { value: 'replace', label: 'Changes the level' }]} onChange={v => pref('hudOptionKey', v)}/></Row>
+    </Group>
+    <Group title="How it looks" footer="Shift and Option together move the level a quarter step at a time, the way macOS always has.">
+      <Row title="Bar" description="Gradient ramps across the filled part; solid keeps one tone."><Segmented label="Bar" value={prefs.hudStyle} options={[{ value: 'solid', label: 'Solid' }, { value: 'gradient', label: 'Gradient' }]} onChange={v => pref('hudStyle', v)}/></Row>
+      <Toggle title="Glow" description="A soft light under the filled part of the bar." value={prefs.hudGlow} onChange={v => pref('hudGlow', v)}/>
+      <Toggle title="Show the percentage" description="The level as a number beside the bar." value={prefs.hudPercentage} onChange={v => pref('hudPercentage', v)}/>
+      <Row title="Closed notch" description="Inline keeps the bar in the wings beside the cutout; Wide takes the full panel width for one press."><Segmented label="Closed notch" value={prefs.hudClosed} options={[{ value: 'inline', label: 'Inline' }, { value: 'wide', label: 'Wide bar' }]} onChange={v => pref('hudClosed', v)}/></Row>
+      <Toggle title="Show in the open notch" description="A bar above the tabs while the notch is open, whichever face you are on." value={prefs.hudOpenNotch} onChange={v => pref('hudOpenNotch', v)}/>
+    </Group>
+    {live.available && prefs.hudEnabled && hud.status === 'listening' && <Group title="Right now" footer={missing.length ? `macOS still shows its own overlay for ${missing.map(channel => HUD_NAMES[channel].toLowerCase()).join(' and ')} on this Mac.` : undefined}>
+      {hud.can.map(channel => <Row key={channel} title={HUD_NAMES[channel]} description={channel === 'volume' ? (hud.muted ? 'Muted.' : 'The output device’s own level.') : 'The built-in display’s backlight.'}><span className="settings-path">{level(channel === 'volume' ? hud.volume : hud.brightness)}</span></Row>)}
+    </Group>}
+    {!live.available && <Group title="Try it out" footer="Sample only. Nothing on this Mac changes.">
+      <Row title="Sample HUD" description="Show a key press in the preview above."><Popup label="Sample HUD" value={sample} options={[{ value: 'off', label: 'No key pressed' }, ...HUD_SAMPLES.map(item => ({ value: item.id, label: item.label }))]} onChange={id => dispatch({ type: 'hud', hud: HUD_SAMPLES.find(item => item.id === id)?.hud ?? null })}/></Row>
+    </Group>}
+  </>;
+}
+
 function AgentsPane({ live, state, dispatch, prefs, pref, app }: PaneProps) {
   const codex = live.state.preferences;
   return <>
@@ -338,7 +369,7 @@ function App() {
     setSection(id);
     if (id === 'agents' || id === 'music' || id === 'tray' || (id === 'clipboard' && prefs.clipboardEnabled)) showView(id);
   };
-  const panes: Record<Section, (props: PaneProps) => ReactNode> = { general: GeneralPane, appearance: AppearancePane, agents: AgentsPane, music: MusicPane, tray: TrayPane, clipboard: ClipboardPane, about: AboutPane };
+  const panes: Record<Section, (props: PaneProps) => ReactNode> = { general: GeneralPane, appearance: AppearancePane, hud: HudPane, agents: AgentsPane, music: MusicPane, tray: TrayPane, clipboard: ClipboardPane, about: AboutPane };
   const Pane = panes[section];
   return <div className={`customize-app theme-${prefs.theme}`}>
     <SearchContext.Provider value={query}>
