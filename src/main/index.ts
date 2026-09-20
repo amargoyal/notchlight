@@ -659,6 +659,23 @@ function applyAppSettings(patch: AppSettingsPatch): void {
   }
 }
 
+/** A settings call from the customize window: answer with the fresh settings, or with why not. */
+function settingsHandle(name: string, action: (...args: unknown[]) => Promise<unknown> | unknown): void {
+  ipcMain.handle(name, async (event, ...args) => {
+    try {
+      if (!trustedAgentWindow(event)) throw new Error('This window cannot change settings.');
+      await action(...args);
+      return { ok: true, settings: appSettings() };
+    } catch (error) {
+      return { ok: false, error: (error as Error).message || 'The action could not be completed.' };
+    }
+  });
+}
+ipcMain.handle('app:settings', event => {
+  if (!trustedAgentWindow(event)) throw new Error('This window cannot read settings.');
+  return appSettings();
+});
+
 ipcMain.on('update:respond', (event, response: UpdateResponse) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (event.senderFrame !== event.sender.mainFrame || !win || win !== updateWin) return;
