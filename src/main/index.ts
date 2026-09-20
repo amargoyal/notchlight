@@ -26,7 +26,7 @@ import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
 import { createGalleryWindow, createCustomizeWindow, createUpdateWindow, NotchWindow } from './notchWindow';
 import { notchState, probeNotch } from './notchProbe';
-import { trayIcon } from './png';
+import { menubarIcon } from './png';
 import { Store } from './store';
 import { CodexAdapter } from './codex';
 import { CodexApprovals } from './codexApprovals';
@@ -287,7 +287,7 @@ function refreshTray(): void {
 }
 
 function startTray(): void {
-  const img = nativeImage.createFromBuffer(trayIcon(), { scaleFactor: 2 });
+  const img = nativeImage.createFromBuffer(menubarIcon(), { scaleFactor: 2 });
   img.setTemplateImage(true);
   tray = new Tray(img);
   tray.setToolTip('Notchlight');
