@@ -29,7 +29,7 @@ export interface PreviewPreferences {
   smartShuffle: boolean;
 }
 export interface PreviewClip { id: string; kind: 'text' | 'url' | 'image'; preview: string; meta: string; pinned: boolean; thumb?: string }
-export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string }
+export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string; /** A Smart Shuffle pick, and the playlist it is not in yet. */ pick?: string }
 export interface PreviewFile { id: string; name: string; kind: 'image' | 'pdf' | 'folder' | 'text'; size: string; unavailable?: boolean }
 export interface PreviewState {
   codexConnection?: Snapshot['codex'];
