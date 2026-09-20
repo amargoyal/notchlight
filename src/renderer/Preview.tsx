@@ -34,7 +34,10 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     face: <><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="10.5" r="1.3" fill="currentColor" stroke="none"/><path d="M9 15c1.6 1.3 4.4 1.3 6 0"/></>,
     info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.8h.01"/></>,
     updown: <path d="m8 9.5 4-4 4 4M8 14.5l4 4 4-4"/>,
-    copy: <><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></>
+    copy: <><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></>,
+    volume: <><path d="M4 9h3l5-4v14l-5-4H4Z"/><path d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10"/></>,
+    mute: <><path d="M4 9h3l5-4v14l-5-4H4Z"/><path d="m16 9.5 5 5m0-5-5 5"/></>,
+    brightness: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></>
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.file}</svg>;
 }
