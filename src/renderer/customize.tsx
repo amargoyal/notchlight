@@ -172,3 +172,24 @@ function GeneralPane({ live, app }: PaneProps) {
   </>;
 }
 
+function AppearancePane({ prefs, pref }: PaneProps) {
+  return <>
+    <Group title="Settings window">
+      <Row title="Theme">
+        <span className="settings-theme">{(['light', 'dark', 'system'] as const).map(theme => <label key={theme} className={prefs.theme === theme ? 'selected' : ''}><input type="radio" name="desktop-theme" checked={prefs.theme === theme} onChange={() => pref('theme', theme)}/><span className={`theme-swatch swatch-${theme}`}><i/><b/><em/></span><span>{theme[0].toUpperCase() + theme.slice(1)}</span></label>)}</span>
+      </Row>
+    </Group>
+    <Group title="Notch">
+      <Row title="Spacing" description="Comfortable gives rows a little more room when the notch is open."><Segmented label="Spacing" value={prefs.density} options={[{ value: 'compact', label: 'Compact' }, { value: 'comfortable', label: 'Comfortable' }]} onChange={v => pref('density', v)}/></Row>
+      <Toggle title="Reduce motion" description="Keeps transitions, the pulse and the bars still." value={prefs.reducedMotion} onChange={v => pref('reducedMotion', v)}/>
+    </Group>
+    <Group title="Resting bar" footer="What the collapsed notch shows. Faces share the bar when they have something to show; either agent still surfaces a request when it needs you.">
+      <Toggle title="Claude" description="Status light and buddy while a session runs." icon={<Buddy size={16}/>} value={prefs.restClaude} onChange={v => pref('restClaude', v)}/>
+      <Toggle title="Codex" description="A separate light and robot while Codex works." icon={<Robot/>} value={prefs.restCodex} onChange={v => pref('restCodex', v)}/>
+      <Toggle title="Music" description="Artwork and the bars while a track is ready." value={prefs.restMusic} onChange={v => pref('restMusic', v)}/>
+      <Toggle title="Tray" description="A count of what you have set aside." value={prefs.restTray} onChange={v => pref('restTray', v)}/>
+      <Toggle title="Clipboard" description={prefs.clipboardEnabled ? 'The kind of the latest item and a count.' : 'Turn on the clipboard history to show it here.'} value={prefs.clipboardEnabled && prefs.restClipboard} disabled={!prefs.clipboardEnabled} onChange={v => pref('restClipboard', v)}/>
+    </Group>
+  </>;
+}
+
