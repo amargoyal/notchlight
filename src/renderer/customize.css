@@ -88,3 +88,14 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-button.is-danger { color: var(--ui-danger); }
 .settings-button.is-quiet { background: transparent; border-color: transparent; box-shadow: none; color: var(--ui-strong); }
 
+/* ---- fields, code, shortcuts ---- */
+.settings-field { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.settings-field input { height: 24px; width: 240px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--ui-line); background: var(--ui-field); color: var(--ui-text); font: 12px/1 ui-monospace, 'SF Mono', Menlo, monospace; }
+.settings-field input[aria-invalid=true] { border-color: var(--ui-danger); }
+.settings-field small { font-size: 11px; color: var(--ui-danger); }
+.settings-code { display: inline-flex; align-items: center; gap: 8px; }
+.settings-code code { padding: 5px 8px; border-radius: 6px; background: var(--ui-control); border: 1px solid var(--ui-line); font: 11px/1 ui-monospace, 'SF Mono', Menlo, monospace; user-select: all; }
+.settings-path { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px/1 ui-monospace, 'SF Mono', Menlo, monospace; color: var(--ui-muted); }
+.settings-kbd { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 6px; border: 1px solid var(--ui-line); background: var(--ui-control); color: var(--ui-text); font-size: 12px; letter-spacing: .08em; cursor: default; }
+.settings-kbd.is-recording { border-color: var(--ui-accent); letter-spacing: 0; color: var(--ui-muted); }
+
