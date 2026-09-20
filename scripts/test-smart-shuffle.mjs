@@ -159,9 +159,11 @@ try {
   assert.equal(shuffle.parsePlayback(playing('spotify:track:t1', { context: { type: 'album', uri: 'spotify:album:x' } })).playlistId, null);
   assert.equal(shuffle.parsePlayback(playing('spotify:track:t1', { smart_shuffle: undefined })).smartShuffle, null, 'the field is undocumented; its absence is not a no');
   assert.equal(shuffle.parsePlayback(playing('spotify:track:t1', { item: { uri: 'spotify:track:t1', linked_from: { uri: 'spotify:track:t0' } } })).linkedUri, 'spotify:track:t0');
-  assert.deepEqual(shuffle.parsePlaylist({ name: 'Late Drives', snapshot_id: 's1', owner: { id: 'amar' }, collaborative: false, tracks: { total: 3 } }), { name: 'Late Drives', snapshotId: 's1', ownerId: 'amar', collaborative: false, total: 3 });
+  assert.deepEqual(shuffle.parsePlaylist({ name: 'Late Drives', snapshot_id: 's1', owner: { id: 'amar' }, collaborative: false, items: { total: 3 } }), { name: 'Late Drives', snapshotId: 's1', ownerId: 'amar', collaborative: false, total: 3 });
+  assert.equal(shuffle.parsePlaylist({ name: 'Old', snapshot_id: 's1', tracks: { total: 4 } }).total, 4, 'the pre-2026 name still counts');
   assert.equal(shuffle.parsePlaylist({ name: 'x' }), null, 'no snapshot id, no playlist');
-  assert.deepEqual(shuffle.parsePlaylistPage({ items: [{ track: { uri: 'spotify:track:a' } }, { track: null }, { track: { uri: 'spotify:track:b', linked_from: { uri: 'spotify:track:b0' } } }], next: null }), { uris: ['spotify:track:a', 'spotify:track:b', 'spotify:track:b0'], next: null });
+  assert.deepEqual(shuffle.parsePlaylistPage({ items: [{ item: { uri: 'spotify:track:a' } }, { item: null }, { item: { uri: 'spotify:track:b', linked_from: { uri: 'spotify:track:b0' } } }], next: null }), { uris: ['spotify:track:a', 'spotify:track:b', 'spotify:track:b0'], next: null });
+  assert.deepEqual(shuffle.parsePlaylistPage({ items: [{ track: { uri: 'spotify:track:old' } }], next: null }).uris, ['spotify:track:old'], 'the pre-2026 name still reads');
   assert.equal(shuffle.parsePlaylistPage({}), null);
   const members = new Set(['spotify:track:own1', 'spotify:track:own2']);
   assert.equal(shuffle.isPick(shuffle.parsePlayback(playing('spotify:track:pick1')), members), true);
