@@ -23,3 +23,10 @@ const SECTIONS: { id: Section; label: string; description: string; icon: string;
 ];
 type View = 'agents' | 'music' | 'tray' | 'clipboard';
 
+/* ---- search ---- */
+const SearchContext = createContext('');
+function matches(query: string, ...texts: (string | undefined)[]): boolean {
+  const q = query.trim().toLowerCase();
+  return !q || texts.some(text => text?.toLowerCase().includes(q));
+}
+
