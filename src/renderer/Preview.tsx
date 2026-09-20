@@ -29,7 +29,8 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     clipboard: <><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6"/></>,
     pin: <><path d="M9 3h6l-1 6 3 3H7l3-3ZM12 12v9"/></>,
     search: <><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></>,
-    sparkle: <path d="M12 3c.6 4.6 3.4 7.4 9 9-5.6 1.6-8.4 4.4-9 9-.6-4.6-3.4-7.4-9-9 5.6-1.6 8.4-4.4 9-9Z" fill="currentColor" stroke="none"/>
+    sparkle: <path d="M12 3c.6 4.6 3.4 7.4 9 9-5.6 1.6-8.4 4.4-9 9-.6-4.6-3.4-7.4-9-9 5.6-1.6 8.4-4.4 9-9Z" fill="currentColor" stroke="none"/>,
+    plus: <><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></>
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.file}</svg>;
 }
