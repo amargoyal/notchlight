@@ -384,7 +384,7 @@ async function boot(): Promise<void> {
   });
   pickFiles = installCompanionIpc(companion, spotify, clips,
     win => !!win && (win === customize || win === notch?.win),
-    () => { openCustomize(); return customize!; });
+    () => { openCustomize(); return customize!; }, account, smart);
   if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
   smart.setEnabled(!DEMO && spotifyEnabled && companion.current().preferences.smartShuffle);
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);
