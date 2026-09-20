@@ -64,7 +64,8 @@ export const SAMPLE_CLIPS: PreviewClip[] = [
 export const TRACKS: PreviewTrack[] = [
   { id: 'late-light', title: 'Late Light', artist: 'The Quiet Hours', album: 'Somewhere, Slowly', duration: 234, artwork: './assets/late-light.svg' },
   { id: 'blue-room', title: 'Blue Room', artist: 'Soft Signal', album: 'After the Rain', duration: 198, artwork: './assets/blue-room.svg' },
-  { id: 'long-way', title: 'The long way home, through the hills and past the sleeping city', artist: 'The Quiet Hours & Friends', album: 'Somewhere, Slowly', duration: 267, artwork: './assets/late-light.svg' }
+  { id: 'long-way', title: 'The long way home, through the hills and past the sleeping city', artist: 'The Quiet Hours & Friends', album: 'Somewhere, Slowly', duration: 267, artwork: './assets/late-light.svg' },
+  { id: 'glass-hours', title: 'Glass Hours', artist: 'Night Ferry', album: 'Harbour Lights', duration: 212, artwork: './assets/blue-room.svg', pick: 'Late Drives' }
 ];
 export const SAMPLE_FILES: PreviewFile[] = [
   { id: 'coast', name: 'Coast.jpg', kind: 'image', size: '2.4 MB' },
