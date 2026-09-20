@@ -181,5 +181,34 @@ export class SmartShuffle extends EventEmitter {
       else if (this.enabled && this.trackId && this.playing) { if (this.heartbeat) clearTimeout(this.heartbeat); this.heartbeat = setTimeout(() => { this.heartbeat = null; void this.read(); }, this.heartbeatMs); }
     }
   }
+  private playlists = new Map<string, Playlist>();
+  /**
+   * The playlist and every track uri in it. Its particulars are read each
+   * time — one small call — and the items only when the snapshot id says they
+   * moved, so a long playlist is walked once and then remembered.
+   */
+  private async playlist(id: string): Promise<Playlist | null> {
+    const head = await this.account.request(`/playlists/${id}?fields=name,snapshot_id,owner(id),collaborative,tracks(total)`);
+    const info = head.status === 200 ? parsePlaylist(head.body) : null;
+    if (!info) { logEvent('spotify', `smart shuffle: playlist ${id} answered ${head.status}`); return null; }
+    const cached = this.playlists.get(id);
+    if (cached && cached.info.snapshotId === info.snapshotId) { cached.info = info; return cached; }
+    if (info.total > this.maxPages * 100) { logEvent('spotify', `smart shuffle: ${info.name} has ${info.total} tracks, too many to check`); return null; }
+    const members = new Set<string>();
+    let next: string | null = `/playlists/${id}/tracks?fields=items(track(uri,linked_from(uri))),next&limit=100`;
+    for (let page = 0; next && page < this.maxPages; page++) {
+      const answer = await this.account.request(next);
+      const parsed = answer.status === 200 ? parsePlaylistPage(answer.body) : null;
+      if (!parsed) { logEvent('spotify', `smart shuffle: playlist items answered ${answer.status}`); return null; }
+      for (const uri of parsed.uris) members.add(uri);
+      next = parsed.next;
+    }
+    const entry = { info, members };
+    this.playlists.delete(id);
+    this.playlists.set(id, entry);
+    if (this.playlists.size > 8) this.playlists.delete(this.playlists.keys().next().value!);
+    logEvent('spotify', `smart shuffle: read ${members.size} of ${info.name}`);
+    return entry;
+  }
   stop(): void { this.clearTimers(); }
 }
