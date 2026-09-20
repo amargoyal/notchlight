@@ -105,3 +105,16 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-status.tone-bad i { background: #d46a5a; box-shadow: 0 0 6px #d46a5a88; }
 .settings-status.tone-off i { background: var(--ui-switch-off); box-shadow: none; }
 
+/* ---- theme swatches ---- */
+.settings-theme { display: flex; gap: 18px; padding: 4px 0; }
+.settings-theme label { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--ui-muted); position: relative; }
+.settings-theme input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.settings-theme label.selected { color: var(--ui-text); }
+.theme-swatch { width: 92px; height: 58px; border-radius: 8px; background: #f5f2ed; display: block; border: 1px solid #d2c9bc; overflow: hidden; position: relative; }
+.theme-swatch i { position: absolute; left: 0; top: 0; height: 100%; width: 26%; background: #d9d2c7; }
+.theme-swatch b { position: absolute; left: 36%; right: 12%; height: 5px; top: 14px; background: #c3b9ab; border-radius: 2px; }
+.theme-swatch em { position: absolute; left: 36%; right: 26%; height: 5px; top: 26px; background: #d8cfc2; border-radius: 2px; }
+.swatch-dark { background: #2f2a25; border-color: #5d5042; } .swatch-dark i { background: #201e1b; } .swatch-dark b { background: #7e6e5b; } .swatch-dark em { background: #53483b; }
+.swatch-system { background: linear-gradient(90deg, #f5f2ed 50%, #2f2a25 50%); } .swatch-system i { background: #d9d2c7; } .swatch-system b, .swatch-system em { background: #a59581; }
+.settings-theme label.selected .theme-swatch, .settings-theme label:focus-within .theme-swatch { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+
