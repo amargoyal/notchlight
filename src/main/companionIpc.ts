@@ -6,12 +6,14 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { CompanionStore } from './companionStore';
 import { SpotifyPlayer } from './spotify';
+import type { SpotifyAccount } from './spotifyAccount';
+import type { SmartShuffle } from './smartShuffle';
 import { ClipboardStore } from './clipboardStore';
 import { trayIcon } from './png';
 import type { OperationResult } from '../shared/companion';
 
 type Event = IpcMainInvokeEvent | IpcMainEvent;
-export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlayer, clips: ClipboardStore, trusted: (win: BrowserWindow | null) => boolean, dialogWindow: () => BrowserWindow) {
+export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlayer, clips: ClipboardStore, trusted: (win: BrowserWindow | null) => boolean, dialogWindow: () => BrowserWindow, account: SpotifyAccount, smart: SmartShuffle) {
   function check(event: Event) {
     if (event.senderFrame !== event.sender.mainFrame || !trusted(BrowserWindow.fromWebContents(event.sender))) throw new Error('This window cannot change the companion.');
   }
