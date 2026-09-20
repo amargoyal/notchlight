@@ -94,3 +94,23 @@ function ShortcutRecorder({ value, onSave }: { value: string; onSave: (accelerat
   </>;
 }
 
+/* ---- app settings, over the bridge when there is one ---- */
+function useAppSettings(live: LiveController) {
+  const [settings, setSettings] = useState<AppSettings>(SAMPLE_APP_SETTINGS);
+  const refresh = useCallback(() => {
+    if (!live.available || !window.notchlight.getAppSettings) return;
+    void window.notchlight.getAppSettings().then(setSettings).catch(() => {});
+  }, [live.available]);
+  useEffect(refresh, [refresh]);
+  const update = (patch: AppSettingsPatch) => {
+    if (!live.available) { setSettings(s => ({ ...s, ...patch })); return; }
+    void live.run(async () => {
+      const result = await window.notchlight.updateAppSettings(patch);
+      if (result.ok && result.settings) setSettings(result.settings);
+      return result;
+    });
+  };
+  return { settings, update, refresh };
+}
+type AppSettingsController = ReturnType<typeof useAppSettings>;
+
