@@ -96,6 +96,36 @@ function Artwork({ state, mini = false }: { state: PreviewState; mini?: boolean 
       : <Icon name="music" size={mini ? 14 : 34}/>}
   </div>;
 }
+/** How a HUD bar is dressed, which is four preferences and nothing else. */
+export interface HudLook { style: 'solid' | 'gradient'; glow: boolean; percentage: boolean }
+/**
+ * One level, as a bar.
+ *
+ * It stands in for the grey square macOS puts in the middle of the screen, so it
+ * says the same two things and no more: which key was pressed, and where the
+ * level landed. The width is written inline rather than animated — the value is
+ * already the end of the movement, and the overlay is a transparent window whose
+ * every frame costs the compositor.
+ */
+export function HudBar({ kind, value, muted, look, wide = false }: { kind: 'volume' | 'brightness'; value: number; muted?: boolean; look: HudLook; wide?: boolean }) {
+  const percent = Math.round(Math.max(0, Math.min(1, value)) * 100);
+  const icon = kind === 'brightness' ? 'brightness' : muted || percent === 0 ? 'mute' : 'volume';
+  const name = kind === 'brightness' ? 'Brightness' : muted ? 'Volume, muted' : 'Volume';
+  return <span className={`mp-hud ${wide ? 'is-wide' : ''} ${look.style === 'gradient' ? 'is-gradient' : ''} ${look.glow ? 'is-glowing' : ''} ${muted ? 'is-muted' : ''}`} role="status" aria-label={`${name} ${percent}%`}>
+    <Icon name={icon} size={14}/>
+    <span className="mp-hud-track"><i style={{ width: `${percent}%` }}/></span>
+    {look.percentage && <b>{percent}</b>}
+  </span>;
+}
+/** The HUD on the resting bar: the key on the left, the level on the right. */
+export function hudRestingPart(activity: { kind: 'volume' | 'brightness'; value: number; muted: boolean }, look: HudLook): RestingPart {
+  const percent = Math.round(Math.max(0, Math.min(1, activity.value)) * 100);
+  const icon = activity.kind === 'brightness' ? 'brightness' : activity.muted || percent === 0 ? 'mute' : 'volume';
+  return {
+    left: <span className="mp-shelf-wing"><Icon name={icon} size={16}/></span>,
+    right: <HudBar kind={activity.kind} value={activity.value} muted={activity.muted} look={look}/>
+  };
+}
 export interface RestingPart { left: ReactNode; right: ReactNode; provider?: boolean }
 /**
  * The resting bar, assembled from whichever faces are switched on and have

@@ -60,6 +60,16 @@
 .mp-equalizer { border-radius: 6px; padding: 0 3px; }
 .mp-equalizer[style*="--mp-tint"] { box-shadow: 0 0 10px var(--mp-tint, transparent); }
 .mp-equalizer[style*="--mp-tint"] i { background: color-mix(in srgb, var(--mp-tint) 45%, #c9b79d); }
+/* The system HUD: one bar standing in for the grey square macOS draws. */
+.mp-hud { display: inline-flex; align-items: center; gap: 7px; color: #c7beb2; }
+.mp-hud .mp-hud-track { position: relative; width: 60px; height: 5px; border-radius: 3px; background: #ffffff26; overflow: hidden; }
+.mp-hud.is-wide .mp-hud-track { width: 260px; height: 6px; }
+.mp-hud .mp-hud-track i { position: absolute; inset: 0 auto 0 0; background: #e6dccd; border-radius: 3px; }
+.mp-hud.is-gradient .mp-hud-track i { background: linear-gradient(90deg, #8d8279, #f2ede7); }
+.mp-hud.is-glowing .mp-hud-track i { box-shadow: 0 0 8px #f2ede766; }
+.mp-hud.is-muted .mp-hud-track i { background: #6e6660; box-shadow: none; }
+.mp-hud b { font: 600 9px/1 ui-monospace, monospace; color: #f2ede7; min-width: 20px; text-align: right; }
+.mp-hud-strip { display: flex; justify-content: center; padding: 4px 0 8px; }
 /* The mini artwork breathes with the bass: --mp-bass is written on the surface by the live equalizer. */
 .mp-artwork.is-breathing { transform: scale(calc(1 + var(--mp-bass, 0) * 0.08)); transform-origin: center; will-change: transform; }
 .agent-sparkline { display: inline-flex; align-items: center; gap: 5px; }
