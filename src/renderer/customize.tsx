@@ -114,3 +114,17 @@ function useAppSettings(live: LiveController) {
 }
 type AppSettingsController = ReturnType<typeof useAppSettings>;
 
+/* ---- sidebar ---- */
+function Sidebar({ section, onSelect, query, onQuery, live, version }: { section: Section; onSelect: (id: Section) => void; query: string; onQuery: (q: string) => void; live: boolean; version: string }) {
+  const visible = SECTIONS.filter(item => matches(query, item.label, item.keywords));
+  return <aside className="settings-sidebar">
+    <div className="settings-titlebar" aria-hidden="true"/>
+    <label className="settings-search"><Icon name="search" size={13}/><input type="search" placeholder="Search" aria-label="Search settings" value={query} onChange={e => onQuery(e.target.value)}/></label>
+    <nav aria-label="Settings sections">
+      {visible.map(item => <button key={item.id} aria-current={section === item.id ? 'page' : undefined} onClick={() => onSelect(item.id)}><span className="settings-tile" style={{ background: item.tile }}><Icon name={item.icon} size={12}/></span><span>{item.label}</span></button>)}
+      {!visible.length && <p className="settings-search-empty">Nothing matches “{query}”.</p>}
+    </nav>
+    <div className="settings-sidebar-foot"><Buddy size={16}/><span><b>Notchlight</b> {version}</span><span className="settings-badge">{live ? 'This Mac' : 'Preview'}</span></div>
+  </aside>;
+}
+
