@@ -221,3 +221,42 @@ function AgentsPane({ live, state, dispatch, prefs, pref, app }: PaneProps) {
   </>;
 }
 
+function MusicPane({ live, state, dispatch, prefs, pref }: PaneProps) {
+  const music = live.state.music;
+  const account = live.state.smartShuffle.account;
+  const playerName = PLAYER_NAMES[music.player];
+  return <>
+    {live.available ? <Group title="Player" footer="macOS may ask for Automation access to the player. No account sign-in is needed for playback.">
+      <Row title="Follow" description="Whichever is open starts with Spotify and moves to Apple Music while Spotify is not running."><Popup label="Follow" value={live.state.preferences.musicPlayer} options={[{ value: 'spotify', label: 'Spotify' }, { value: 'apple', label: 'Apple Music' }, { value: 'auto', label: 'Whichever is open' }]} onChange={v => void live.run(() => window.notchlight.updatePreferences({ musicPlayer: v }))}/></Row>
+      <Row title="Connection" description={music.message || (music.status === 'ready' ? `Connected to ${playerName} on this Mac.` : 'Connect a player to show real music in the notch.')}>
+        <Status tone={music.status === 'ready' ? 'good' : music.status === 'disconnected' ? 'off' : 'wait'}>{music.status === 'ready' ? 'Connected' : music.status === 'disconnected' ? 'Not connected' : music.status === 'not-running' ? `${playerName} is closed` : 'Waiting'}</Status>
+        <Button disabled={music.busy} onClick={() => void live.run(() => window.notchlight.connectSpotify())}>{live.state.preferences.spotifyEnabled ? 'Reconnect' : 'Connect'}</Button>
+        {live.state.preferences.spotifyEnabled && <Button kind="quiet" onClick={() => void live.run(() => window.notchlight.updatePreferences({ spotifyEnabled: false }))}>Disconnect</Button>}
+      </Row>
+    </Group> : <Group title="Player" footer="Play, pause, skip and seek through an original sample playlist. No audio will play.">
+      <Row title="Sample state" description="Try the states the Music face can show."><Popup label="Sample player state" value={state.music.missingArtwork ? 'missing' : state.music.source} options={[{ value: 'ready', label: 'Ready to play' }, { value: 'empty', label: 'Nothing playing' }, { value: 'missing', label: 'Missing artwork' }, { value: 'unavailable', label: 'Player unavailable' }]} onChange={value => dispatch({ type: 'music-state', source: value === 'missing' ? 'ready' : value as PreviewState['music']['source'], missingArtwork: value === 'missing' })}/></Row>
+    </Group>}
+    <Group title="Now playing">
+      <Toggle title="Album artwork" description="Give each track a familiar face." value={prefs.artwork} onChange={v => pref('artwork', v)}/>
+      <Toggle title="Glow in the artwork’s colour" description="A soft light behind the artwork and the bars, taken from the record sleeve." value={prefs.artworkGlow} onChange={v => pref('artworkGlow', v)}/>
+      <Toggle title="Breathe with the bass" description="The small artwork moves with the low end while the bars are live. Still under Reduce motion." value={prefs.artworkPulse} onChange={v => pref('artworkPulse', v)}/>
+    </Group>
+    <Group title="Visualizer" footer={live.available && live.state.preferences.spotifyEnabled ? 'Capture is separate from the connection: track details and playback keep working when the bars cannot. Nothing is recorded; the output is reduced to five numbers and dropped.' : undefined}>
+      <Toggle title="Move with the music" description={live.available ? 'Bars in the collapsed wing follow what is actually playing.' : 'A quiet rhythm in the collapsed wing.'} value={prefs.visualizer} onChange={v => pref('visualizer', v)}/>
+      <Row title="Bars" description="Mirrored folds nine bars around the bass so they read as one shape."><Segmented label="Bars" value={prefs.equalizerLayout} options={[{ value: 'rising', label: 'Rising' }, { value: 'mirrored', label: 'Mirrored' }]} onChange={v => pref('equalizerLayout', v)}/></Row>
+      {live.available && live.state.preferences.spotifyEnabled && <Row title="Audio capture" description={describeCapture(live.state.capture, music, live.state.preferences)}><Status tone={live.state.capture.status === 'listening' ? 'good' : live.state.capture.status === 'unavailable' ? 'bad' : 'off'}>{live.state.capture.status === 'listening' ? 'Listening' : live.state.capture.status === 'starting' ? 'Starting' : live.state.capture.status === 'unavailable' ? 'Unavailable' : 'Idle'}</Status></Row>}
+    </Group>
+    <Group title="Smart Shuffle" footer={live.available ? <>Picks come from Spotify’s Web API, which needs an app of your own: create one at developer.spotify.com/dashboard, add the redirect address as a Redirect URI, and paste its Client ID here. Playback needs none of this.</> : undefined}>
+      <Toggle title="Mark Smart Shuffle picks" description="A track Spotify slipped into the playlist gets a mark, with + to keep it and × to move on." value={prefs.smartShuffle} onChange={v => pref('smartShuffle', v)}/>
+      {live.available && <>
+        <Row title="Redirect URI" description="Add this to your Spotify app before signing in."><span className="settings-code"><code>{SPOTIFY_REDIRECT_URI}</code><Button onClick={() => void navigator.clipboard.writeText(SPOTIFY_REDIRECT_URI)}><Icon name="copy" size={13}/>Copy</Button></span></Row>
+        <Row title="Client ID" description="Saved when it is whole: on blur or Enter."><ClientIdField value={live.state.preferences.spotifyClientId} onSave={id => void live.run(() => window.notchlight.updatePreferences({ spotifyClientId: id }))}/></Row>
+        <Row title="Spotify account" description={describeAccount(account)}>
+          <Status tone={account.status === 'ready' ? 'good' : account.status === 'signing-in' ? 'wait' : account.status === 'error' ? 'bad' : 'off'}>{account.status === 'ready' ? `Signed in${account.user ? ` as ${account.user}` : ''}` : account.status === 'signing-in' ? 'Waiting for your browser' : 'Signed out'}</Status>
+          {account.status !== 'off' && <Button disabled={account.status === 'signing-in'} onClick={() => void live.run(() => account.status === 'ready' ? window.notchlight.signOutSpotify() : window.notchlight.signInSpotify())}>{account.status === 'ready' ? 'Sign Out' : 'Sign In'}</Button>}
+        </Row>
+      </>}
+    </Group>
+  </>;
+}
+
