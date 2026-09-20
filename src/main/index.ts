@@ -675,6 +675,7 @@ ipcMain.handle('app:settings', event => {
   if (!trustedAgentWindow(event)) throw new Error('This window cannot read settings.');
   return appSettings();
 });
+settingsHandle('app:settings:update', patch => { applyAppSettings(validateAppSettings(patch)); refreshTray(); });
 
 ipcMain.on('update:respond', (event, response: UpdateResponse) => {
   const win = BrowserWindow.fromWebContents(event.sender);
