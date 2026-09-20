@@ -1,0 +1,53 @@
+/**
+ * Smart Shuffle picks, and the + and × that answer them.
+ *
+ * Smart Shuffle slips tracks Spotify thinks you will like into a playlist's
+ * flow. Inside Spotify a pick carries a mark, a + that adds it to the playlist
+ * and an × that sends it away and tells the recommender it missed. The
+ * scripting dictionary says nothing about any of this — it names the track,
+ * not where it came from — so the answer comes from the Web API: the playback
+ * state says which playlist is playing and whether Smart Shuffle is on, and the
+ * playlist's own items say whether the track is one of its own. Playing from a
+ * playlist, Smart Shuffle on, not in the playlist: a pick.
+ *
+ * The + is Spotify's own: the track goes into the playlist, and the mark goes
+ * with it because the track is now one of the playlist's own. The × is half of
+ * Spotify's: it skips the track, but Spotify keeps no public door for "not for
+ * me", so the recommender hears the skip and nothing more. Spotify's desktop
+ * app exposes no accessibility tree for its own buttons either, so there is
+ * nothing to press on its behalf.
+ */
+import { EventEmitter } from 'node:events';
+import { logEvent } from './lifecycle';
+import type { SpotifyAccount } from './spotifyAccount';
+import type { SmartShufflePick, SmartShuffleSnapshot } from '../shared/companion';
+
+/** What the playback state says, as much of it as a pick needs. */
+export interface Playback {
+  trackUri: string | null;
+  /** The track this one stands in for, when Spotify relinked it for this market. */
+  linkedUri: string | null;
+  playlistId: string | null;
+  /** Spotify's word on Smart Shuffle; null when the answer does not carry it. */
+  smartShuffle: boolean | null;
+  playing: boolean;
+}
+const str = (v: unknown) => typeof v === 'string' && v ? v : null;
+/** spotify:playlist:… and the older spotify:user:…:playlist:… both name a playlist. */
+export const playlistIdOf = (uri: string | null): string | null => uri ? /^spotify:(?:user:[^:]+:)?playlist:([A-Za-z0-9]{22})$/.exec(uri)?.[1] ?? null : null;
+/** GET /me/player into a Playback; null when nothing is playing (a 204, or a body with no item). */
+export function parsePlayback(body: unknown): Playback | null {
+  if (!body || typeof body !== 'object') return null;
+  const raw = body as Record<string, unknown>;
+  const item = raw.item && typeof raw.item === 'object' ? raw.item as Record<string, unknown> : null;
+  if (!item) return null;
+  const linked = item.linked_from && typeof item.linked_from === 'object' ? item.linked_from as Record<string, unknown> : null;
+  const context = raw.context && typeof raw.context === 'object' ? raw.context as Record<string, unknown> : null;
+  return {
+    trackUri: str(item.uri),
+    linkedUri: linked ? str(linked.uri) : null,
+    playlistId: context?.type === 'playlist' ? playlistIdOf(str(context.uri)) : null,
+    smartShuffle: typeof raw.smart_shuffle === 'boolean' ? raw.smart_shuffle : null,
+    playing: raw.is_playing === true
+  };
+}
