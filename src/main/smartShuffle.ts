@@ -236,7 +236,7 @@ export class SmartShuffle extends EventEmitter {
     if (!pick.canAdd) throw new Error(`${pick.playlistName} is not yours to add to.`);
     this.setBusy(true);
     try {
-      const { status, body } = await this.account.request(`/playlists/${pick.playlistId}/tracks`, { method: 'POST', body: JSON.stringify({ uris: [pick.trackId] }) });
+      const { status, body } = await this.account.request(`/playlists/${pick.playlistId}/items`, { method: 'POST', body: JSON.stringify({ uris: [pick.trackId] }) });
       if (status !== 200 && status !== 201) {
         const detail = body && typeof body === 'object' && (body as { error?: { message?: unknown } }).error?.message;
         throw new Error(status === 403 ? `Spotify would not let this account add to ${pick.playlistName}.` : `Spotify did not add the track${typeof detail === 'string' ? ` (${detail})` : ''}.`);
