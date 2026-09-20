@@ -52,3 +52,28 @@ export function shortcutLabel(accelerator: string): string {
   const names: Record<string, string> = { commandorcontrol: '⌘', cmdorctrl: '⌘', command: '⌘', cmd: '⌘', control: '⌃', ctrl: '⌃', alt: '⌥', option: '⌥', shift: '⇧', super: '⌘', meta: '⌘', space: 'Space', escape: 'Esc', return: '↩', enter: '↩', tab: '⇥', up: '↑', down: '↓', left: '←', right: '→' };
   return accelerator.split('+').filter(Boolean).map(part => names[part.toLowerCase()] ?? part.toUpperCase()).join('');
 }
+
+/** Only known, correctly typed settings may cross the renderer boundary. */
+export function validateAppSettings(value: unknown): AppSettingsPatch {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid settings.');
+  const result: AppSettingsPatch = {};
+  const integer = (item: unknown, min: number, max: number, what: string): number => {
+    if (typeof item !== 'number' || !Number.isFinite(item) || item < min || item > max) throw new Error(`${what} is out of range.`);
+    return Math.round(item);
+  };
+  for (const [key, item] of Object.entries(value)) {
+    switch (key) {
+      case 'loginItem': case 'allowWithoutNotch': case 'watchProcesses':
+        if (typeof item !== 'boolean') throw new Error('Invalid setting value.');
+        result[key] = item; break;
+      case 'hoverDelay': result.hoverDelay = integer(item, 0, 5000, 'The hover delay'); break;
+      case 'staleSec': result.staleSec = integer(item, 60, 7 * 24 * 60 * 60, 'The session timeout'); break;
+      case 'doneLingerSec': result.doneLingerSec = integer(item, 0, 24 * 60 * 60, 'The finished-light delay'); break;
+      case 'shortcut':
+        if (typeof item !== 'string' || item.length > 64 || !/^([A-Za-z0-9]+\+)*[A-Za-z0-9]*$/.test(item)) throw new Error('That is not a shortcut Notchlight can register.');
+        result.shortcut = item; break;
+      default: throw new Error('Unknown setting.');
+    }
+  }
+  return result;
+}
