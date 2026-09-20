@@ -71,7 +71,12 @@ false, a track you queued by hand is left alone.
 
 The playlist's tracks are read in pages of a hundred, once, and remembered by
 snapshot id; every later read costs one small call for the playlist's head.
-Playlists past 5,000 tracks are not checked. While the same track keeps
+Playlists past 5,000 tracks are not checked. The reads go through the
+`/playlists/{id}/items` endpoints of Spotify's March 2026 API; the older
+`/tracks` ones answer 403 to a development-mode app. That API also hands a
+playlist's items only to its owner and collaborators, so a pick on someone
+else's playlist cannot be told from the playlist's own tracks and stays
+unmarked. While the same track keeps
 playing, the state is read again every thirty seconds, so switching Smart
 Shuffle on or off inside Spotify shows within that.
 
