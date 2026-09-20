@@ -120,9 +120,23 @@ function openGallery(): void {
   });
 }
 
+/**
+ * A dev run has no app bundle, so the Dock would show Electron's own icon while
+ * a window is open. The packaged app carries build/icon.icns and needs nothing.
+ */
+let dockIconSet = false;
+function showDock(): void {
+  if (!app.isPackaged && !dockIconSet) {
+    dockIconSet = true;
+    const icon = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'build', 'icon.png'));
+    if (!icon.isEmpty()) app.dock?.setIcon(icon);
+  }
+  void app.dock?.show();
+}
+
 /** Keep the Dock available while either ordinary desktop window is open. */
 function syncDock(): void {
-  if (gallery || customize) void app.dock?.show();
+  if (gallery || customize) showDock();
   else app.dock?.hide();
 }
 
