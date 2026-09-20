@@ -677,6 +677,8 @@ ipcMain.handle('app:settings', event => {
 });
 settingsHandle('app:settings:update', patch => { applyAppSettings(validateAppSettings(patch)); refreshTray(); });
 settingsHandle('app:updates', () => checkForUpdates());
+settingsHandle('app:config-folder', async () => { const failure = await shell.openPath(APP_DIR); if (failure) throw new Error(failure); });
+settingsHandle('app:gallery', () => openGallery());
 
 ipcMain.on('update:respond', (event, response: UpdateResponse) => {
   const win = BrowserWindow.fromWebContents(event.sender);
