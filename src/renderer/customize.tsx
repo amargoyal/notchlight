@@ -59,9 +59,9 @@ function Status({ tone = 'good', children }: { tone?: 'good' | 'wait' | 'off' | 
 function Button({ kind, children, ...rest }: { kind?: 'primary' | 'danger' | 'quiet' } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button type="button" {...rest} className={`settings-button${kind ? ` is-${kind}` : ''}`}>{children}</button>;
 }
-/** The app icon as the Dock draws it: the buddy on a black rounded square. */
+/** The app icon as the Dock draws it: the 1a mark, the notch hung from the edge of an ivory squircle (build/icon.svg). */
 function AppIcon({ size }: { size: number }) {
-  return <span className="settings-app-icon" style={{ width: size, height: size, borderRadius: Math.round(size * 0.23) }}><Buddy size={Math.round(size * 0.64)}/></span>;
+  return <svg className="settings-app-icon" width={size} height={size} viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22.37" fill="#f2ede7"/><path d="M16 0H84V20A16 16 0 0 1 68 36H32A16 16 0 0 1 16 20Z" fill="#000"/><circle cx="34" cy="20" r="6.5" fill="#5fbe86"/></svg>;
 }
 const Robot = () => <span style={{ width: 16, height: 16, borderRadius: 5, background: '#dce7ea', border: '1.5px solid #89aab5', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><i style={{ width: 8, height: 3, borderRadius: 2, background: '#15252d', display: 'block' }}/></span>;
 
