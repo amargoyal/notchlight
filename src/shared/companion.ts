@@ -205,6 +205,7 @@ export interface CompanionSnapshot {
   files: ShelfFile[];
   music: SpotifySnapshot;
   capture: CaptureSnapshot;
+  hud: HudSnapshot;
   clipboard: ClipboardSnapshot;
   smartShuffle: SmartShuffleSnapshot;
   transfer: TransferProgress | null;
