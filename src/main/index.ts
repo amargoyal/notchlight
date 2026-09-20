@@ -660,6 +660,8 @@ app.on('before-quit', () => {
   globalShortcut.unregisterAll();
   if (shelfTimer) clearInterval(shelfTimer);
   spotify?.stop();
+  smart?.stop();
+  account?.stop();
   clips?.stop();
   pasteboardWatch?.stop();
   watcher?.stop();
