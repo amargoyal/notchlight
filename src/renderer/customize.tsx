@@ -128,3 +128,23 @@ function Sidebar({ section, onSelect, query, onQuery, live, version }: { section
   </aside>;
 }
 
+/* ---- the preview strip ---- */
+function PreviewStrip({ live, state, dispatch, onCustomize }: { live: LiveController; state: PreviewState; dispatch: Dispatch<PreviewAction>; onCustomize: () => void }) {
+  const [open, setOpen] = useState(true);
+  const expanded = live.available ? open : state.open;
+  const setExpanded = (value: boolean) => { if (live.available) setOpen(value); else dispatch({ type: 'open', value }); };
+  const notice = live.available ? live.error || live.state.notice : state.notice;
+  return <section className={`settings-preview${expanded ? '' : ' is-collapsed'}`} aria-label="Live preview">
+    <div className="settings-preview-bar">
+      <span className="settings-preview-title"><i/>{live.available ? 'Your notch' : 'Live preview'}</span>
+      <span className="settings-preview-tools"><span className="settings-preview-note">{live.available ? 'Changes apply as you make them.' : 'Sample data · no audio or real files'}</span><Segmented label="Notch state" value={expanded ? 'expanded' : 'collapsed'} options={[{ value: 'expanded', label: 'Expanded' }, { value: 'collapsed', label: 'Collapsed' }]} onChange={v => setExpanded(v === 'expanded')}/></span>
+    </div>
+    <div className="mp-desktop">
+      <div className="mp-menubar" aria-hidden="true"><span>{live.available ? 'Notchlight' : 'Finder'} <b>File</b> <b>Edit</b> <b>View</b></span><span>{live.available ? 'On this Mac' : 'Wed 9:41'}</span></div>
+      <div className="mp-camera" style={{ width: live.available ? live.snapshot.notchW : 190, height: live.available ? live.snapshot.notchH : 34 }}/>
+      {live.available ? <CompanionSurface live={live} open={open} hovering onCustomize={onCustomize}/> : <PreviewSurface state={state} dispatch={dispatch} onCustomize={onCustomize}/>}
+    </div>
+    <div className="settings-preview-notice" role={live.error ? 'alert' : 'status'} aria-live="polite">{notice || (live.available ? 'Music follows your player. Tray takes your real files.' : 'Tip: switch faces in the notch to see each one.')}</div>
+  </section>;
+}
+
