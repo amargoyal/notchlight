@@ -83,6 +83,7 @@ export type PreviewAction =
   | { type: 'preferences'; patch: Partial<PreviewPreferences> } | { type: 'reset' }
   | { type: 'start-playlist' } | { type: 'play' } | { type: 'skip'; delta: number } | { type: 'seek'; position: number } | { type: 'tick' }
   | { type: 'music-state'; source: PreviewState['music']['source']; missingArtwork?: boolean }
+  | { type: 'pick-add' } | { type: 'pick-dismiss' }
   | { type: 'codex'; value: PreviewState['codex'] }
   | { type: 'claude'; value: PreviewState['claude'] }
   | { type: 'add'; id: string } | { type: 'remove'; id: string } | { type: 'select'; id: string }
@@ -99,6 +100,8 @@ export function previewReducer(s: PreviewState, a: PreviewAction): PreviewState 
     case 'codex': return { ...s, codex: a.value };
     case 'claude': return { ...s, claude: a.value };
     case 'music-state': return { ...s, music: { ...s.music, source: a.source, missingArtwork: !!a.missingArtwork } };
+    case 'pick-add': return { ...s, music: { ...s.music, added: [...s.music.added, TRACKS[s.music.index].id] }, notice: `Added to ${TRACKS[s.music.index].pick ?? 'the playlist'}.` };
+    case 'pick-dismiss': return previewReducer(s, { type: 'skip', delta: 1 });
     case 'start-playlist': return { ...s, music: { ...s.music, source: 'ready', playing: true } };
     case 'play': return s.music.source !== 'ready' ? s : { ...s, music: { ...s.music, playing: !s.music.playing } };
     case 'skip': return s.music.source !== 'ready' ? s : { ...s, music: { ...s.music, index: (s.music.index + a.delta + TRACKS.length) % TRACKS.length, position: 0 } };
