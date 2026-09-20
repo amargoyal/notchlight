@@ -351,7 +351,13 @@ async function boot(): Promise<void> {
   syncCodex();
   if (!DEMO) codexApprovals.start();
   let spotifyEnabled = companion.current().preferences.spotifyEnabled;
-  spotify.on('change', music => companion.setMusic(music));
+  spotify.on('change', music => {
+    companion.setMusic(music);
+    smart.observe(music.status === 'ready' && music.player === 'spotify' && music.track ? music.track.id : null, music.playing);
+  });
+  account.configure(companion.current().preferences.spotifyClientId);
+  account.load();
+  companion.setSmartShuffle(smart.snapshot());
   const syncLevels = () => {
     if (spotify.currentPlayer() !== tappedPlayer) { tappedPlayer = spotify.currentPlayer(); levels.setActive(false); }
     levels.setActive(!dark && wantsLevels(companion.current()));
