@@ -8,7 +8,9 @@
  * not where it came from — so the answer comes from the Web API: the playback
  * state says which playlist is playing and whether Smart Shuffle is on, and the
  * playlist's own items say whether the track is one of its own. Playing from a
- * playlist, Smart Shuffle on, not in the playlist: a pick.
+ * playlist, Smart Shuffle on, not in the playlist: a pick. Since March 2026 the
+ * Web API hands a playlist's items only to its owner and collaborators, so a
+ * pick on someone else's playlist cannot be told apart and stays unmarked.
  *
  * The + is Spotify's own: the track goes into the playlist, and the mark goes
  * with it because the track is now one of the playlist's own. The × is half of
