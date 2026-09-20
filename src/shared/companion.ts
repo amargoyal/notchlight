@@ -38,13 +38,28 @@ export interface CompanionPreferences {
   spotifyClientId: string;
   /** Mark Smart Shuffle picks in the Music face, with a + and an × to answer them. */
   smartShuffle: boolean;
+  /** Answer the volume and brightness keys in the notch instead of the macOS square. Needs Accessibility. */
+  hudEnabled: boolean;
+  /** Option held keeps its macOS meaning — open the matching settings pane — or moves the level like any other press. */
+  hudOptionKey: 'settings' | 'replace';
+  /** A solid bar, or one that ramps across its own length. */
+  hudStyle: 'solid' | 'gradient';
+  /** A soft light under the filled part of the bar. */
+  hudGlow: boolean;
+  /** The level as a number beside the bar. */
+  hudPercentage: boolean;
+  /** Show the bar above the tabs while the notch is open, not only while it rests. */
+  hudOpenNotch: boolean;
+  /** Resting, the bar sits in the wings beside the cutout, or takes the full panel width. */
+  hudClosed: 'inline' | 'wide';
 }
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false,
   restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
-  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true
+  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
+  hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline'
 };
 export type MusicPlayer = 'spotify' | 'apple';
 export const PLAYER_NAMES: Record<MusicPlayer, string> = { spotify: 'Spotify', apple: 'Apple Music' };
@@ -282,7 +297,8 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid preferences.');
   const result: Record<string, unknown> = {};
   const choices: Record<string, readonly string[]> = {
-    theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100'], equalizerLayout: ['rising', 'mirrored'], musicPlayer: ['spotify', 'apple', 'auto']
+    theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100'], equalizerLayout: ['rising', 'mirrored'], musicPlayer: ['spotify', 'apple', 'auto'],
+    hudOptionKey: ['settings', 'replace'], hudStyle: ['solid', 'gradient'], hudClosed: ['inline', 'wide']
   };
   for (const [key, item] of Object.entries(value)) {
     if (!Object.hasOwn(DEFAULT_COMPANION_PREFERENCES, key)) throw new Error('Unknown preference.');
