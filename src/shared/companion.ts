@@ -171,6 +171,32 @@ export function describeCapture(capture: CaptureSnapshot, music: SpotifySnapshot
     default: return music.status === 'ready' && music.playing ? 'Capture starts when the bars are on screen.' : 'Capture runs only while Spotify plays and the bars are showing.';
   }
 }
+/** The names the settings pane and the notch use for the two channels. */
+export const HUD_NAMES: Record<HudChannel, string> = { volume: 'Volume', brightness: 'Brightness' };
+/**
+ * What the settings pane says about the system HUD. The permission is the one
+ * line a user can act on, so it names the pane and what to look for in it.
+ */
+export function describeHud(hud: HudSnapshot, enabled: boolean): string {
+  if (!enabled) return 'Off. macOS shows its own square in the middle of the screen for volume and brightness.';
+  switch (hud.status) {
+    case 'listening': {
+      const missing = (['volume', 'brightness'] as HudChannel[]).filter(channel => !hud.can.includes(channel));
+      const taken = hud.can.map(channel => HUD_NAMES[channel].toLowerCase()).join(' and ') || 'nothing';
+      return `Replacing the system overlay for ${taken}.${missing.length ? ` macOS still handles ${missing.map(channel => HUD_NAMES[channel].toLowerCase()).join(' and ')} on this Mac.` : ''}`;
+    }
+    case 'starting': return 'Starting the key listener…';
+    case 'unavailable': switch (hud.reason) {
+      case 'accessibility': return 'macOS has not allowed Notchlight to see the keys. Allow it under System Settings → Privacy & Security → Accessibility; this tries again on its own. An app update can need the box ticked again.';
+      case 'no-tap': return 'macOS refused the key listener. Allowing Notchlight under Accessibility again usually settles it.';
+      case 'no-output': return 'No output device is selected, so there is no volume to change.';
+      case 'unsupported': return 'Neither the volume nor the brightness can be changed on this Mac. macOS keeps its own overlay.';
+      case 'no-helper': return 'The key helper could not be built. Install the Xcode command line tools, or use a packaged build.';
+      default: return 'The key helper stopped unexpectedly. It will try again shortly.';
+    }
+    default: return 'Waiting for the key listener to start.';
+  }
+}
 /** One thing that was copied: text, a URL, or an image. */
 export interface ClipboardItem {
   id: string;
