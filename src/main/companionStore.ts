@@ -85,6 +85,7 @@ export class CompanionStore extends EventEmitter {
     this.state = { ...this.state, capture }; this.emitState();
   }
   setClipboard(clipboard: ClipboardSnapshot): void { this.state = { ...this.state, clipboard }; this.emitState(); }
+  setSmartShuffle(smartShuffle: SmartShuffleSnapshot): void { this.state = { ...this.state, smartShuffle }; this.emitState(); }
   notice(notice: string): void { this.state = { ...this.state, notice }; this.emitState(); }
   add(paths: unknown): Promise<void> {
     if (!Array.isArray(paths) || paths.length > 100 || paths.some(p => typeof p !== 'string' || !path.isAbsolute(p))) return Promise.reject(new Error('Choose files from Finder.'));
