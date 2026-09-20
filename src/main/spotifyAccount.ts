@@ -307,6 +307,14 @@ export class SpotifyAccount extends EventEmitter {
       return { status: response.status, body };
     }
   }
+  /** Forget the sign-in here. Spotify's side stays until you remove the app under your account's settings. */
+  signOut(): void {
+    this.signing?.cancel('Signed out.');
+    this.record = null;
+    this.persist();
+    logEvent('spotify', 'account: signed out');
+    this.settle();
+  }
   private persist(): void {
     try { writeTokenFile(this.options.file, this.record, this.cipher); }
     catch (error) { logEvent('spotify', `account: could not save the sign-in (${(error as Error).message})`); }
