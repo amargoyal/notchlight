@@ -60,3 +60,10 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-row-description { font-size: 11px; line-height: 1.4; color: var(--ui-muted); }
 .settings-row-control { display: flex; align-items: center; gap: 8px; flex: none; }
 
+/* ---- switch ---- */
+.settings-switch { appearance: none; -webkit-appearance: none; width: 26px; height: 15px; margin: 0; border-radius: 9px; background: var(--ui-switch-off); position: relative; flex: none; cursor: default; transition: background 150ms; }
+.settings-switch::after { content: ''; position: absolute; top: 1px; left: 1px; width: 13px; height: 13px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #00000044; transition: transform 150ms; }
+.settings-switch:checked { background: var(--ui-accent); }
+.settings-switch:checked::after { transform: translateX(11px); }
+.settings-switch:disabled { opacity: .5; }
+
