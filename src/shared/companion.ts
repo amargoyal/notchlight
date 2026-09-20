@@ -34,13 +34,15 @@ export interface CompanionPreferences {
   artworkPulse: boolean;
   /** A tokens-per-second line in the session panel. */
   sparkline: boolean;
+  /** The Client ID of your own Spotify developer app; empty until you paste one. */
+  spotifyClientId: string;
 }
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false,
   restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
-  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false
+  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: ''
 };
 export type MusicPlayer = 'spotify' | 'apple';
 export const PLAYER_NAMES: Record<MusicPlayer, string> = { spotify: 'Spotify', apple: 'Apple Music' };
