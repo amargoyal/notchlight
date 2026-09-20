@@ -34,7 +34,7 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-description { margin: 0; color: var(--ui-muted); }
 
 /* ---- the preview strip ---- */
-.settings-preview { position: sticky; top: 0; z-index: 2; border: 1px solid var(--ui-line); border-radius: 12px; overflow: hidden; background: var(--ui-group); box-shadow: 0 8px 24px -18px #00000080; }
+.settings-preview { position: sticky; top: 0; z-index: 2; flex: none; border: 1px solid var(--ui-line); border-radius: 12px; overflow: hidden; background: var(--ui-group); box-shadow: 0 8px 24px -18px #00000080; }
 .settings-preview-bar { display: flex; align-items: center; justify-content: space-between; height: 38px; padding: 0 12px 0 14px; border-bottom: 1px solid var(--ui-line); }
 .settings-preview-title { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
 .settings-preview-tools { display: flex; align-items: center; gap: 12px; }
@@ -46,7 +46,7 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .settings-preview .mp-desktop { transition: none; } }
 
 /* ---- groups and rows ---- */
-.settings-controls { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+.settings-controls { border: 0; padding: 0; margin: 0; min-width: 0; flex: none; display: flex; flex-direction: column; gap: 22px; }
 .settings-controls:disabled { opacity: .6; }
 .settings-group { display: flex; flex-direction: column; gap: 8px; }
 .settings-group h2 { margin: 0; padding: 0 2px; font-size: 13px; font-weight: 600; }
