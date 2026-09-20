@@ -113,7 +113,7 @@ export interface AccountOptions {
 /** Spotify's own words for a refusal, or ours. */
 const describeRefusal = (body: Record<string, unknown> | null, fallback = 'Spotify refused the sign-in.') => {
   const detail = body && typeof body.error_description === 'string' ? body.error_description : body && typeof body.error === 'string' ? body.error : '';
-  return detail ? `${fallback.replace(/\\.$/, '')}: ${detail}.` : fallback;
+  return detail ? `${fallback.replace(/\.$/, '')}: ${detail}.` : fallback;
 };
 /** What the browser tab shows once the answer is in. */
 const answerPage = (message: string) => `<!doctype html><meta charset="utf-8"><title>Notchlight</title><body style="font: 15px/1.5 -apple-system, sans-serif; color: #f2ede7; background: #141210; display: grid; place-items: center; height: 100vh; margin: 0"><p style="max-width: 32em; text-align: center">${message.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!)}</p></body>`;
