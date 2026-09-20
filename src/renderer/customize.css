@@ -67,3 +67,10 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-switch:checked::after { transform: translateX(11px); }
 .settings-switch:disabled { opacity: .5; }
 
+/* ---- segmented control ---- */
+.settings-segmented { display: inline-flex; gap: 1px; padding: 2px; border-radius: 7px; background: var(--ui-control); }
+.settings-segmented label { position: relative; padding: 3px 10px; border-radius: 5px; font-size: 12px; color: var(--ui-muted); }
+.settings-segmented label.is-selected { background: var(--ui-field); color: var(--ui-text); box-shadow: 0 1px 2px #00000022; }
+.settings-segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.settings-segmented label:focus-within { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+
