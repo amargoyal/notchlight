@@ -33,3 +33,12 @@ export const SCOPES = ['user-read-playback-state', 'playlist-read-private', 'pla
 /** How long the browser tab may take. */
 export const SIGN_IN_TIMEOUT_MS = 3 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
+
+export const isClientId = (value: string): boolean => /^[0-9a-f]{32}$/i.test(value);
+
+const base64url = (buffer: Buffer) => buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+/** A fresh PKCE verifier and its S256 challenge. */
+export function pkcePair(bytes: Buffer = randomBytes(64)): { verifier: string; challenge: string } {
+  const verifier = base64url(bytes);
+  return { verifier, challenge: base64url(createHash('sha256').update(verifier).digest()) };
+}
