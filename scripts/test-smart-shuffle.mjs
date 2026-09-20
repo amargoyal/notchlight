@@ -175,7 +175,7 @@ try {
 
   // The reads and the answers, against a stand-in account.
   class FakeAccount extends EventEmitter {
-    ready = true; calls = []; head = { name: 'Late Drives', snapshot_id: 's1', owner: { id: 'amar' }, collaborative: false, tracks: { total: 2 } };
+    ready = true; calls = []; head = { name: 'Late Drives', snapshot_id: 's1', owner: { id: 'amar' }, collaborative: false, items: { total: 2 } };
     playback = playing('spotify:track:pick1');
     signedIn() { return this.ready; }
     userId() { return this.ready ? 'amar' : null; }
@@ -184,9 +184,10 @@ try {
       this.calls.push({ target, method: init.method ?? 'GET', body: init.body });
       if (target === '/me/player') return this.playback ? { status: 200, body: this.playback } : { status: 204, body: null };
       if (target.startsWith(`/playlists/${P}?`)) return { status: 200, body: this.head };
-      if (target.startsWith(`/playlists/${P}/tracks?`)) return { status: 200, body: { items: [{ track: { uri: 'spotify:track:own1' } }], next: `${account.API_URL}/playlists/${P}/tracks?offset=1&limit=100` } };
-      if (target.startsWith(`${account.API_URL}/playlists/${P}/tracks?offset=1`)) return { status: 200, body: { items: [{ track: { uri: 'spotify:track:own2' } }], next: null } };
-      if (target === `/playlists/${P}/tracks` && init.method === 'POST') return { status: 201, body: { snapshot_id: 's2' } };
+      if (target.startsWith(`/playlists/${P}/items?`)) return { status: 200, body: { items: [{ item: { uri: 'spotify:track:own1' } }], next: `${account.API_URL}/playlists/${P}/items?offset=1&limit=100` } };
+      if (target.startsWith(`${account.API_URL}/playlists/${P}/items?offset=1`)) return { status: 200, body: { items: [{ item: { uri: 'spotify:track:own2' } }], next: null } };
+      if (target === `/playlists/${P}/items` && init.method === 'POST') return { status: 201, body: { snapshot_id: 's2' } };
+      if (target.includes('/tracks')) return { status: 403, body: { error: { status: 403, message: 'This endpoint is not available for this app.' } } };
       throw new Error(`unexpected ${target}`);
     }
   }
