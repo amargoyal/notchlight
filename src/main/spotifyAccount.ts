@@ -48,3 +48,13 @@ export function authorizeUrl(clientId: string, state: string, challenge: string,
   url.search = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: redirectUri, scope: SCOPES.join(' '), state, code_challenge_method: 'S256', code_challenge: challenge }).toString();
   return url.href;
 }
+/** The browser's answer on the loopback: a code, or why there is none. */
+export function parseCallback(url: string, expectedState: string): { code: string } | { error: string } {
+  let parsed: URL;
+  try { parsed = new URL(url, 'http://127.0.0.1'); } catch { return { error: 'The answer from Spotify could not be read.' }; }
+  if (parsed.searchParams.get('state') !== expectedState) return { error: 'The answer from Spotify did not belong to this sign-in.' };
+  const error = parsed.searchParams.get('error');
+  if (error) return { error: error === 'access_denied' ? 'Spotify access was declined.' : `Spotify refused the sign-in (${error}).` };
+  const code = parsed.searchParams.get('code');
+  return code ? { code } : { error: 'Spotify did not send a code.' };
+}
