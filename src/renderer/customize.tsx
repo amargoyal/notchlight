@@ -71,3 +71,26 @@ function ClientIdField({ value, onSave }: { value: string; onSave: (id: string) 
   return <span className="settings-field"><input type="text" spellCheck={false} autoCapitalize="off" autoCorrect="off" placeholder="32 characters, from your Spotify app" aria-label="Client ID" value={draft} aria-invalid={!valid} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); }}/>{!valid && <small>A Client ID is 32 hexadecimal characters.</small>}</span>;
 }
 
+/** Electron's accelerator for a key press, from the physical key so ⌥ does not turn N into ˜. */
+function acceleratorFor(e: KeyboardEvent<HTMLElement>): string {
+  const mods = [e.metaKey && 'Command', e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift'].filter((m): m is string => !!m);
+  const code = e.code;
+  const key = /^Key[A-Z]$/.test(code) ? code.slice(3) : /^Digit\d$/.test(code) ? code.slice(5) : /^F\d{1,2}$/.test(code) ? code
+    : ({ Space: 'Space', Enter: 'Return', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Tab: 'Tab' } as Record<string, string>)[code] ?? '';
+  return key && mods.length ? [...mods, key].join('+') : '';
+}
+function ShortcutRecorder({ value, onSave }: { value: string; onSave: (accelerator: string) => void }) {
+  const [recording, setRecording] = useState(false);
+  return <>
+    <button type="button" className={`settings-kbd${recording ? ' is-recording' : ''}`} aria-label={recording ? 'Press the new shortcut, or Escape to keep the old one' : `Shortcut: ${value ? shortcutLabel(value) : 'none'}. Click to change.`} onClick={() => setRecording(true)} onBlur={() => setRecording(false)} onKeyDown={e => {
+      if (!recording) return;
+      e.preventDefault();
+      if (e.key === 'Escape') { setRecording(false); return; }
+      if (e.key === 'Backspace' || e.key === 'Delete') { onSave(''); setRecording(false); return; }
+      const accelerator = acceleratorFor(e);
+      if (accelerator) { onSave(accelerator); setRecording(false); }
+    }}>{recording ? 'Type a shortcut…' : value ? shortcutLabel(value) : 'None'}</button>
+    {value && !recording && <Button kind="quiet" onClick={() => onSave('')}>Remove</Button>}
+  </>;
+}
+
