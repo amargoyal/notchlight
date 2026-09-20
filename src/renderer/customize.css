@@ -45,3 +45,18 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-preview-notice { min-height: 30px; display: flex; align-items: center; padding: 0 14px; font-size: 11px; color: var(--ui-muted); border-top: 1px solid var(--ui-line); }
 @media (prefers-reduced-motion: reduce) { .settings-preview .mp-desktop { transition: none; } }
 
+/* ---- groups and rows ---- */
+.settings-controls { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 22px; }
+.settings-controls:disabled { opacity: .6; }
+.settings-group { display: flex; flex-direction: column; gap: 8px; }
+.settings-group h2 { margin: 0; padding: 0 2px; font-size: 13px; font-weight: 600; }
+.settings-group-rows { background: var(--ui-group); border: 1px solid var(--ui-line); border-radius: 10px; overflow: hidden; }
+.settings-group-footer { margin: 0; padding: 0 14px; font-size: 11px; line-height: 1.5; color: var(--ui-muted); }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 44px; padding: 9px 14px; }
+.settings-row + .settings-row { border-top: 1px solid var(--ui-line); }
+.settings-row.is-dimmed { opacity: .35; }
+.settings-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.settings-row-title { font-size: 13px; }
+.settings-row-description { font-size: 11px; line-height: 1.4; color: var(--ui-muted); }
+.settings-row-control { display: flex; align-items: center; gap: 8px; flex: none; }
+
