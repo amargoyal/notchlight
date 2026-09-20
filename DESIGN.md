@@ -1,7 +1,7 @@
 # Notchlight design system
 
 ## Direction
-Operate mode. Extend the incumbent black notch, warm off-white text, terracotta buddy and small status lights. Music is led by original artwork; Tray by recognizable file thumbnails. The desktop surface is an orderly macOS-style preference window, with a persistent working preview.
+Operate mode. Extend the incumbent black notch, warm off-white text, terracotta buddy and small status lights. Music is led by original artwork; Tray by recognizable file thumbnails. The desktop surface is an orderly macOS-style preference window, with a persistent working preview: a sidebar with search and one icon tile per pane (General first, About last), a preview strip pinned above the form, and inset grouped rows with a title, a one-line note and the control on the right. Every switch for the resting bar lives in one group under Appearance.
 
 ## Tokens and geometry
 Notch #000; inset #0a0a0a; text #f2ede7; muted #a69c93; terracotta #c97c5c. Existing status colors remain unchanged. Desktop light #f5f2ed with #ece7e0 sidebar; desktop dark #211f1d with #191817 sidebar. System sans for UI, monospace for time and file metadata. Expanded notch width 472pt, hardware width/height supplied by snapshot. Controls never occupy the camera column. Existing measured shell animates size over 260ms; view content fades over 180ms. Reduced motion disables both.
