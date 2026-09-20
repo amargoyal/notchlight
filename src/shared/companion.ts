@@ -168,6 +168,7 @@ export interface CompanionSnapshot {
   music: SpotifySnapshot;
   capture: CaptureSnapshot;
   clipboard: ClipboardSnapshot;
+  smartShuffle: SmartShuffleSnapshot;
   transfer: TransferProgress | null;
   /** How many references the last Remove took; Undo puts them back. */
   undoable: number;
