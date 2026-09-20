@@ -84,7 +84,13 @@ export class CompanionStore extends EventEmitter {
     if (current.status === capture.status && current.reason === capture.reason && current.retryAt === capture.retryAt) return;
     this.state = { ...this.state, capture }; this.emitState();
   }
-  setHud(hud: HudSnapshot): void { this.state = { ...this.state, hud }; this.emitState(); }
+  setHud(hud: HudSnapshot): void {
+    const current = this.state.hud;
+    if (current.status === hud.status && current.reason === hud.reason && current.volume === hud.volume
+      && current.muted === hud.muted && current.brightness === hud.brightness
+      && current.can.length === hud.can.length && current.can.every((channel, i) => channel === hud.can[i])) return;
+    this.state = { ...this.state, hud }; this.emitState();
+  }
   setClipboard(clipboard: ClipboardSnapshot): void { this.state = { ...this.state, clipboard }; this.emitState(); }
   setSmartShuffle(smartShuffle: SmartShuffleSnapshot): void { this.state = { ...this.state, smartShuffle }; this.emitState(); }
   notice(notice: string): void { this.state = { ...this.state, notice }; this.emitState(); }
