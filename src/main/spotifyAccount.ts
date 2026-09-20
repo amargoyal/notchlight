@@ -20,11 +20,11 @@ import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { logEvent } from './lifecycle';
-import type { SpotifyAccountSnapshot } from '../shared/companion';
+import { SPOTIFY_REDIRECT_PORT, SPOTIFY_REDIRECT_URI, type SpotifyAccountSnapshot } from '../shared/companion';
 
 /** Spotify allows plain http only on a loopback literal, and the port is part of the registered URI. */
-export const REDIRECT_PORT = 41739;
-export const REDIRECT_URI = `http://127.0.0.1:${REDIRECT_PORT}/callback`;
+export const REDIRECT_PORT = SPOTIFY_REDIRECT_PORT;
+export const REDIRECT_URI = SPOTIFY_REDIRECT_URI;
 export const AUTHORIZE_URL = 'https://accounts.spotify.com/authorize';
 export const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 export const API_URL = 'https://api.spotify.com/v1';
