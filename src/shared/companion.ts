@@ -34,13 +34,17 @@ export interface CompanionPreferences {
   artworkPulse: boolean;
   /** A tokens-per-second line in the session panel. */
   sparkline: boolean;
+  /** The Client ID of your own Spotify developer app; empty until you paste one. */
+  spotifyClientId: string;
+  /** Mark Smart Shuffle picks in the Music face, with a + and an × to answer them. */
+  smartShuffle: boolean;
 }
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false,
   restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
-  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false
+  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true
 };
 export type MusicPlayer = 'spotify' | 'apple';
 export const PLAYER_NAMES: Record<MusicPlayer, string> = { spotify: 'Spotify', apple: 'Apple Music' };
@@ -68,6 +72,35 @@ export interface SpotifySnapshot {
   busy: boolean;
   message?: string;
 }
+/**
+ * The Spotify account behind Smart Shuffle: the Web API sign-in, separate
+ * from the scripting connection that reads and controls the player.
+ */
+export interface SpotifyAccountSnapshot {
+  status: 'off' | 'signed-out' | 'signing-in' | 'ready' | 'error';
+  /** The display name of who is signed in. */
+  user?: string;
+  message?: string;
+}
+/** A track Smart Shuffle slipped into the playlist's flow — not one of the playlist's own. */
+export interface SmartShufflePick {
+  /** spotify:track:… — only meaningful while it is the current track. */
+  trackId: string;
+  playlistId: string;
+  playlistName: string;
+  /** The playlist is yours or collaborative, so the + can add to it. */
+  canAdd: boolean;
+}
+export interface SmartShuffleSnapshot {
+  account: SpotifyAccountSnapshot;
+  pick: SmartShufflePick | null;
+  /** An add or a dismiss is on its way to Spotify. */
+  busy: boolean;
+}
+export const EMPTY_SMART_SHUFFLE: SmartShuffleSnapshot = { account: { status: 'off' }, pick: null, busy: false };
+/** Where the browser brings the sign-in back to. Spotify wants this exact address registered on the app. */
+export const SPOTIFY_REDIRECT_PORT = 41739;
+export const SPOTIFY_REDIRECT_URI = `http://127.0.0.1:${SPOTIFY_REDIRECT_PORT}/callback`;
 export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', player: 'spotify', playing: false, position: 0, at: 0, volume: -1, track: null, busy: false };
 /** Where playback is now, given the last read and the clock. Paused stays put; nothing runs past the end. */
 export function playhead(music: SpotifySnapshot, now: number): number {
@@ -88,6 +121,15 @@ export interface CaptureSnapshot {
   retryAt: number | null;
 }
 export const EMPTY_CAPTURE: CaptureSnapshot = { status: 'idle', reason: null, retryAt: null };
+/** What the settings pane says about the Spotify account. */
+export function describeAccount(account: SpotifyAccountSnapshot): string {
+  switch (account.status) {
+    case 'off': return account.message ?? 'Paste your Spotify app’s Client ID to sign in.';
+    case 'signing-in': return account.message ?? 'Finish signing in in your browser.';
+    case 'ready': return `Signed in${account.user ? ` as ${account.user}` : ''}. Picks show in Music while Spotify plays a playlist with Smart Shuffle on.`;
+    default: return account.message ?? 'Not signed in. Picks need the account; playback does not.';
+  }
+}
 /** What the settings pane says about capture. Spotify's own state is described elsewhere. */
 export function describeCapture(capture: CaptureSnapshot, music: SpotifySnapshot, preferences: { visualizer: boolean; reducedMotion: boolean }): string {
   if (!preferences.visualizer) return 'The bars are off. Turn on Move with the music to capture Spotify’s output.';
@@ -142,6 +184,7 @@ export interface CompanionSnapshot {
   music: SpotifySnapshot;
   capture: CaptureSnapshot;
   clipboard: ClipboardSnapshot;
+  smartShuffle: SmartShuffleSnapshot;
   transfer: TransferProgress | null;
   /** How many references the last Remove took; Undo puts them back. */
   undoable: number;
@@ -149,6 +192,7 @@ export interface CompanionSnapshot {
 }
 export interface OperationResult { ok: boolean; error?: string }
 export type SpotifyCommand = 'toggle' | 'next' | 'previous' | 'seek' | 'volume';
+export type SmartShuffleAnswer = 'add' | 'dismiss';
 export interface CompanionBridge {
   installCodexHooks(remove?: boolean): Promise<OperationResult>;
   chooseCodexHome(): Promise<OperationResult>;
@@ -168,6 +212,11 @@ export interface CompanionBridge {
   connectSpotify(): Promise<OperationResult>;
   openSpotify(): Promise<OperationResult>;
   controlSpotify(command: SpotifyCommand, position?: number): Promise<OperationResult>;
+  /** Sign in to the Spotify account in the browser, for Smart Shuffle picks. */
+  signInSpotify(): Promise<OperationResult>;
+  signOutSpotify(): Promise<OperationResult>;
+  /** Answer the current pick: + adds it to the playlist, × skips it. */
+  answerPick(answer: SmartShuffleAnswer): Promise<OperationResult>;
   /** Five band levels, bass first, each 0…1, while Spotify plays and the bars are on screen. */
   onMusicLevels(cb: (levels: number[]) => void): () => void;
   /** Put a history item back on the clipboard. */
@@ -191,6 +240,10 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
     if (key === 'codexHome') {
       if (typeof item !== 'string' || item.length > 4096 || item.includes('\0') || item !== '' && !item.startsWith('/')) throw new Error('Choose an absolute Codex home directory.');
       result[key] = item; continue;
+    }
+    if (key === 'spotifyClientId') {
+      if (typeof item !== 'string' || item !== '' && !/^[0-9a-f]{32}$/i.test(item.trim())) throw new Error('A Spotify Client ID is 32 hexadecimal characters.');
+      result[key] = item.trim().toLowerCase(); continue;
     }
     if (choices[key] ? !choices[key].includes(String(item)) || typeof item !== 'string' : typeof item !== 'boolean') throw new Error('Invalid preference value.');
     result[key] = item;

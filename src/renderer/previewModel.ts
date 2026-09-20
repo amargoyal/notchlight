@@ -25,16 +25,18 @@ export interface PreviewPreferences {
   artworkGlow: boolean;
   artworkPulse: boolean;
   sparkline: boolean;
+  spotifyClientId: string;
+  smartShuffle: boolean;
 }
 export interface PreviewClip { id: string; kind: 'text' | 'url' | 'image'; preview: string; meta: string; pinned: boolean; thumb?: string }
-export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string }
+export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string; /** A Smart Shuffle pick, and the playlist it is not in yet. */ pick?: string }
 export interface PreviewFile { id: string; name: string; kind: 'image' | 'pdf' | 'folder' | 'text'; size: string; unavailable?: boolean }
 export interface PreviewState {
   codexConnection?: Snapshot['codex'];
   view: PreviewView;
   open: boolean;
   preferences: PreviewPreferences;
-  music: { index: number; position: number; playing: boolean; source: 'ready' | 'empty' | 'unavailable'; missingArtwork: boolean };
+  music: { index: number; position: number; playing: boolean; source: 'ready' | 'empty' | 'unavailable'; missingArtwork: boolean; /** Picks the + has already added, by track id. */ added: string[] };
   files: PreviewFile[];
   clips: PreviewClip[];
   selected: string | null;
@@ -49,7 +51,7 @@ export const DEFAULT_PREFERENCES: PreviewPreferences = {
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true,
   restClaude: true, restCodex: true, codexBuddy: true, codexPulse: true, restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
-  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false
+  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true
 };
 export const SAMPLE_CLIPS: PreviewClip[] = [
   { id: 'clip-url', kind: 'url', preview: 'https://developer.apple.com/documentation/coreaudio', meta: 'developer.apple.com · 2m', pinned: false },
@@ -62,7 +64,8 @@ export const SAMPLE_CLIPS: PreviewClip[] = [
 export const TRACKS: PreviewTrack[] = [
   { id: 'late-light', title: 'Late Light', artist: 'The Quiet Hours', album: 'Somewhere, Slowly', duration: 234, artwork: './assets/late-light.svg' },
   { id: 'blue-room', title: 'Blue Room', artist: 'Soft Signal', album: 'After the Rain', duration: 198, artwork: './assets/blue-room.svg' },
-  { id: 'long-way', title: 'The long way home, through the hills and past the sleeping city', artist: 'The Quiet Hours & Friends', album: 'Somewhere, Slowly', duration: 267, artwork: './assets/late-light.svg' }
+  { id: 'long-way', title: 'The long way home, through the hills and past the sleeping city', artist: 'The Quiet Hours & Friends', album: 'Somewhere, Slowly', duration: 267, artwork: './assets/late-light.svg' },
+  { id: 'glass-hours', title: 'Glass Hours', artist: 'Night Ferry', album: 'Harbour Lights', duration: 212, artwork: './assets/blue-room.svg', pick: 'Late Drives' }
 ];
 export const SAMPLE_FILES: PreviewFile[] = [
   { id: 'coast', name: 'Coast.jpg', kind: 'image', size: '2.4 MB' },
@@ -72,7 +75,7 @@ export const SAMPLE_FILES: PreviewFile[] = [
 ];
 export function initialPreview(): PreviewState {
   return { view: 'music', open: true, preferences: { ...DEFAULT_PREFERENCES },
-    music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false },
+    music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false, added: [] },
     files: SAMPLE_FILES.slice(0, 2), clips: SAMPLE_CLIPS, selected: null, received: [], drag: null, notice: '', codex: 'off', claude: 'working' };
 }
 export type PreviewAction =
@@ -80,6 +83,7 @@ export type PreviewAction =
   | { type: 'preferences'; patch: Partial<PreviewPreferences> } | { type: 'reset' }
   | { type: 'start-playlist' } | { type: 'play' } | { type: 'skip'; delta: number } | { type: 'seek'; position: number } | { type: 'tick' }
   | { type: 'music-state'; source: PreviewState['music']['source']; missingArtwork?: boolean }
+  | { type: 'pick-add' } | { type: 'pick-dismiss' }
   | { type: 'codex'; value: PreviewState['codex'] }
   | { type: 'claude'; value: PreviewState['claude'] }
   | { type: 'add'; id: string } | { type: 'remove'; id: string } | { type: 'select'; id: string }
@@ -96,6 +100,8 @@ export function previewReducer(s: PreviewState, a: PreviewAction): PreviewState 
     case 'codex': return { ...s, codex: a.value };
     case 'claude': return { ...s, claude: a.value };
     case 'music-state': return { ...s, music: { ...s.music, source: a.source, missingArtwork: !!a.missingArtwork } };
+    case 'pick-add': return { ...s, music: { ...s.music, added: [...s.music.added, TRACKS[s.music.index].id] }, notice: `Added to ${TRACKS[s.music.index].pick ?? 'the playlist'}.` };
+    case 'pick-dismiss': return previewReducer(s, { type: 'skip', delta: 1 });
     case 'start-playlist': return { ...s, music: { ...s.music, source: 'ready', playing: true } };
     case 'play': return s.music.source !== 'ready' ? s : { ...s, music: { ...s.music, playing: !s.music.playing } };
     case 'skip': return s.music.source !== 'ready' ? s : { ...s, music: { ...s.music, index: (s.music.index + a.delta + TRACKS.length) % TRACKS.length, position: 0 } };

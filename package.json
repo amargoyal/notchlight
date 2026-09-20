@@ -32,6 +32,7 @@
     "test:codex": "node scripts/test-codex.mjs",
     "test:clipboard": "node scripts/test-clipboard.mjs",
     "test:updates": "node scripts/test-updates.mjs",
+    "test:smart-shuffle": "node scripts/test-smart-shuffle.mjs",
     "smoke:codex": "node scripts/smoke-codex.mjs",
     "dist": "npm run build && electron-builder --mac dmg --arm64 --publish never"
   },

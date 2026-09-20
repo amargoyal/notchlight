@@ -28,7 +28,9 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     warning: <><path d="m12 3 10 18H2ZM12 9v5"/><path d="M12 17h.01"/></>,
     clipboard: <><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6"/></>,
     pin: <><path d="M9 3h6l-1 6 3 3H7l3-3ZM12 12v9"/></>,
-    search: <><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></>
+    search: <><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></>,
+    sparkle: <path d="M12 3c.6 4.6 3.4 7.4 9 9-5.6 1.6-8.4 4.4-9 9-.6-4.6-3.4-7.4-9-9 5.6-1.6 8.4-4.4 9-9Z" fill="currentColor" stroke="none"/>,
+    plus: <><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></>
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.file}</svg>;
 }
@@ -117,6 +119,7 @@ function Equalizer({ active, layout = 'rising', tint }: { active: boolean; layou
 
 function MusicFace({ state, dispatch }: Controls) {
   const track = TRACKS[state.music.index];
+  const pick = track.pick && !state.music.added.includes(track.id) ? track.pick : null;
   if (state.music.source !== 'ready') return <div className="mp-empty">
     <Icon name={state.music.source === 'empty' ? 'music' : 'warning'} size={30}/>
     <p>{state.music.source === 'empty' ? 'A little room for music.' : 'Music is taking a moment.'}</p>
@@ -128,7 +131,7 @@ function MusicFace({ state, dispatch }: Controls) {
       <Artwork state={state}/>
       <div className="mp-track-meta">
         <h2 title={track.title}>{track.title}</h2>
-        <p title={track.artist}>{track.artist}</p>
+        <p title={track.artist}>{pick && <span className="mp-pick" role="img" aria-label="Smart Shuffle pick" title={`A Smart Shuffle pick — not in ${pick} yet`}><Icon name="sparkle" size={11}/></span>}{track.artist}</p>
         <div className="mp-seek"><span>{time(state.music.position)}</span><input aria-label="Track position" aria-valuetext={`${time(state.music.position)} of ${time(track.duration)}`} type="range" min="0" max={track.duration} value={state.music.position} onChange={e => dispatch({ type: 'seek', position: Number(e.target.value) })}/><span>−{time(track.duration - state.music.position)}</span></div>
         <div className="mp-transport">
           <button className="mp-icon-button" aria-label="Previous track" onClick={() => dispatch({ type: 'skip', delta: -1 })}><Icon name="back" size={18}/></button>
@@ -136,6 +139,10 @@ function MusicFace({ state, dispatch }: Controls) {
           <button className="mp-icon-button" aria-label="Next track" onClick={() => dispatch({ type: 'skip', delta: 1 })}><Icon name="next" size={18}/></button>
         </div>
       </div>
+      {pick && <div className="mp-track-actions">
+        <button className="mp-icon-button mp-pick-button" aria-label="Not for me: skip this pick" title="Not for me" onClick={() => dispatch({ type: 'pick-dismiss' })}><Icon name="close" size={16}/></button>
+        <button className="mp-icon-button mp-pick-button" aria-label={`Add to ${pick}`} title={`Add to ${pick}`} onClick={() => dispatch({ type: 'pick-add' })}><Icon name="plus" size={16}/></button>
+      </div>}
     </div>
   </div>;
 }
@@ -282,6 +289,7 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'Music · missing artwork', note: 'The music symbol holds the composition together.', patch: s => ({ ...s, music: { ...s.music, missingArtwork: true } }) },
   { name: 'Music · unavailable', note: 'Explain what happened and offer a way back.', patch: s => ({ ...s, music: { ...s.music, source: 'unavailable' } }) },
   { name: 'Music · long title, wider notch', note: 'A two-line title and a 240 × 38pt camera exclusion.', notchW: 240, notchH: 38, patch: s => ({ ...s, music: { ...s.music, index: 2 } }) },
+  { name: 'Music · Smart Shuffle pick', note: 'A track Spotify slipped in: the mark by the artist, + keeps it, × moves on.', patch: s => ({ ...s, music: { ...s.music, index: 3 } }) },
   { name: 'Resting · everything on', note: 'Agent identities nearest the lens; Music and Tray use the outer space.', patch: s => ({ ...s, open: false }) },
   { name: 'Resting · music only', note: 'Album on the left. Playback on the right.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
   { name: 'Resting · Claude and music', note: 'Two faces share the bar without crowding it.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restTray: false } }) },

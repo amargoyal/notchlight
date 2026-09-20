@@ -6,12 +6,14 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { CompanionStore } from './companionStore';
 import { SpotifyPlayer } from './spotify';
+import type { SpotifyAccount } from './spotifyAccount';
+import type { SmartShuffle } from './smartShuffle';
 import { ClipboardStore } from './clipboardStore';
 import { trayIcon } from './png';
 import type { OperationResult } from '../shared/companion';
 
 type Event = IpcMainInvokeEvent | IpcMainEvent;
-export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlayer, clips: ClipboardStore, trusted: (win: BrowserWindow | null) => boolean, dialogWindow: () => BrowserWindow) {
+export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlayer, clips: ClipboardStore, trusted: (win: BrowserWindow | null) => boolean, dialogWindow: () => BrowserWindow, account: SpotifyAccount, smart: SmartShuffle) {
   function check(event: Event) {
     if (event.senderFrame !== event.sender.mainFrame || !trusted(BrowserWindow.fromWebContents(event.sender))) throw new Error('This window cannot change the companion.');
   }
@@ -86,6 +88,13 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
   handle('clipboard:clear', async (_e, includePinned) => { await clips.clear(includePinned); store.notice(includePinned ? 'Clipboard history and pins cleared.' : 'Clipboard history cleared. Pinned items were kept.'); });
   handle('clipboard:pause', (_e, paused) => { if (typeof paused !== 'boolean') throw new Error('Invalid pause.'); clips.setPaused(paused); });
   handle('spotify:control', (_e, command, position) => spotify.command(command, position));
+  handle('spotify:signin', async () => { await account.signIn(); store.notice(`Signed in to Spotify${account.snapshot().user ? ` as ${account.snapshot().user}` : ''}.`); });
+  handle('spotify:signout', () => { account.signOut(); store.notice('Signed out of Spotify. The saved sign-in was removed from this Mac.'); });
+  handle('spotify:pick', (_e, answer) => {
+    if (answer === 'add') return smart.add();
+    if (answer === 'dismiss') return smart.dismiss();
+    throw new Error('Unknown answer to a pick.');
+  });
   return async () => {
     const result = await dialog.showOpenDialog(dialogWindow(), { title: 'Add to Tray', properties: ['openFile', 'openDirectory', 'multiSelections'] });
     if (!result.canceled) await store.add(result.filePaths);

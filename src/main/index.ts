@@ -4,7 +4,7 @@
  * Hooks and transcripts feed one live store and one notch overlay. The gallery
  * and customization preview are ordinary windows with a shared Dock lifecycle.
  */
-import { app, BrowserWindow, clipboard, ClipboardItem as ElectronClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, shell, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, ClipboardItem as ElectronClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, safeStorage, shell, Tray } from 'electron';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
@@ -16,6 +16,8 @@ import { ClipboardStore, SKIPPED_FORMATS, type Pasteboard } from './clipboardSto
 import { LineHelper, parsePasteboardChange, type PasteboardChange } from './helperProcess';
 import { SpotifyPlayer } from './spotify';
 import { SpotifyWatcher } from './spotifyWatch';
+import { SpotifyAccount } from './spotifyAccount';
+import { SmartShuffle } from './smartShuffle';
 import { fetchTint } from './tint';
 import { installCompanionIpc } from './companionIpc';
 import { AudioLevels, helperArguments, wantsLevels } from './audioLevels';
@@ -71,6 +73,8 @@ let clips: ClipboardStore;
 let pasteboardWatch: LineHelper<PasteboardChange>;
 let spotify: SpotifyPlayer;
 let watcher: SpotifyWatcher;
+let account: SpotifyAccount;
+let smart: SmartShuffle;
 let levels: AudioLevels;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
@@ -284,6 +288,11 @@ async function boot(): Promise<void> {
   watcher.on('change', change => spotify.onExternalChange(change));
   // With instant word of every change, the polls are only a safety net.
   watcher.on('listening', (listening: boolean) => spotify.setPollInterval(listening ? 10_000 : 2_500));
+  // The sign-in is sealed with the keychain when Electron can; a Mac without one keeps it owner-only on disk.
+  account = new SpotifyAccount({ file: path.join(APP_DIR, 'spotify-account.json'), open: url => shell.openExternal(url), cipher: safeStorage.isEncryptionAvailable() ? { encrypt: text => safeStorage.encryptString(text), decrypt: data => safeStorage.decryptString(data) } : null });
+  smart = new SmartShuffle(account, { skip: () => spotify.command('next') });
+  smart.on('change', state => companion.setSmartShuffle(state));
+  smart.on('notice', (text: string) => companion.notice(text));
   // The tap follows the player being read; a change of player restarts it on the other app.
   let tappedPlayer = spotify.currentPlayer();
   levels = new AudioLevels(undefined, () => helperArguments(config(), spotify.currentPlayer()));
@@ -342,7 +351,13 @@ async function boot(): Promise<void> {
   syncCodex();
   if (!DEMO) codexApprovals.start();
   let spotifyEnabled = companion.current().preferences.spotifyEnabled;
-  spotify.on('change', music => companion.setMusic(music));
+  spotify.on('change', music => {
+    companion.setMusic(music);
+    smart.observe(music.status === 'ready' && music.player === 'spotify' && music.track ? music.track.id : null, music.playing);
+  });
+  account.configure(companion.current().preferences.spotifyClientId);
+  account.load();
+  companion.setSmartShuffle(smart.snapshot());
   const syncLevels = () => {
     if (spotify.currentPlayer() !== tappedPlayer) { tappedPlayer = spotify.currentPlayer(); levels.setActive(false); }
     levels.setActive(!dark && wantsLevels(companion.current()));
@@ -354,6 +369,8 @@ async function boot(): Promise<void> {
     send(customize, 'companion', state);
     syncLevels();
     spotify.setPlayer(state.preferences.musicPlayer);
+    account.configure(state.preferences.spotifyClientId);
+    smart.setEnabled(!DEMO && state.preferences.spotifyEnabled && state.preferences.smartShuffle);
     if (state.preferences.spotifyEnabled !== spotifyEnabled) {
       spotifyEnabled = state.preferences.spotifyEnabled;
       spotify.setEnabled(spotifyEnabled);
@@ -367,8 +384,9 @@ async function boot(): Promise<void> {
   });
   pickFiles = installCompanionIpc(companion, spotify, clips,
     win => !!win && (win === customize || win === notch?.win),
-    () => { openCustomize(); return customize!; });
+    () => { openCustomize(); return customize!; }, account, smart);
   if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
+  smart.setEnabled(!DEMO && spotifyEnabled && companion.current().preferences.smartShuffle);
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);
 
   hover = new Hover((open) => send(notch?.win ?? null, 'open', open), () => config());
@@ -642,6 +660,8 @@ app.on('before-quit', () => {
   globalShortcut.unregisterAll();
   if (shelfTimer) clearInterval(shelfTimer);
   spotify?.stop();
+  smart?.stop();
+  account?.stop();
   clips?.stop();
   pasteboardWatch?.stop();
   watcher?.stop();

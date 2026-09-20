@@ -408,6 +408,15 @@ the track's public page once per track for the full credit, so a collaboration
 reads "Internet Money, Lil Tecca" rather than a solo record. Offline, the lead
 artist stands.
 
+A track Smart Shuffle slipped into a playlist gets Spotify's own treatment: a
+mark before the artist, a **+** that adds it to the playlist — the mark goes
+with it — and an **×** that moves on. Telling a pick from the playlist's own
+tracks takes Spotify's Web API, so this part alone needs a sign-in with a
+Client ID of your own; **Customize → Music → Spotify account** walks through
+it, and [Smart Shuffle picks](docs/smart-shuffle.md) covers what is asked for,
+what is kept where, and what the × cannot do — Spotify keeps no public door
+for "not for me", so the recommender hears only the skip.
+
 
 ## Clipboard history
 
@@ -433,7 +442,8 @@ to looking at the types every half second.
 Run `npm run customize` or choose **Customize Notchlight…** from the menu bar
 for the native window. Its controls update the live notch and save preferences.
 Connect Spotify in Music; macOS may request Automation access and, separately,
-audio capture for the visualizer. No Spotify account sign-in is required here.
+audio capture for the visualizer. No Spotify account sign-in is required for
+playback; only [Smart Shuffle picks](docs/smart-shuffle.md) ask for one.
 
 Tray keeps real file references. Click selects one, Command-click adds,
 Shift-click takes a range, Command-A takes all; every action then works on
