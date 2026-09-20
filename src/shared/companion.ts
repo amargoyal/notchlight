@@ -98,6 +98,9 @@ export interface SmartShuffleSnapshot {
   busy: boolean;
 }
 export const EMPTY_SMART_SHUFFLE: SmartShuffleSnapshot = { account: { status: 'off' }, pick: null, busy: false };
+/** Where the browser brings the sign-in back to. Spotify wants this exact address registered on the app. */
+export const SPOTIFY_REDIRECT_PORT = 41739;
+export const SPOTIFY_REDIRECT_URI = `http://127.0.0.1:${SPOTIFY_REDIRECT_PORT}/callback`;
 export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', player: 'spotify', playing: false, position: 0, at: 0, volume: -1, track: null, busy: false };
 /** Where playback is now, given the last read and the clock. Paused stays put; nothing runs past the end. */
 export function playhead(music: SpotifySnapshot, now: number): number {
