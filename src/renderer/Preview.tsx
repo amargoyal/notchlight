@@ -139,6 +139,10 @@ function MusicFace({ state, dispatch }: Controls) {
           <button className="mp-icon-button" aria-label="Next track" onClick={() => dispatch({ type: 'skip', delta: 1 })}><Icon name="next" size={18}/></button>
         </div>
       </div>
+      {pick && <div className="mp-track-actions">
+        <button className="mp-icon-button mp-pick-button" aria-label="Not for me: skip this pick" title="Not for me" onClick={() => dispatch({ type: 'pick-dismiss' })}><Icon name="close" size={16}/></button>
+        <button className="mp-icon-button mp-pick-button" aria-label={`Add to ${pick}`} title={`Add to ${pick}`} onClick={() => dispatch({ type: 'pick-add' })}><Icon name="plus" size={16}/></button>
+      </div>}
     </div>
   </div>;
 }
