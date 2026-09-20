@@ -119,6 +119,7 @@ function Equalizer({ active, layout = 'rising', tint }: { active: boolean; layou
 
 function MusicFace({ state, dispatch }: Controls) {
   const track = TRACKS[state.music.index];
+  const pick = track.pick && !state.music.added.includes(track.id) ? track.pick : null;
   if (state.music.source !== 'ready') return <div className="mp-empty">
     <Icon name={state.music.source === 'empty' ? 'music' : 'warning'} size={30}/>
     <p>{state.music.source === 'empty' ? 'A little room for music.' : 'Music is taking a moment.'}</p>
