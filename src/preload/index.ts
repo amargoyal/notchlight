@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { ApprovalDecision, HitRect, Snapshot } from '../shared/types';
-import type { CompanionPreferences, CompanionSnapshot, CompanionView, SpotifyCommand } from '../shared/companion';
+import type { CompanionPreferences, CompanionSnapshot, CompanionView, SmartShuffleAnswer, SpotifyCommand } from '../shared/companion';
 import type { UpdateInfo, UpdateResponse } from '../shared/updates';
 
 function subscribe<T>(channel: string, cb: (value: T) => void): () => void {
@@ -40,6 +40,9 @@ contextBridge.exposeInMainWorld('notchlight', {
   connectSpotify: () => ipcRenderer.invoke('spotify:connect'),
   openSpotify: () => ipcRenderer.invoke('spotify:open'),
   controlSpotify: (command: SpotifyCommand, position?: number) => ipcRenderer.invoke('spotify:control', command, position),
+  signInSpotify: () => ipcRenderer.invoke('spotify:signin'),
+  signOutSpotify: () => ipcRenderer.invoke('spotify:signout'),
+  answerPick: (answer: SmartShuffleAnswer) => ipcRenderer.invoke('spotify:pick', answer),
   onMusicLevels: (cb: (levels: number[]) => void) => subscribe('music:levels', cb),
   copyClipboardItem: (id: string) => ipcRenderer.invoke('clipboard:copy', id),
   pinClipboardItem: (id: string, pinned: boolean) => ipcRenderer.invoke('clipboard:pin', id, pinned),
