@@ -72,3 +72,17 @@ export interface TokenRecord {
 }
 /** Electron's safeStorage, or anything shaped like it. */
 export interface Cipher { encrypt(text: string): Buffer; decrypt(data: Buffer): string }
+function isRecord(value: unknown): value is TokenRecord {
+  if (!value || typeof value !== 'object') return false;
+  const r = value as Record<string, unknown>;
+  return isClientId(String(r.clientId)) && typeof r.refreshToken === 'string' && !!r.refreshToken && typeof r.accessToken === 'string' && typeof r.expiresAt === 'number' && typeof r.scope === 'string';
+}
+/** The saved sign-in, or null for none, unreadable, or sealed with a key this Mac no longer has. */
+export function readTokenFile(file: string, cipher: Cipher | null): TokenRecord | null {
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+    const text = typeof raw.sealed === 'string' ? cipher?.decrypt(Buffer.from(raw.sealed, 'base64')) : typeof raw.plain === 'string' ? raw.plain : undefined;
+    const record = text ? JSON.parse(text) : null;
+    return isRecord(record) ? record : null;
+  } catch { return null; }
+}
