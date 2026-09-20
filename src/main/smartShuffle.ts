@@ -8,7 +8,9 @@
  * not where it came from — so the answer comes from the Web API: the playback
  * state says which playlist is playing and whether Smart Shuffle is on, and the
  * playlist's own items say whether the track is one of its own. Playing from a
- * playlist, Smart Shuffle on, not in the playlist: a pick.
+ * playlist, Smart Shuffle on, not in the playlist: a pick. Since March 2026 the
+ * Web API hands a playlist's items only to its owner and collaborators, so a
+ * pick on someone else's playlist cannot be told apart and stays unmarked.
  *
  * The + is Spotify's own: the track goes into the playlist, and the mark goes
  * with it because the track is now one of the playlist's own. The × is half of
@@ -33,6 +35,11 @@ export interface Playback {
   playing: boolean;
 }
 const str = (v: unknown) => typeof v === 'string' && v ? v : null;
+/** A status and, when Spotify explained itself, its sentence — for the log. */
+const answered = (status: number, body: unknown) => {
+  const message = body && typeof body === 'object' ? (body as { error?: { message?: unknown } }).error?.message : undefined;
+  return typeof message === 'string' ? `${status} (${message})` : String(status);
+};
 /** spotify:playlist:… and the older spotify:user:…:playlist:… both name a playlist. */
 export const playlistIdOf = (uri: string | null): string | null => uri ? /^spotify:(?:user:[^:]+:)?playlist:([A-Za-z0-9]{22})$/.exec(uri)?.[1] ?? null : null;
 /** GET /me/player into a Playback; null when nothing is playing (a 204, or a body with no item). */
@@ -57,7 +64,8 @@ export function parsePlaylist(body: unknown): PlaylistInfo | null {
   if (!body || typeof body !== 'object') return null;
   const raw = body as Record<string, unknown>;
   const owner = raw.owner && typeof raw.owner === 'object' ? raw.owner as Record<string, unknown> : null;
-  const tracks = raw.tracks && typeof raw.tracks === 'object' ? raw.tracks as Record<string, unknown> : null;
+  // The playlist's contents are `items` since March 2026, `tracks` before.
+  const tracks = raw.items && typeof raw.items === 'object' ? raw.items as Record<string, unknown> : raw.tracks && typeof raw.tracks === 'object' ? raw.tracks as Record<string, unknown> : null;
   const snapshotId = str(raw.snapshot_id);
   if (!snapshotId) return null;
   return { name: str(raw.name) ?? 'the playlist', snapshotId, ownerId: (owner && str(owner.id)) ?? '', collaborative: raw.collaborative === true, total: typeof tracks?.total === 'number' ? tracks.total : 0 };
@@ -68,7 +76,9 @@ export function parsePlaylistPage(body: unknown): { uris: string[]; next: string
   const raw = body as { items: unknown[]; next?: unknown };
   const uris: string[] = [];
   for (const item of raw.items) {
-    const track = item && typeof item === 'object' && (item as Record<string, unknown>).track;
+    // Since the March 2026 API the entry is `item`; `track` is what it was called before.
+    const entry = item && typeof item === 'object' ? item as Record<string, unknown> : null;
+    const track = entry?.item ?? entry?.track;
     if (!track || typeof track !== 'object') continue;
     const t = track as Record<string, unknown>;
     const uri = str(t.uri);
@@ -167,7 +177,7 @@ export class SmartShuffle extends EventEmitter {
       if (!trackId || !this.enabled) return;
       const { status, body } = await this.account.request('/me/player');
       if (this.trackId !== trackId || !this.enabled) return;
-      if (status !== 200) { if (status !== 204) logEvent('spotify', `smart shuffle: playback state answered ${status}`); this.setPick(null); return; }
+      if (status !== 200) { if (status !== 204) logEvent('spotify', `smart shuffle: playback state answered ${answered(status, body)}`); this.setPick(null); return; }
       const playback = parsePlayback(body);
       // The Web API and the scripting read can disagree for a beat around a skip; the heartbeat looks again.
       if (!playback || playback.trackUri !== trackId) return;
@@ -197,18 +207,19 @@ export class SmartShuffle extends EventEmitter {
    * moved, so a long playlist is walked once and then remembered.
    */
   private async playlist(id: string): Promise<Playlist | null> {
-    const head = await this.account.request(`/playlists/${id}?fields=name,snapshot_id,owner(id),collaborative,tracks(total)`);
+    const head = await this.account.request(`/playlists/${id}?fields=name,snapshot_id,owner(id),collaborative,items(total)`);
     const info = head.status === 200 ? parsePlaylist(head.body) : null;
-    if (!info) { logEvent('spotify', `smart shuffle: playlist ${id} answered ${head.status}`); return null; }
+    if (!info) { logEvent('spotify', `smart shuffle: playlist ${id} answered ${answered(head.status, head.body)}`); return null; }
     const cached = this.playlists.get(id);
     if (cached && cached.info.snapshotId === info.snapshotId) { cached.info = info; return cached; }
     if (info.total > this.maxPages * 100) { logEvent('spotify', `smart shuffle: ${info.name} has ${info.total} tracks, too many to check`); return null; }
     const members = new Set<string>();
-    let next: string | null = `/playlists/${id}/tracks?fields=items(track(uri,linked_from(uri))),next&limit=100`;
+    // /tracks answers 403 to development-mode apps since March 9, 2026; /items is the door now, and linked_from is gone with it.
+    let next: string | null = `/playlists/${id}/items?fields=items(item(uri)),next&limit=100`;
     for (let page = 0; next && page < this.maxPages; page++) {
       const answer = await this.account.request(next);
       const parsed = answer.status === 200 ? parsePlaylistPage(answer.body) : null;
-      if (!parsed) { logEvent('spotify', `smart shuffle: playlist items answered ${answer.status}`); return null; }
+      if (!parsed) { logEvent('spotify', `smart shuffle: playlist items answered ${answered(answer.status, answer.body)}`); return null; }
       for (const uri of parsed.uris) members.add(uri);
       next = parsed.next;
     }
@@ -232,7 +243,7 @@ export class SmartShuffle extends EventEmitter {
     if (!pick.canAdd) throw new Error(`${pick.playlistName} is not yours to add to.`);
     this.setBusy(true);
     try {
-      const { status, body } = await this.account.request(`/playlists/${pick.playlistId}/tracks`, { method: 'POST', body: JSON.stringify({ uris: [pick.trackId] }) });
+      const { status, body } = await this.account.request(`/playlists/${pick.playlistId}/items`, { method: 'POST', body: JSON.stringify({ uris: [pick.trackId] }) });
       if (status !== 200 && status !== 201) {
         const detail = body && typeof body === 'object' && (body as { error?: { message?: unknown } }).error?.message;
         throw new Error(status === 403 ? `Spotify would not let this account add to ${pick.playlistName}.` : `Spotify did not add the track${typeof detail === 'string' ? ` (${detail})` : ''}.`);

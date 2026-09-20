@@ -159,9 +159,11 @@ try {
   assert.equal(shuffle.parsePlayback(playing('spotify:track:t1', { context: { type: 'album', uri: 'spotify:album:x' } })).playlistId, null);
   assert.equal(shuffle.parsePlayback(playing('spotify:track:t1', { smart_shuffle: undefined })).smartShuffle, null, 'the field is undocumented; its absence is not a no');
   assert.equal(shuffle.parsePlayback(playing('spotify:track:t1', { item: { uri: 'spotify:track:t1', linked_from: { uri: 'spotify:track:t0' } } })).linkedUri, 'spotify:track:t0');
-  assert.deepEqual(shuffle.parsePlaylist({ name: 'Late Drives', snapshot_id: 's1', owner: { id: 'amar' }, collaborative: false, tracks: { total: 3 } }), { name: 'Late Drives', snapshotId: 's1', ownerId: 'amar', collaborative: false, total: 3 });
+  assert.deepEqual(shuffle.parsePlaylist({ name: 'Late Drives', snapshot_id: 's1', owner: { id: 'amar' }, collaborative: false, items: { total: 3 } }), { name: 'Late Drives', snapshotId: 's1', ownerId: 'amar', collaborative: false, total: 3 });
+  assert.equal(shuffle.parsePlaylist({ name: 'Old', snapshot_id: 's1', tracks: { total: 4 } }).total, 4, 'the pre-2026 name still counts');
   assert.equal(shuffle.parsePlaylist({ name: 'x' }), null, 'no snapshot id, no playlist');
-  assert.deepEqual(shuffle.parsePlaylistPage({ items: [{ track: { uri: 'spotify:track:a' } }, { track: null }, { track: { uri: 'spotify:track:b', linked_from: { uri: 'spotify:track:b0' } } }], next: null }), { uris: ['spotify:track:a', 'spotify:track:b', 'spotify:track:b0'], next: null });
+  assert.deepEqual(shuffle.parsePlaylistPage({ items: [{ item: { uri: 'spotify:track:a' } }, { item: null }, { item: { uri: 'spotify:track:b', linked_from: { uri: 'spotify:track:b0' } } }], next: null }), { uris: ['spotify:track:a', 'spotify:track:b', 'spotify:track:b0'], next: null });
+  assert.deepEqual(shuffle.parsePlaylistPage({ items: [{ track: { uri: 'spotify:track:old' } }], next: null }).uris, ['spotify:track:old'], 'the pre-2026 name still reads');
   assert.equal(shuffle.parsePlaylistPage({}), null);
   const members = new Set(['spotify:track:own1', 'spotify:track:own2']);
   assert.equal(shuffle.isPick(shuffle.parsePlayback(playing('spotify:track:pick1')), members), true);
@@ -173,7 +175,7 @@ try {
 
   // The reads and the answers, against a stand-in account.
   class FakeAccount extends EventEmitter {
-    ready = true; calls = []; head = { name: 'Late Drives', snapshot_id: 's1', owner: { id: 'amar' }, collaborative: false, tracks: { total: 2 } };
+    ready = true; calls = []; head = { name: 'Late Drives', snapshot_id: 's1', owner: { id: 'amar' }, collaborative: false, items: { total: 2 } };
     playback = playing('spotify:track:pick1');
     signedIn() { return this.ready; }
     userId() { return this.ready ? 'amar' : null; }
@@ -182,9 +184,10 @@ try {
       this.calls.push({ target, method: init.method ?? 'GET', body: init.body });
       if (target === '/me/player') return this.playback ? { status: 200, body: this.playback } : { status: 204, body: null };
       if (target.startsWith(`/playlists/${P}?`)) return { status: 200, body: this.head };
-      if (target.startsWith(`/playlists/${P}/tracks?`)) return { status: 200, body: { items: [{ track: { uri: 'spotify:track:own1' } }], next: `${account.API_URL}/playlists/${P}/tracks?offset=1&limit=100` } };
-      if (target.startsWith(`${account.API_URL}/playlists/${P}/tracks?offset=1`)) return { status: 200, body: { items: [{ track: { uri: 'spotify:track:own2' } }], next: null } };
-      if (target === `/playlists/${P}/tracks` && init.method === 'POST') return { status: 201, body: { snapshot_id: 's2' } };
+      if (target.startsWith(`/playlists/${P}/items?`)) return { status: 200, body: { items: [{ item: { uri: 'spotify:track:own1' } }], next: `${account.API_URL}/playlists/${P}/items?offset=1&limit=100` } };
+      if (target.startsWith(`${account.API_URL}/playlists/${P}/items?offset=1`)) return { status: 200, body: { items: [{ item: { uri: 'spotify:track:own2' } }], next: null } };
+      if (target === `/playlists/${P}/items` && init.method === 'POST') return { status: 201, body: { snapshot_id: 's2' } };
+      if (target.includes('/tracks')) return { status: 403, body: { error: { status: 403, message: 'This endpoint is not available for this app.' } } };
       throw new Error(`unexpected ${target}`);
     }
   }

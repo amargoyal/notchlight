@@ -71,7 +71,12 @@ false, a track you queued by hand is left alone.
 
 The playlist's tracks are read in pages of a hundred, once, and remembered by
 snapshot id; every later read costs one small call for the playlist's head.
-Playlists past 5,000 tracks are not checked. While the same track keeps
+Playlists past 5,000 tracks are not checked. The reads go through the
+`/playlists/{id}/items` endpoints of Spotify's March 2026 API; the older
+`/tracks` ones answer 403 to a development-mode app. That API also hands a
+playlist's items only to its owner and collaborators, so a pick on someone
+else's playlist cannot be told from the playlist's own tracks and stays
+unmarked. While the same track keeps
 playing, the state is read again every thirty seconds, so switching Smart
 Shuffle on or off inside Spotify shows within that.
 
@@ -101,6 +106,8 @@ and × answer.
 - **Signed in, Smart Shuffle on, no mark** — check `~/.notchlight/island.log`
   for `smart shuffle:` lines. "playback state answered 204" means the Web API
   sees no active playback; play something from Spotify on this Mac. "too many
-  to check" is the 5,000-track limit.
+  to check" is the 5,000-track limit. "playlist items answered 403" with
+  Spotify's sentence beside it means the playlist is not yours to read, or the
+  app's API access changed.
 - **The + is dimmed** — the playlist is not yours and not collaborative;
   Spotify would refuse the add.
