@@ -40,7 +40,7 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-preview-title { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
 .settings-preview-tools { display: flex; align-items: center; gap: 12px; }
 .settings-preview-note { font-size: 11px; color: var(--ui-muted); }
-.settings-preview .mp-desktop { height: 300px; border-radius: 0; border: 0; box-shadow: none; transition: height 260ms ease; }
+.settings-preview .mp-desktop { height: 264px; border-radius: 0; border: 0; box-shadow: none; transition: height 260ms ease; }
 .settings-preview.is-collapsed .mp-desktop { height: 150px; }
 .settings-preview .mp-menubar { height: 24px; font-size: 11px; }
 .settings-preview-notice { min-height: 30px; display: flex; align-items: center; padding: 0 14px; font-size: 11px; color: var(--ui-muted); border-top: 1px solid var(--ui-line); }
