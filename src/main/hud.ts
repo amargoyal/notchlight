@@ -40,6 +40,7 @@ export class Hud extends EventEmitter {
   private helper: LineHelper<HudEvent> | null = null;
   private optionKey: HudOptionKey = 'settings';
   private wanted = false;
+  private stopped = false;
   private state: HudSnapshot = { ...EMPTY_HUD };
   constructor(private locate: () => Promise<string | null> = () => ensureHelper('hudwatch')) { super(); }
 
@@ -51,6 +52,7 @@ export class Hud extends EventEmitter {
    * key press at most, and only when the preference is edited.
    */
   configure(active: boolean, optionKey: HudOptionKey): void {
+    if (this.stopped) return;
     const restart = this.helper !== null && optionKey !== this.optionKey;
     this.optionKey = optionKey;
     this.wanted = active;
@@ -65,7 +67,15 @@ export class Hud extends EventEmitter {
     this.helper.setActive(true);
   }
 
-  stop(): void { this.configure(false, this.optionKey); }
+  /**
+   * Terminal, unlike turning the preference off. The quit handler calls this
+   * while the companion store is still listening, and its answering change
+   * would otherwise start a fresh helper on the way out the door.
+   */
+  stop(): void {
+    this.configure(false, this.optionKey);
+    this.stopped = true;
+  }
 
   private build(): LineHelper<HudEvent> {
     const helper = new LineHelper<HudEvent>('hudwatch', parseHudEvent, 'hud', async () => {
