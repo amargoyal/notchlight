@@ -638,6 +638,27 @@ function appSettings(): AppSettings {
   };
 }
 
+/** Write a validated patch: login item to macOS, the rest to config.json, and a new shortcut to the keyboard right away. */
+function applyAppSettings(patch: AppSettingsPatch): void {
+  const { loginItem, ...rest } = patch;
+  if (loginItem !== undefined) {
+    if (!app.isPackaged) throw new Error('Launch at login needs the packaged app.');
+    app.setLoginItemSettings({ openAtLogin: loginItem });
+    logEvent('notchlight', `start at login ${loginItem ? 'on' : 'off'}`);
+  }
+  if (!Object.keys(rest).length) return;
+  const before = config().shortcut;
+  writeConfig(rest);
+  if (rest.shortcut !== undefined && rest.shortcut !== before) {
+    globalShortcut.unregisterAll();
+    if (!registerShortcut()) {
+      writeConfig({ shortcut: before });
+      registerShortcut();
+      throw new Error('That shortcut is taken by another app. The old one still works.');
+    }
+  }
+}
+
 ipcMain.on('update:respond', (event, response: UpdateResponse) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (event.senderFrame !== event.sender.mainFrame || !win || win !== updateWin) return;
