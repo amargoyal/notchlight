@@ -676,6 +676,7 @@ ipcMain.handle('app:settings', event => {
   return appSettings();
 });
 settingsHandle('app:settings:update', patch => { applyAppSettings(validateAppSettings(patch)); refreshTray(); });
+settingsHandle('app:updates', () => checkForUpdates());
 
 ipcMain.on('update:respond', (event, response: UpdateResponse) => {
   const win = BrowserWindow.fromWebContents(event.sender);
