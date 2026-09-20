@@ -128,7 +128,7 @@ function Sidebar({ section, onSelect, query, onQuery, live, version }: { section
       {visible.map(item => <button key={item.id} aria-current={section === item.id ? 'page' : undefined} onClick={() => onSelect(item.id)}><span className="settings-tile" style={{ background: item.tile }}><Icon name={item.icon} size={12}/></span><span>{item.label}</span></button>)}
       {!visible.length && <p className="settings-search-empty">Nothing matches “{query}”.</p>}
     </nav>
-    <div className="settings-sidebar-foot"><Buddy size={16}/><span><b>Notchlight</b> {version}</span><span className="settings-badge">{live ? 'This Mac' : 'Preview'}</span></div>
+    <div className="settings-sidebar-foot"><AppIcon size={18}/><span><b>Notchlight</b> {version}</span><span className="settings-badge">{live ? 'This Mac' : 'Preview'}</span></div>
   </aside>;
 }
 
