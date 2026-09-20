@@ -46,3 +46,9 @@ export const SAMPLE_APP_SETTINGS: AppSettings = {
   version: '0.2.0', packaged: false, loginItem: false, hoverDelay: 550, shortcut: 'Alt+Shift+N', allowWithoutNotch: false,
   staleSec: 3 * 60 * 60, watchProcesses: true, doneLingerSec: 0, cutout: { w: 200, h: 32 }, claudeHooks: false, configDir: '~/.notchlight'
 };
+
+/** ⌥⇧N for a menu or a row, from Electron's accelerator spelling. */
+export function shortcutLabel(accelerator: string): string {
+  const names: Record<string, string> = { commandorcontrol: '⌘', cmdorctrl: '⌘', command: '⌘', cmd: '⌘', control: '⌃', ctrl: '⌃', alt: '⌥', option: '⌥', shift: '⇧', super: '⌘', meta: '⌘', space: 'Space', escape: 'Esc', return: '↩', enter: '↩', tab: '⇥', up: '↑', down: '↓', left: '←', right: '→' };
+  return accelerator.split('+').filter(Boolean).map(part => names[part.toLowerCase()] ?? part.toUpperCase()).join('');
+}
