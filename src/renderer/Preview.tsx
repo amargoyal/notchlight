@@ -32,7 +32,9 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     sparkle: <path d="M12 3c.6 4.6 3.4 7.4 9 9-5.6 1.6-8.4 4.4-9 9-.6-4.6-3.4-7.4-9-9 5.6-1.6 8.4-4.4 9-9Z" fill="currentColor" stroke="none"/>,
     plus: <><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></>,
     face: <><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="10.5" r="1.3" fill="currentColor" stroke="none"/><path d="M9 15c1.6 1.3 4.4 1.3 6 0"/></>,
-    info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.8h.01"/></>
+    info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.8h.01"/></>,
+    updown: <path d="m8 9.5 4-4 4 4M8 14.5l4 4 4-4"/>,
+    copy: <><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></>
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.file}</svg>;
 }
