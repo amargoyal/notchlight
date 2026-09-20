@@ -102,7 +102,7 @@ try {
   assert.equal(acct.snapshot().status, 'ready');
   assert.equal(acct.snapshot().user, 'Amar');
   assert.equal(acct.userId(), 'amar');
-  assert.deepEqual(states, ['signed-out', 'signing-in', 'ready']);
+  assert.deepEqual(states, ['off', 'signed-out', 'signing-in', 'ready'], 'load says off with its sentence, then the id, then the browser');
   assert.equal(opened.length, 1);
   assert.equal(account.readTokenFile(file, cipher).refreshToken, 'r1', 'saved for next time');
   assert.equal(await acct.token(), 'a1');
