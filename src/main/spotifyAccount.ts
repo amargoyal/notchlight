@@ -110,6 +110,9 @@ export interface AccountOptions {
 }
 
 /** One account: signed out until a browser says otherwise, and a bearer token for as long as the refresh token holds. */
+/** What the browser tab shows once the answer is in. */
+const answerPage = (message: string) => `<!doctype html><meta charset="utf-8"><title>Notchlight</title><body style="font: 15px/1.5 -apple-system, sans-serif; color: #f2ede7; background: #141210; display: grid; place-items: center; height: 100vh; margin: 0"><p style="max-width: 32em; text-align: center">${message.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!)}</p></body>`;
+
 export class SpotifyAccount extends EventEmitter {
   private clientId = '';
   private record: TokenRecord | null = null;
