@@ -232,6 +232,39 @@ export class SpotifyAccount extends EventEmitter {
     if (typeof access !== 'string' || !access || !refresh) throw new Error('Spotify’s answer had no token in it.');
     return { clientId: this.clientId, accessToken: access, refreshToken: refresh, expiresAt: this.now() + expiresIn * 1000, scope: typeof body.scope === 'string' ? body.scope : previous?.scope ?? '', user: previous?.user };
   }
+  private refreshing: Promise<string | null> | null = null;
+  /**
+   * A bearer token that works right now: the saved one while it has half a
+   * minute left, otherwise a fresh one from the refresh token. Null when signed
+   * out, or when Spotify no longer honours the refresh token — which signs the
+   * account out, with a sentence saying so.
+   */
+  token(): Promise<string | null> {
+    const record = this.record;
+    if (!record || record.clientId !== this.clientId) return Promise.resolve(null);
+    if (record.expiresAt - this.now() > 30_000) return Promise.resolve(record.accessToken);
+    this.refreshing ??= this.refresh(record).finally(() => { this.refreshing = null; });
+    return this.refreshing;
+  }
+  private async refresh(record: TokenRecord): Promise<string | null> {
+    let answer: { status: number; body: Record<string, unknown> | null };
+    try { answer = await this.accounts({ grant_type: 'refresh_token', refresh_token: record.refreshToken, client_id: this.clientId }); }
+    catch (error) { logEvent('spotify', `account: refresh failed (${(error as Error).message})`); return null; }
+    if (this.record !== record) return this.record?.accessToken ?? null;
+    if (answer.status === 200 && answer.body) {
+      this.record = this.accept(answer.body, record);
+      this.persist();
+      return this.record.accessToken;
+    }
+    // 400 invalid_grant: revoked, or the app was deleted. Anything else is Spotify having a moment.
+    if (answer.status === 400) {
+      logEvent('spotify', `account: refresh refused (${describeRefusal(answer.body, '')})`);
+      this.record = null;
+      this.persist();
+      this.settle('Spotify signed you out. Sign in again to see Smart Shuffle picks.');
+    } else logEvent('spotify', `account: refresh answered ${answer.status}`);
+    return null;
+  }
   private persist(): void {
     try { writeTokenFile(this.options.file, this.record, this.cipher); }
     catch (error) { logEvent('spotify', `account: could not save the sign-in (${(error as Error).message})`); }
