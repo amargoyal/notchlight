@@ -68,6 +68,16 @@ export interface SpotifySnapshot {
   busy: boolean;
   message?: string;
 }
+/**
+ * The Spotify account behind Smart Shuffle: the Web API sign-in, separate
+ * from the scripting connection that reads and controls the player.
+ */
+export interface SpotifyAccountSnapshot {
+  status: 'off' | 'signed-out' | 'signing-in' | 'ready' | 'error';
+  /** The display name of who is signed in. */
+  user?: string;
+  message?: string;
+}
 export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', player: 'spotify', playing: false, position: 0, at: 0, volume: -1, track: null, busy: false };
 /** Where playback is now, given the last read and the clock. Paused stays put; nothing runs past the end. */
 export function playhead(music: SpotifySnapshot, now: number): number {
