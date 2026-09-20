@@ -99,3 +99,9 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-kbd { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 6px; border: 1px solid var(--ui-line); background: var(--ui-control); color: var(--ui-text); font-size: 12px; letter-spacing: .08em; cursor: default; }
 .settings-kbd.is-recording { border-color: var(--ui-accent); letter-spacing: 0; color: var(--ui-muted); }
 
+/* ---- status text ---- */
+.settings-status { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ui-muted); max-width: 340px; text-align: right; }
+.settings-status.tone-wait i { background: #e0b04a; box-shadow: 0 0 6px #e0b04a88; }
+.settings-status.tone-bad i { background: #d46a5a; box-shadow: 0 0 6px #d46a5a88; }
+.settings-status.tone-off i { background: var(--ui-switch-off); box-shadow: none; }
+
