@@ -1,0 +1,35 @@
+/**
+ * The Spotify account behind Smart Shuffle.
+ *
+ * Reading and controlling the player goes over Apple Events and needs no
+ * account. Knowing whether the current track is one Smart Shuffle slipped in —
+ * and adding it to the playlist when you want it — needs Spotify's Web API,
+ * and that needs a sign-in. Spotify gives every app its own Client ID, so this
+ * one is yours: create an app at developer.spotify.com, register the loopback
+ * address below as its Redirect URI, and paste the id in Customize.
+ *
+ * The sign-in is OAuth with PKCE, which is what Spotify asks of desktop apps:
+ * a browser tab, a one-shot server on 127.0.0.1 to catch the answer, and a
+ * refresh token kept in ~/.notchlight/spotify-account.json — encrypted with
+ * the keychain when Electron offers it. No secret is involved; a public client
+ * has none to keep.
+ */
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash, randomBytes } from 'node:crypto';
+import { EventEmitter } from 'node:events';
+import { logEvent } from './lifecycle';
+import type { SpotifyAccountSnapshot } from '../shared/companion';
+
+/** Spotify allows plain http only on a loopback literal, and the port is part of the registered URI. */
+export const REDIRECT_PORT = 41739;
+export const REDIRECT_URI = `http://127.0.0.1:${REDIRECT_PORT}/callback`;
+export const AUTHORIZE_URL = 'https://accounts.spotify.com/authorize';
+export const TOKEN_URL = 'https://accounts.spotify.com/api/token';
+export const API_URL = 'https://api.spotify.com/v1';
+/** What is playing and from where; playlists, to read and to add to. Skipping goes through the player. */
+export const SCOPES = ['user-read-playback-state', 'playlist-read-private', 'playlist-read-collaborative', 'playlist-modify-public', 'playlist-modify-private'];
+/** How long the browser tab may take. */
+export const SIGN_IN_TIMEOUT_MS = 3 * 60 * 1000;
+const FETCH_TIMEOUT_MS = 10_000;
