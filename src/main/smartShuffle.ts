@@ -51,3 +51,14 @@ export function parsePlayback(body: unknown): Playback | null {
     playing: raw.is_playing === true
   };
 }
+/** The playlist itself: enough to name it, to know whose it is, and to notice when it changes. */
+export interface PlaylistInfo { name: string; snapshotId: string; ownerId: string; collaborative: boolean; total: number }
+export function parsePlaylist(body: unknown): PlaylistInfo | null {
+  if (!body || typeof body !== 'object') return null;
+  const raw = body as Record<string, unknown>;
+  const owner = raw.owner && typeof raw.owner === 'object' ? raw.owner as Record<string, unknown> : null;
+  const tracks = raw.tracks && typeof raw.tracks === 'object' ? raw.tracks as Record<string, unknown> : null;
+  const snapshotId = str(raw.snapshot_id);
+  if (!snapshotId) return null;
+  return { name: str(raw.name) ?? 'the playlist', snapshotId, ownerId: (owner && str(owner.id)) ?? '', collaborative: raw.collaborative === true, total: typeof tracks?.total === 'number' ? tracks.total : 0 };
+}
