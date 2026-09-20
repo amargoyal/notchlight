@@ -679,6 +679,7 @@ settingsHandle('app:settings:update', patch => { applyAppSettings(validateAppSet
 settingsHandle('app:updates', () => checkForUpdates());
 settingsHandle('app:config-folder', async () => { const failure = await shell.openPath(APP_DIR); if (failure) throw new Error(failure); });
 settingsHandle('app:gallery', () => openGallery());
+settingsHandle('app:claude-hooks', () => installHooks());
 
 ipcMain.on('update:respond', (event, response: UpdateResponse) => {
   const win = BrowserWindow.fromWebContents(event.sender);
