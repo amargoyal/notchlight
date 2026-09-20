@@ -207,7 +207,8 @@ export class SmartShuffle extends EventEmitter {
     if (cached && cached.info.snapshotId === info.snapshotId) { cached.info = info; return cached; }
     if (info.total > this.maxPages * 100) { logEvent('spotify', `smart shuffle: ${info.name} has ${info.total} tracks, too many to check`); return null; }
     const members = new Set<string>();
-    let next: string | null = `/playlists/${id}/tracks?fields=items(track(uri,linked_from(uri))),next&limit=100`;
+    // /tracks answers 403 to development-mode apps since March 9, 2026; /items is the door now, and linked_from is gone with it.
+    let next: string | null = `/playlists/${id}/items?fields=items(item(uri)),next&limit=100`;
     for (let page = 0; next && page < this.maxPages; page++) {
       const answer = await this.account.request(next);
       const parsed = answer.status === 200 ? parsePlaylistPage(answer.body) : null;
