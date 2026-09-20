@@ -111,6 +111,8 @@ export class SmartShuffle extends EventEmitter {
     this.settleMs = options.settleMs ?? 500;
     this.heartbeatMs = options.heartbeatMs ?? 30_000;
     this.maxPages = options.maxPages ?? 50;
+    // Signing in starts a read for the track already playing; signing out takes the mark down.
+    account.on('change', () => { if (account.signedIn()) this.schedule(); else { this.clearTimers(); this.pick = null; } this.publish(); });
   }
   snapshot(): SmartShuffleSnapshot { return { account: this.account.snapshot(), pick: this.pick, busy: this.busy }; }
   private publish(): void { this.emit('change', this.snapshot()); }
@@ -121,5 +123,34 @@ export class SmartShuffle extends EventEmitter {
     this.publish();
   }
   private setBusy(busy: boolean): void { if (busy !== this.busy) { this.busy = busy; this.publish(); } }
-  stop(): void { /* nothing scheduled yet */ }
+  private timer: NodeJS.Timeout | null = null;
+  private heartbeat: NodeJS.Timeout | null = null;
+  private clearTimers(): void {
+    if (this.timer) clearTimeout(this.timer);
+    if (this.heartbeat) clearTimeout(this.heartbeat);
+    this.timer = this.heartbeat = null;
+  }
+  /** The preference, and whether Spotify is connected at all. Off clears the mark at once. */
+  setEnabled(enabled: boolean): void {
+    if (enabled === this.enabled) return;
+    this.enabled = enabled;
+    if (!enabled) { this.clearTimers(); this.setPick(null); return; }
+    this.schedule();
+  }
+  /** The player's word: which Spotify track is current, and whether it plays. Null when there is none, or the player is Apple Music. */
+  observe(trackId: string | null, playing: boolean): void {
+    const changed = trackId !== this.trackId;
+    this.trackId = trackId;
+    this.playing = playing;
+    if (!changed) { if (!playing) { if (this.heartbeat) clearTimeout(this.heartbeat); this.heartbeat = null; } return; }
+    this.setPick(null);
+    this.clearTimers();
+    if (trackId) this.schedule();
+  }
+  private schedule(delay = this.settleMs): void {
+    if (!this.enabled || !this.trackId || !this.account.signedIn()) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => { this.timer = null; void this.read(); }, delay);
+  }
+  stop(): void { this.clearTimers(); }
 }
