@@ -78,6 +78,15 @@ export interface SpotifyAccountSnapshot {
   user?: string;
   message?: string;
 }
+/** A track Smart Shuffle slipped into the playlist's flow — not one of the playlist's own. */
+export interface SmartShufflePick {
+  /** spotify:track:… — only meaningful while it is the current track. */
+  trackId: string;
+  playlistId: string;
+  playlistName: string;
+  /** The playlist is yours or collaborative, so the + can add to it. */
+  canAdd: boolean;
+}
 export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', player: 'spotify', playing: false, position: 0, at: 0, volume: -1, track: null, busy: false };
 /** Where playback is now, given the last read and the clock. Paused stays put; nothing runs past the end. */
 export function playhead(music: SpotifySnapshot, now: number): number {
