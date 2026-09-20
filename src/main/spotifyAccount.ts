@@ -205,5 +205,15 @@ export class SpotifyAccount extends EventEmitter {
     }).catch(error => { this.settle((error as Error).message); throw error; });
     void code; void verifier; void redirectUri;
   }
+  /** One call to the accounts service, with a deadline; the body as JSON, or null when it is not. */
+  private async accounts(form: Record<string, string>): Promise<{ status: number; body: Record<string, unknown> | null }> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const response = await this.fetchImpl(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(form).toString(), signal: controller.signal });
+      const body = await response.json().catch(() => null) as Record<string, unknown> | null;
+      return { status: response.status, body };
+    } finally { clearTimeout(timer); }
+  }
   stop(): void { this.signing?.cancel('Notchlight is quitting.'); }
 }
