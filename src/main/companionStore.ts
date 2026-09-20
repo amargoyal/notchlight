@@ -4,7 +4,7 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_SPOTIFY, validatePreferences, type CaptureSnapshot, type ClipboardSnapshot, type CompanionSnapshot, type CompanionView, type ShelfFile, type SpotifySnapshot, type TransferProgress } from '../shared/companion';
+import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, validatePreferences, type CaptureSnapshot, type ClipboardSnapshot, type CompanionSnapshot, type CompanionView, type ShelfFile, type SmartShuffleSnapshot, type SpotifySnapshot, type TransferProgress } from '../shared/companion';
 
 type Entry = { id: string; path: string };
 /** What Remove took away, so Undo can put it back where it was. */
@@ -29,7 +29,7 @@ export class CompanionStore extends EventEmitter {
   private removed: Removed | null = null;
   constructor(private file: string, private icon: (file: string) => Promise<string>, pulse = true) {
     super();
-    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, clipboard: { ...EMPTY_CLIPBOARD }, transfer: null, undoable: 0, notice: '' };
+    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' };
   }
   current(): CompanionSnapshot { return this.state; }
   private emitState() { this.emit('change', this.state); }
