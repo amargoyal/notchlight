@@ -50,14 +50,14 @@ function FinderWindow({ lifted }) {
   </div>;
 }
 function PlayerWindow({ T }) {
-  const pos = 72 + T;
+  const pos = (AD_TRACK?.offset ?? 72) + soundtrackTime(T);
   return <div style={{ position: 'absolute', left: 1000, top: 96, width: 260, borderRadius: 11, background: '#141210', overflow: 'hidden', boxShadow: '0 30px 60px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.08)', color: '#f2ede7' }}>
     <div style={{ height: 38, display: 'flex', alignItems: 'center', padding: '0 14px' }}><Traffic /></div>
     <div style={{ padding: '4px 22px 22px' }}>
-      <img src="./assets/late-light.svg" alt="" style={{ width: 216, height: 216, borderRadius: 8, display: 'block' }} />
-      <div style={{ font: `600 15px/1.3 ${DSANS}`, marginTop: 16 }}>Late Light</div>
-      <div style={{ font: `400 12px/1.4 ${DSANS}`, color: '#a69c93' }}>The Quiet Hours</div>
-      <div style={{ marginTop: 14, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.14)' }}><div style={{ width: `${pos / 234 * 100}%`, height: '100%', borderRadius: 2, background: '#d1bca2' }} /></div>
+      <img src={ART} alt="" style={{ width: 216, height: 216, borderRadius: 8, display: 'block' }} />
+      <div style={{ font: `600 15px/1.3 ${DSANS}`, marginTop: 16 }}>{AD_TRACK?.title || "Late Light"}</div>
+      <div style={{ font: `400 12px/1.4 ${DSANS}`, color: '#a69c93' }}>{AD_TRACK?.artist || "The Quiet Hours"}</div>
+      <div style={{ marginTop: 14, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.14)' }}><div style={{ width: `${pos / (AD_TRACK?.duration ?? 234) * 100}%`, height: '100%', borderRadius: 2, background: '#d1bca2' }} /></div>
     </div>
   </div>;
 }

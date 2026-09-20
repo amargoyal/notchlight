@@ -1,6 +1,6 @@
 // Faces of the island, ported from IslandView.tsx, Preview.tsx, LiveCompanion.tsx, Agents.tsx + preview.css values.
 const { C: NC, MONO: NMONO, SANS: NSANS, PANEL_W: NPW } = NL;
-const ART = './assets/late-light.svg', LAND = './assets/landscape.svg', TINT = '#c47a4a';
+const ART = AD_TRACK?.art || './assets/late-light.svg', LAND = './assets/landscape.svg', TINT = AD_TRACK?.tint || '#c47a4a';
 const SESS = {
   claude: { title: 'A quieter place to work', project: 'notchlight', cwd: '~/dev/notchlight', branch: 'faces', agent: 'Shaping the music view', tokens0: 24100 },
   codex: { title: 'Bring the Codex companion to life', project: 'notchlight', cwd: '~/dev/notchlight', branch: 'faces', agent: 'Designing the shared Agents view', ask: { command: 'npm run test:codex', message: 'Allow Codex to run the test suite?' } }
@@ -122,9 +122,9 @@ function FacePanel({ T, phase, hoverAllow, face }) {
   </div>;
 }
 
-// Equalizer: mp-wave 1.1s ease-in-out alternate, delay band*-0.19s → pure function of T
+// Use measured song bands when available; otherwise retain the original periodic motion.
 function NLEqualizer({ T, active = true }) {
-  const bars = [0, 1, 2, 3, 4].map(band => { const ph = ((T + band * 0.19) / 1.1) % 2; const tri = ph < 1 ? ph : 2 - ph; const v = -(Math.cos(Math.PI * tri) - 1) / 2; return 0.25 + 0.75 * v; });
+  const bars = AD_TRACK?.levels?.[Math.min(899,Math.max(0,Math.floor(T*60)))] || [0, 1, 2, 3, 4].map(band => { const ph = ((T + band * 0.19) / 1.1) % 2; const tri = ph < 1 ? ph : 2 - ph; const v = -(Math.cos(Math.PI * tri) - 1) / 2; return 0.25 + 0.75 * v; });
   return <span style={{ height: 18, display: 'flex', alignItems: 'center', gap: 2, borderRadius: 6, padding: '0 3px', boxShadow: `0 0 10px ${TINT}` }}>
     {bars.map((s, i) => <i key={i} style={{ display: 'block', width: 2, height: 14, borderRadius: 2, background: `color-mix(in srgb, ${TINT} 45%, #c9b79d)`, transform: `scaleY(${active ? s : 0.29})`, transformOrigin: 'center' }} />)}
   </span>;
@@ -142,16 +142,16 @@ const wingR = { display: 'flex', alignItems: 'center', justifyContent: 'flex-end
 const iconBtn = (name, white) => <div style={{ width: 32, height: 32, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: white ? '#f2ede7' : '#a69c93' }}><NLIcon name={name} size={18} /></div>;
 
 function FaceMusic({ T, volume, files, paused = false }) {
-  const pos = 72 + T, dur = 234; const pct = pos / dur * 100;
+  const pos = (AD_TRACK?.offset ?? 72) + T, dur = AD_TRACK?.duration ?? 234; const pct = pos / dur * 100;
   return <div style={{ width: NPW }}>
-    <NLWings width={NPW} left={<div style={wingL}><NLArtwork mini /></div>} right={<div style={wingR} data-target="bars">{volume != null ? <NLVolume level={volume} /> : <NLEqualizer T={T} />}</div>} />
+    <NLWings width={NPW} left={<div style={wingL}><NLArtwork mini /></div>} right={<div style={wingR} data-target="bars">{volume != null ? <NLVolume level={volume} /> : <NLEqualizer T={T} active={!paused} />}</div>} />
     <NLNav view="music" files={files} />
     <div style={{ padding: '14px 22px 12px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
         <NLArtwork />
         <div style={{ minWidth: 0, flex: 1, textAlign: 'center' }}>
-          <h2 style={{ font: `600 14px/1.25 ${NSANS}`, color: NC.text, margin: '0 0 2px', letterSpacing: '-.015em', ...NL.CLIP }}>Late Light</h2>
-          <p style={{ font: `400 11px/1.5 ${NSANS}`, color: '#a69c93', margin: 0, ...NL.CLIP }}>The Quiet Hours</p>
+          <h2 style={{ font: `600 14px/1.25 ${NSANS}`, color: NC.text, margin: '0 0 2px', letterSpacing: '-.015em', ...NL.CLIP }}>{AD_TRACK?.title || "Late Light"}</h2>
+          <p style={{ font: `400 11px/1.5 ${NSANS}`, color: '#a69c93', margin: 0, ...NL.CLIP }}>{AD_TRACK?.artist || "The Quiet Hours"}</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, font: `400 9px/1 ${NMONO}`, color: '#a69c93' }}>
             <span style={{ flex: 'none', minWidth: 28 }}>{NL.time(pos)}</span>
             <div style={{ flex: 1, height: 12, display: 'flex', alignItems: 'center', position: 'relative' }}><div style={{ position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, background: 'rgba(255,255,255,.16)' }} /><div style={{ position: 'absolute', left: 0, width: `${pct}%`, height: 4, borderRadius: 2, background: '#d1bca2' }} /><div style={{ position: 'absolute', left: `calc(${pct}% - 5px)`, width: 10, height: 10, borderRadius: '50%', background: '#d1bca2' }} /></div>
@@ -223,11 +223,11 @@ function FaceClip({ T = 0, after, hoverId, files }) {
 }
 
 // RestingWings with both providers: budget leaves no room for the other faces → "+3" overflow, Cx/Cl lights, buddies
-function FaceResting({ T, codexFace = 'working' }) {
+function FaceResting({ T, codexFace = 'working', paused = false }) {
   const light = (status, pulse) => { const b = pulse ? NL.breath(T) : 0; return <i style={{ display: 'block', width: 7, height: 7, borderRadius: '50%', flex: 'none', background: NL.lightColor(status), boxShadow: NL.glow(NL.lightColor(status), .7), opacity: 1 - 0.6 * b, transform: `scale(${1 - 0.2 * b})` }} />; };
   const wing = { display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', minHeight: 30 };
   return <NLWings
     left={<div style={wing}><NLArtwork mini />{light('working', false)}{light('working', true)}</div>}
-    right={<div style={wing}><NLBuddy face="working" size={20} /><NLBuddy provider="codex" face={codexFace} size={20} /><NLEqualizer T={T} /></div>} />;
+    right={<div style={wing}><NLBuddy face="working" size={20} /><NLBuddy provider="codex" face={codexFace} size={20} /><NLEqualizer T={T} active={!paused} /></div>} />;
 }
 Object.assign(window, { FaceStubs, FaceList, FacePanel, FaceMusic, FaceTray, FaceClip, FaceResting, NLFileThumb, NLArtwork, NLEqualizer, NL_SESS: SESS });
