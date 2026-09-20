@@ -64,6 +64,10 @@ export class Hud extends EventEmitter {
     const fresh = this.helper === null;
     this.helper ??= this.build();
     if (fresh) this.set({ ...EMPTY_HUD, status: 'starting' });
+    // A binary that could not be built does not turn up later: the lookup is
+    // cached for this helper's life. Switching the preference off and on builds
+    // a fresh one and looks again, which is the only thing that could help.
+    else if (this.state.status === 'unavailable' && this.state.reason === 'no-helper') return;
     this.helper.setActive(true);
   }
 
