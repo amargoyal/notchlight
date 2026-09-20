@@ -95,8 +95,16 @@ export class Hud extends EventEmitter {
     return helper;
   }
 
+  /**
+   * Only speak up when something moved. The companion store listens for this
+   * and its own change brings `configure` back round, so a change announced
+   * unconditionally is a loop rather than an update.
+   */
   private set(next: HudSnapshot) {
     const before = this.state;
+    if (before.status === next.status && before.reason === next.reason && before.volume === next.volume
+      && before.muted === next.muted && before.brightness === next.brightness
+      && before.can.length === next.can.length && before.can.every((channel, i) => channel === next.can[i])) return;
     this.state = next;
     if (before.status !== next.status) logEvent('hud', `${before.status} → ${next.status}${next.reason ? ` (${next.reason})` : ''}`);
     this.emit('change', next);
