@@ -87,6 +87,13 @@ export interface SmartShufflePick {
   /** The playlist is yours or collaborative, so the + can add to it. */
   canAdd: boolean;
 }
+export interface SmartShuffleSnapshot {
+  account: SpotifyAccountSnapshot;
+  pick: SmartShufflePick | null;
+  /** An add or a dismiss is on its way to Spotify. */
+  busy: boolean;
+}
+export const EMPTY_SMART_SHUFFLE: SmartShuffleSnapshot = { account: { status: 'off' }, pick: null, busy: false };
 export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', player: 'spotify', playing: false, position: 0, at: 0, volume: -1, track: null, busy: false };
 /** Where playback is now, given the last read and the clock. Paused stays put; nothing runs past the end. */
 export function playhead(music: SpotifySnapshot, now: number): number {
