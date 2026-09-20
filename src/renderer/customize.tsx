@@ -193,3 +193,31 @@ function AppearancePane({ prefs, pref }: PaneProps) {
   </>;
 }
 
+function AgentsPane({ live, state, dispatch, prefs, pref, app }: PaneProps) {
+  const codex = live.state.preferences;
+  return <>
+    <Group title="Claude Code" footer="Gated tools are answered in the notch; everything else in the terminal.">
+      <Row title="Claude Code" description={live.available ? live.snapshot.claude?.message || 'Sessions on this Mac appear in the notch.' : 'Sessions on this Mac appear in the notch.'}>
+        {live.available ? (app.settings.claudeHooks ? <Status>Hooks installed</Status> : <Button onClick={() => void live.run(() => window.notchlight.installClaudeHooks()).then(app.refresh)}>Install Hooks…</Button>)
+          : <Popup label="Sample Claude state" value={state.claude} options={[{ value: 'working', label: 'Working' }, { value: 'asking', label: 'Needs your attention' }, { value: 'done', label: 'Finished' }, { value: 'idle', label: 'Nothing running' }, { value: 'many', label: 'Several sessions' }]} onChange={value => dispatch({ type: 'claude', value })}/>}
+      </Row>
+      <Toggle title="Show buddy" description="A little company in your notch." icon={<Buddy size={16}/>} value={prefs.buddy} onChange={v => pref('buddy', v)}/>
+      <Toggle title="Pulse while working" description="Let the status light gently breathe." value={prefs.pulse} onChange={v => pref('pulse', v)}/>
+      <Toggle title="Tokens per second" description="A small line in the session panel showing the last minute of output." value={prefs.sparkline} onChange={v => pref('sparkline', v)}/>
+    </Group>
+    <Group title="Codex">
+      {live.available ? <>
+        <Toggle title="Monitor local Codex" description="Reads activity from Codex Desktop and CLI on this Mac. Off by default; no account connection is needed." value={codex.codexEnabled} onChange={v => void live.run(() => window.notchlight.updatePreferences({ codexEnabled: v }))}/>
+        <Row title="Connection" description={live.snapshot.codex?.message || 'Enable Codex to read local task activity.'}><Status tone={live.snapshot.codex?.state === 'ready' ? 'good' : live.snapshot.codex?.state === 'disabled' || !live.snapshot.codex ? 'off' : 'wait'}>{live.snapshot.codex?.state === 'ready' ? 'Reading' : live.snapshot.codex?.state === 'missing' ? 'Not found' : live.snapshot.codex?.state === 'unsupported' ? 'Unsupported' : 'Off'}</Status></Row>
+        <Row title="Codex home" description="Where Codex keeps its sessions."><span className="settings-path">{codex.codexHome || '~/.codex'}</span><Button onClick={() => void live.run(() => window.notchlight.chooseCodexHome())}>Choose…</Button>{codex.codexHome && <Button kind="quiet" onClick={() => void live.run(() => window.notchlight.updatePreferences({ codexHome: '' }))}>Use Default</Button>}</Row>
+      </> : <Row title="Sample Codex state" description="Try the states the Agents face can show."><Popup label="Sample Codex state" value={state.codex} options={(['off', 'working', 'asking', 'done', 'failed', 'idle', 'interrupted', 'unknown', 'many'] as const).map(value => ({ value, label: value[0].toUpperCase() + value.slice(1) }))} onChange={value => dispatch({ type: 'codex', value })}/></Row>}
+      <Toggle title="Show robot" description="A cool ivory robot for local Codex tasks." icon={<Robot/>} value={prefs.codexBuddy} onChange={v => pref('codexBuddy', v)}/>
+      <Toggle title="Pulse while working" description="Let Codex’s light breathe while it works." value={prefs.codexPulse} onChange={v => pref('codexPulse', v)}/>
+    </Group>
+    {live.available && <Group title="Codex approvals" footer={<>Codex asks you to review and trust new hook definitions with <code>/hooks</code>, then reload or restart open sessions. Codex’s own approval policy is never changed.</>}>
+      <Row title="Hooks" description="Give immediate status and make approvals possible. Other installed hooks are preserved."><Button onClick={() => void live.run(() => window.notchlight.installCodexHooks())}>Install Hooks</Button><Button kind="quiet" onClick={() => void live.run(() => window.notchlight.installCodexHooks(true))}>Remove</Button></Row>
+      <Toggle title="Answer approvals in Notchlight" description="Allow once, deny, or hand back to Codex. Unanswered requests return to Codex after 55 seconds." value={codex.codexApprovals} onChange={v => void live.run(() => window.notchlight.updatePreferences({ codexApprovals: v }))}/>
+    </Group>}
+  </>;
+}
+
