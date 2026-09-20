@@ -4,7 +4,7 @@
  * Hooks and transcripts feed one live store and one notch overlay. The gallery
  * and customization preview are ordinary windows with a shared Dock lifecycle.
  */
-import { app, BrowserWindow, clipboard, ClipboardItem as ElectronClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, shell, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, ClipboardItem as ElectronClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, safeStorage, shell, Tray } from 'electron';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
@@ -16,6 +16,8 @@ import { ClipboardStore, SKIPPED_FORMATS, type Pasteboard } from './clipboardSto
 import { LineHelper, parsePasteboardChange, type PasteboardChange } from './helperProcess';
 import { SpotifyPlayer } from './spotify';
 import { SpotifyWatcher } from './spotifyWatch';
+import { SpotifyAccount } from './spotifyAccount';
+import { SmartShuffle } from './smartShuffle';
 import { fetchTint } from './tint';
 import { installCompanionIpc } from './companionIpc';
 import { AudioLevels, helperArguments, wantsLevels } from './audioLevels';
@@ -71,6 +73,8 @@ let clips: ClipboardStore;
 let pasteboardWatch: LineHelper<PasteboardChange>;
 let spotify: SpotifyPlayer;
 let watcher: SpotifyWatcher;
+let account: SpotifyAccount;
+let smart: SmartShuffle;
 let levels: AudioLevels;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
