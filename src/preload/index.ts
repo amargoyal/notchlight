@@ -56,5 +56,6 @@ contextBridge.exposeInMainWorld('notchlight', {
   updateAppSettings: (patch: AppSettingsPatch) => ipcRenderer.invoke('app:settings:update', patch),
   checkForUpdates: () => ipcRenderer.invoke('app:updates'),
   revealConfigFolder: () => ipcRenderer.invoke('app:config-folder'),
-  openGallery: () => ipcRenderer.invoke('app:gallery')
+  openGallery: () => ipcRenderer.invoke('app:gallery'),
+  installClaudeHooks: () => ipcRenderer.invoke('app:claude-hooks')
 });
