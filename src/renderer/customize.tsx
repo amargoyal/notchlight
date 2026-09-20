@@ -296,3 +296,23 @@ function ClipboardPane({ live, prefs, pref, showView }: PaneProps) {
   </>;
 }
 
+function AboutPane({ live, dispatch, app }: PaneProps) {
+  const [confirming, setConfirming] = useState(false);
+  const s = app.settings;
+  const reset = () => { if (live.available) void live.run(() => window.notchlight.updatePreferences(DEFAULT_PREFERENCES)); else dispatch({ type: 'reset' }); setConfirming(false); };
+  return <>
+    <div className="settings-identity"><Buddy size={44}/><div><h2>Notchlight</h2><p>Version {s.version} · Claude and Codex activity, Spotify, and a file shelf, within reach.</p></div><span className="settings-identity-actions"><Button disabled={!live.available} onClick={() => void live.run(() => window.notchlight.checkForUpdates())}>Check for Updates</Button></span></div>
+    <Group title="This Mac">
+      <Row title="Cutout" description={s.cutout ? 'Measured on the built-in display each time Notchlight starts.' : 'No cutout on this display. The island can hang off the menu bar instead; see General.'}><span className="settings-path">{s.cutout ? `${s.cutout.w} × ${s.cutout.h} pt` : 'None'}</span></Row>
+      <Row title="Config folder" description={`${s.configDir} holds config.json, the clipboard history and the log.`}><Button disabled={!live.available} onClick={() => void live.run(() => window.notchlight.revealConfigFolder())}><Icon name="folder" size={13}/>Reveal in Finder</Button></Row>
+      <Row title="Faces gallery" description="Every face and state, side by side."><Button disabled={!live.available} onClick={() => void live.run(() => window.notchlight.openGallery())}>Open Gallery</Button></Row>
+    </Group>
+    <Group title="Reset">
+      <Row title={live.available ? 'Reset all preferences' : 'Reset the preview'} description={live.available ? 'Puts every face preference back to its default. Sessions, hooks, config.json and the clipboard history are kept.' : 'Puts the sample notch back the way it started.'}>
+        {confirming ? <><Button kind="danger" onClick={reset}>{live.available ? 'Reset Preferences' : 'Reset Preview'}</Button><Button kind="quiet" onClick={() => setConfirming(false)}>Cancel</Button></> : <Button onClick={() => setConfirming(true)}>Reset…</Button>}
+      </Row>
+    </Group>
+    <p className="settings-credit">Made by Amar Goyal. <a href="https://github.com/amargoyal/notchlight" target="_blank" rel="noreferrer">Source on GitHub</a></p>
+  </>;
+}
+
