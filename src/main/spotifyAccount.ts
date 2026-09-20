@@ -110,6 +110,11 @@ export interface AccountOptions {
 }
 
 /** One account: signed out until a browser says otherwise, and a bearer token for as long as the refresh token holds. */
+/** Spotify's own words for a refusal, or ours. */
+const describeRefusal = (body: Record<string, unknown> | null, fallback = 'Spotify refused the sign-in.') => {
+  const detail = body && typeof body.error_description === 'string' ? body.error_description : body && typeof body.error === 'string' ? body.error : '';
+  return detail ? `${fallback.replace(/\\.$/, '')}: ${detail}.` : fallback;
+};
 /** What the browser tab shows once the answer is in. */
 const answerPage = (message: string) => `<!doctype html><meta charset="utf-8"><title>Notchlight</title><body style="font: 15px/1.5 -apple-system, sans-serif; color: #f2ede7; background: #141210; display: grid; place-items: center; height: 100vh; margin: 0"><p style="max-width: 32em; text-align: center">${message.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!)}</p></body>`;
 
@@ -203,7 +208,11 @@ export class SpotifyAccount extends EventEmitter {
         open(authorizeUrl(this.clientId, state, challenge, redirectUri)).catch(error => finish(new Error(`The browser could not be opened (${(error as Error).message}).`)));
       });
     }).catch(error => { this.settle((error as Error).message); throw error; });
-    void code; void verifier; void redirectUri;
+    const { status, body } = await this.accounts({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, client_id: this.clientId, code_verifier: verifier }).catch(error => { throw new Error(`Spotify could not be reached to finish the sign-in (${(error as Error).message}).`); });
+    if (status !== 200 || !body) { const why = describeRefusal(body); this.settle(why); throw new Error(why); }
+    this.record = this.accept(body, null);
+    this.persist();
+    this.settle();
   }
   /** One call to the accounts service, with a deadline; the body as JSON, or null when it is not. */
   private async accounts(form: Record<string, string>): Promise<{ status: number; body: Record<string, unknown> | null }> {
@@ -222,6 +231,10 @@ export class SpotifyAccount extends EventEmitter {
     const expiresIn = typeof body.expires_in === 'number' && body.expires_in > 0 ? body.expires_in : 3600;
     if (typeof access !== 'string' || !access || !refresh) throw new Error('Spotify’s answer had no token in it.');
     return { clientId: this.clientId, accessToken: access, refreshToken: refresh, expiresAt: this.now() + expiresIn * 1000, scope: typeof body.scope === 'string' ? body.scope : previous?.scope ?? '', user: previous?.user };
+  }
+  private persist(): void {
+    try { writeTokenFile(this.options.file, this.record, this.cipher); }
+    catch (error) { logEvent('spotify', `account: could not save the sign-in (${(error as Error).message})`); }
   }
   stop(): void { this.signing?.cancel('Notchlight is quitting.'); }
 }
