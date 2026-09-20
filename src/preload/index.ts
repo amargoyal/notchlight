@@ -53,5 +53,6 @@ contextBridge.exposeInMainWorld('notchlight', {
   onUpdate: (cb: (info: UpdateInfo) => void) => subscribe('update', cb),
   respondToUpdate: (response: UpdateResponse) => ipcRenderer.send('update:respond', response),
   getAppSettings: () => ipcRenderer.invoke('app:settings'),
-  updateAppSettings: (patch: AppSettingsPatch) => ipcRenderer.invoke('app:settings:update', patch)
+  updateAppSettings: (patch: AppSettingsPatch) => ipcRenderer.invoke('app:settings:update', patch),
+  checkForUpdates: () => ipcRenderer.invoke('app:updates')
 });
