@@ -83,3 +83,43 @@ export function isPick(playback: Playback, members: ReadonlySet<string>): boolea
   if (!playback.playlistId || !playback.trackUri || playback.smartShuffle === false) return false;
   return !members.has(playback.trackUri) && !(playback.linkedUri && members.has(playback.linkedUri));
 }
+
+export interface SmartShuffleOptions {
+  /** Skip the current track through the player: instant, and no Premium needed. */
+  skip: () => Promise<void>;
+  /** How long a track change waits before the read, so a run of skips is one read. */
+  settleMs?: number;
+  /** While the same track keeps playing, look again this often: Smart Shuffle can be switched mid-track. */
+  heartbeatMs?: number;
+  /** Pages of a hundred a playlist may run to; past that its membership is unknown and nothing is marked. */
+  maxPages?: number;
+}
+type Playlist = { info: PlaylistInfo; members: Set<string> };
+
+/** Follows the player's current track and says whether it is a pick; answers with the + and the ×. */
+export class SmartShuffle extends EventEmitter {
+  private enabled = false;
+  private trackId: string | null = null;
+  private playing = false;
+  private pick: SmartShufflePick | null = null;
+  private busy = false;
+  private readonly settleMs: number;
+  private readonly heartbeatMs: number;
+  private readonly maxPages: number;
+  constructor(private readonly account: SpotifyAccount, private readonly options: SmartShuffleOptions) {
+    super();
+    this.settleMs = options.settleMs ?? 500;
+    this.heartbeatMs = options.heartbeatMs ?? 30_000;
+    this.maxPages = options.maxPages ?? 50;
+  }
+  snapshot(): SmartShuffleSnapshot { return { account: this.account.snapshot(), pick: this.pick, busy: this.busy }; }
+  private publish(): void { this.emit('change', this.snapshot()); }
+  private setPick(pick: SmartShufflePick | null): void {
+    if (pick === this.pick || pick && this.pick && pick.trackId === this.pick.trackId && pick.playlistId === this.pick.playlistId && pick.canAdd === this.pick.canAdd) return;
+    if (pick) logEvent('spotify', `smart shuffle: pick from ${pick.playlistName}`);
+    this.pick = pick;
+    this.publish();
+  }
+  private setBusy(busy: boolean): void { if (busy !== this.busy) { this.busy = busy; this.publish(); } }
+  stop(): void { /* nothing scheduled yet */ }
+}
