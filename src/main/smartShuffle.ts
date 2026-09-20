@@ -210,5 +210,34 @@ export class SmartShuffle extends EventEmitter {
     logEvent('spotify', `smart shuffle: read ${members.size} of ${info.name}`);
     return entry;
   }
+  /** The pick the buttons are for, or a sentence about why there is none. */
+  private current(): SmartShufflePick {
+    const pick = this.pick;
+    if (!pick || pick.trackId !== this.trackId) throw new Error('There is no Smart Shuffle pick to answer right now.');
+    if (this.busy) throw new Error('Still answering the last pick.');
+    return pick;
+  }
+  /** The +: the track becomes one of the playlist's own, and the mark goes. */
+  async add(): Promise<void> {
+    const pick = this.current();
+    if (!pick.canAdd) throw new Error(`${pick.playlistName} is not yours to add to.`);
+    this.setBusy(true);
+    try {
+      const { status, body } = await this.account.request(`/playlists/${pick.playlistId}/tracks`, { method: 'POST', body: JSON.stringify({ uris: [pick.trackId] }) });
+      if (status !== 200 && status !== 201) {
+        const detail = body && typeof body === 'object' && (body as { error?: { message?: unknown } }).error?.message;
+        throw new Error(status === 403 ? `Spotify would not let this account add to ${pick.playlistName}.` : `Spotify did not add the track${typeof detail === 'string' ? ` (${detail})` : ''}.`);
+      }
+      const playlist = this.playlists.get(pick.playlistId);
+      if (playlist) {
+        playlist.members.add(pick.trackId);
+        const snapshotId = body && typeof body === 'object' ? (body as { snapshot_id?: unknown }).snapshot_id : undefined;
+        if (typeof snapshotId === 'string') playlist.info.snapshotId = snapshotId;
+      }
+      logEvent('spotify', `smart shuffle: added to ${pick.playlistName}`);
+      if (this.pick === pick) this.setPick(null);
+      this.emit('notice', `Added to ${pick.playlistName}.`);
+    } finally { this.setBusy(false); }
+  }
   stop(): void { this.clearTimers(); }
 }
