@@ -148,3 +148,6 @@ function PreviewStrip({ live, state, dispatch, onCustomize }: { live: LiveContro
   </section>;
 }
 
+/* ---- panes ---- */
+interface PaneProps { live: LiveController; state: PreviewState; dispatch: Dispatch<PreviewAction>; prefs: PreviewPreferences; pref: <K extends keyof PreviewPreferences>(key: K, value: PreviewPreferences[K]) => void; app: AppSettingsController; showView: (view: View) => void }
+
