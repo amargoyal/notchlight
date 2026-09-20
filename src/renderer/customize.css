@@ -24,3 +24,12 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-sidebar-foot b { color: var(--ui-text); font-weight: 600; }
 .settings-badge { margin-left: auto; border: 1px solid var(--ui-line); border-radius: 5px; padding: 2px 6px; font-size: 10px; }
 
+/* ---- main column ---- */
+.settings-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.settings-header { display: flex; align-items: center; justify-content: space-between; height: 52px; padding: 0 28px; flex: none; -webkit-app-region: drag; }
+.settings-header h1 { margin: 0; font-size: 15px; font-weight: 600; }
+.settings-pill { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ui-muted); border: 1px solid var(--ui-line); border-radius: 99px; padding: 3px 9px; -webkit-app-region: no-drag; }
+.settings-pill i, .settings-status i, .settings-preview-title i { width: 8px; height: 8px; border-radius: 50%; background: #5fbe86; box-shadow: 0 0 6px #5fbe8688; flex: none; }
+.settings-content { flex: 1; min-height: 0; overflow: auto; padding: 0 28px 28px; display: flex; flex-direction: column; gap: 22px; }
+.settings-description { margin: 0; color: var(--ui-muted); }
+
