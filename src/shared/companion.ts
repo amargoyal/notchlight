@@ -180,6 +180,7 @@ export interface CompanionSnapshot {
 }
 export interface OperationResult { ok: boolean; error?: string }
 export type SpotifyCommand = 'toggle' | 'next' | 'previous' | 'seek' | 'volume';
+export type SmartShuffleAnswer = 'add' | 'dismiss';
 export interface CompanionBridge {
   installCodexHooks(remove?: boolean): Promise<OperationResult>;
   chooseCodexHome(): Promise<OperationResult>;
@@ -199,6 +200,11 @@ export interface CompanionBridge {
   connectSpotify(): Promise<OperationResult>;
   openSpotify(): Promise<OperationResult>;
   controlSpotify(command: SpotifyCommand, position?: number): Promise<OperationResult>;
+  /** Sign in to the Spotify account in the browser, for Smart Shuffle picks. */
+  signInSpotify(): Promise<OperationResult>;
+  signOutSpotify(): Promise<OperationResult>;
+  /** Answer the current pick: + adds it to the playlist, × skips it. */
+  answerPick(answer: SmartShuffleAnswer): Promise<OperationResult>;
   /** Five band levels, bass first, each 0…1, while Spotify plays and the bars are on screen. */
   onMusicLevels(cb: (levels: number[]) => void): () => void;
   /** Put a history item back on the clipboard. */
