@@ -33,6 +33,11 @@ export interface Playback {
   playing: boolean;
 }
 const str = (v: unknown) => typeof v === 'string' && v ? v : null;
+/** A status and, when Spotify explained itself, its sentence — for the log. */
+const answered = (status: number, body: unknown) => {
+  const message = body && typeof body === 'object' ? (body as { error?: { message?: unknown } }).error?.message : undefined;
+  return typeof message === 'string' ? `${status} (${message})` : String(status);
+};
 /** spotify:playlist:… and the older spotify:user:…:playlist:… both name a playlist. */
 export const playlistIdOf = (uri: string | null): string | null => uri ? /^spotify:(?:user:[^:]+:)?playlist:([A-Za-z0-9]{22})$/.exec(uri)?.[1] ?? null : null;
 /** GET /me/player into a Playback; null when nothing is playing (a 204, or a body with no item). */
@@ -170,7 +175,7 @@ export class SmartShuffle extends EventEmitter {
       if (!trackId || !this.enabled) return;
       const { status, body } = await this.account.request('/me/player');
       if (this.trackId !== trackId || !this.enabled) return;
-      if (status !== 200) { if (status !== 204) logEvent('spotify', `smart shuffle: playback state answered ${status}`); this.setPick(null); return; }
+      if (status !== 200) { if (status !== 204) logEvent('spotify', `smart shuffle: playback state answered ${answered(status, body)}`); this.setPick(null); return; }
       const playback = parsePlayback(body);
       // The Web API and the scripting read can disagree for a beat around a skip; the heartbeat looks again.
       if (!playback || playback.trackUri !== trackId) return;
@@ -202,7 +207,7 @@ export class SmartShuffle extends EventEmitter {
   private async playlist(id: string): Promise<Playlist | null> {
     const head = await this.account.request(`/playlists/${id}?fields=name,snapshot_id,owner(id),collaborative,items(total)`);
     const info = head.status === 200 ? parsePlaylist(head.body) : null;
-    if (!info) { logEvent('spotify', `smart shuffle: playlist ${id} answered ${head.status}`); return null; }
+    if (!info) { logEvent('spotify', `smart shuffle: playlist ${id} answered ${answered(head.status, head.body)}`); return null; }
     const cached = this.playlists.get(id);
     if (cached && cached.info.snapshotId === info.snapshotId) { cached.info = info; return cached; }
     if (info.total > this.maxPages * 100) { logEvent('spotify', `smart shuffle: ${info.name} has ${info.total} tracks, too many to check`); return null; }
@@ -212,7 +217,7 @@ export class SmartShuffle extends EventEmitter {
     for (let page = 0; next && page < this.maxPages; page++) {
       const answer = await this.account.request(next);
       const parsed = answer.status === 200 ? parsePlaylistPage(answer.body) : null;
-      if (!parsed) { logEvent('spotify', `smart shuffle: playlist items answered ${answer.status}`); return null; }
+      if (!parsed) { logEvent('spotify', `smart shuffle: playlist items answered ${answered(answer.status, answer.body)}`); return null; }
       for (const uri of parsed.uris) members.add(uri);
       next = parsed.next;
     }
