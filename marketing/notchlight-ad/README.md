@@ -1,5 +1,7 @@
 # Notchlight — A little more useful
 
+A separate **15-second social cut** is available in `short.html`. See [SHORT-CUT.md](SHORT-CUT.md) for timing, exports and build commands.
+
 Finished vertical social ad, 36 seconds, 1080 × 1920, 60 fps. No narration. The source uses the supplied Claude composition's UI, buddies, and original vector assets, with a new timeline and camera system. The original Downloads files are unchanged.
 
 ## Deliverables
@@ -54,3 +56,5 @@ npm run render
 - Rechecked an encoded frame at the Allow once click rather than relying only on browser screenshots.
 
 See `storyboard.md` for timing and research references.
+
+Chosen music revision: [Ganja with synchronized playback and volume](DYNAMIC-MUSIC.md).

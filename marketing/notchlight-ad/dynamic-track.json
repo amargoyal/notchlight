@@ -1,0 +1,18 @@
+{
+  "title": "Ganja",
+  "artist": "Ooyy",
+  "art": "./assets/ganja-cover.jpg",
+  "tint": "#89bdb0",
+  "duration": 175,
+  "offset": 33.69,
+  "pause": 3.75,
+  "play": 4.25,
+  "scroll": [
+    4.6,
+    4.8,
+    5.0
+  ],
+  "initialVolume": 60,
+  "volumeStep": 5,
+  "source": "https://www.epidemicsound.com/music/tracks/97b32bde-059a-3e11-b501-12d99abb3e67/"
+}

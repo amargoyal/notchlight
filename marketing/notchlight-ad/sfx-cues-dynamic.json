@@ -1,0 +1,58 @@
+[
+  {
+    "seconds": 3.75,
+    "effect": "Pause"
+  },
+  {
+    "seconds": 4.25,
+    "effect": "Play"
+  },
+  {
+    "seconds": 0.12,
+    "effect": "Immediate notch unfold"
+  },
+  {
+    "seconds": 3.05,
+    "effect": "Music tab"
+  },
+  {
+    "seconds": 4.6,
+    "effect": "Volume: three ascending wheel ticks"
+  },
+  {
+    "seconds": 5.5,
+    "effect": "Fold to resting notch"
+  },
+  {
+    "seconds": 6.15,
+    "effect": "File lifted"
+  },
+  {
+    "seconds": 6.5,
+    "effect": "File carry"
+  },
+  {
+    "seconds": 7.05,
+    "effect": "Tray unfolds"
+  },
+  {
+    "seconds": 7.72,
+    "effect": "File lands"
+  },
+  {
+    "seconds": 8.85,
+    "effect": "Clipboard tab"
+  },
+  {
+    "seconds": 10.1,
+    "effect": "Copied: light pop"
+  },
+  {
+    "seconds": 11.55,
+    "effect": "Everything folds away"
+  },
+  {
+    "seconds": 12.3,
+    "effect": "New logo resolves"
+  }
+]
