@@ -260,3 +260,22 @@ function MusicPane({ live, state, dispatch, prefs, pref }: PaneProps) {
   </>;
 }
 
+function TrayPane({ live, state, dispatch, prefs, pref }: PaneProps) {
+  const nextSample = SAMPLE_FILES.find(file => !state.files.some(f => f.id === file.id));
+  return <>
+    <Group title="Shelf" footer={live.available ? 'Native drags keep the reference in Tray. Save Copy… makes a confirmed copy in a folder; originals are never deleted.' : 'Drag a sample file from the notch into another face, or click one to add it.'}>
+      <Row title="Thumbnails" description="Large shows the file preview; Small keeps more items in view."><Segmented label="Thumbnails" value={prefs.thumbnails} options={[{ value: 'small', label: 'Small' }, { value: 'large', label: 'Large' }]} onChange={v => pref('thumbnails', v)}/></Row>
+      <Toggle title="Remove after Save Copy" description={live.available ? 'Clears an item once a copy lands in a folder. Native drags keep the item.' : 'Clears the sample shelf when a file arrives.'} value={prefs.removeAfterTransfer} onChange={v => pref('removeAfterTransfer', v)}/>
+      <Row title="Add files" description={live.available ? 'Or drop them from Finder onto the notch.' : 'Sample files, for a look at the shelf.'}>
+        {live.available ? <Button onClick={() => void live.run(() => window.notchlight.pickFiles())}><Icon name="folder" size={13}/>Add Files…</Button>
+          : <><Button disabled={!nextSample} onClick={() => { if (nextSample) dispatch({ type: 'files', files: [...state.files, nextSample] }); }}>Add Sample File</Button><Button kind="quiet" disabled={state.files.length === 0} onClick={() => dispatch({ type: 'files', files: [] })}>Empty Tray</Button></>}
+      </Row>
+    </Group>
+    {live.available && <Group title="Right now">
+      <Row title={`${live.state.files.length} ${live.state.files.length === 1 ? 'item' : 'items'} on the shelf`} description={live.state.files.length ? live.state.files.slice(0, 3).map(f => f.name).join(' · ') + (live.state.files.length > 3 ? ' …' : '') : 'Nothing set aside yet.'}>
+        <Button kind="danger" disabled={!live.state.files.length} onClick={() => void live.run(() => window.notchlight.removeFiles(live.state.files.map(f => f.id)))}>Empty Tray</Button>
+      </Row>
+    </Group>}
+  </>;
+}
+
