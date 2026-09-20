@@ -42,3 +42,9 @@ export function pkcePair(bytes: Buffer = randomBytes(64)): { verifier: string; c
   const verifier = base64url(bytes);
   return { verifier, challenge: base64url(createHash('sha256').update(verifier).digest()) };
 }
+/** The page the browser opens to ask for access. */
+export function authorizeUrl(clientId: string, state: string, challenge: string, redirectUri: string = REDIRECT_URI): string {
+  const url = new URL(AUTHORIZE_URL);
+  url.search = new URLSearchParams({ response_type: 'code', client_id: clientId, redirect_uri: redirectUri, scope: SCOPES.join(' '), state, code_challenge_method: 'S256', code_challenge: challenge }).toString();
+  return url.href;
+}
