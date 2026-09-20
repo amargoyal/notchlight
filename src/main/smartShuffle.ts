@@ -68,7 +68,9 @@ export function parsePlaylistPage(body: unknown): { uris: string[]; next: string
   const raw = body as { items: unknown[]; next?: unknown };
   const uris: string[] = [];
   for (const item of raw.items) {
-    const track = item && typeof item === 'object' && (item as Record<string, unknown>).track;
+    // Since the March 2026 API the entry is `item`; `track` is what it was called before.
+    const entry = item && typeof item === 'object' ? item as Record<string, unknown> : null;
+    const track = entry?.item ?? entry?.track;
     if (!track || typeof track !== 'object') continue;
     const t = track as Record<string, unknown>;
     const uri = str(t.uri);
