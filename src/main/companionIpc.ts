@@ -88,6 +88,8 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
   handle('clipboard:clear', async (_e, includePinned) => { await clips.clear(includePinned); store.notice(includePinned ? 'Clipboard history and pins cleared.' : 'Clipboard history cleared. Pinned items were kept.'); });
   handle('clipboard:pause', (_e, paused) => { if (typeof paused !== 'boolean') throw new Error('Invalid pause.'); clips.setPaused(paused); });
   handle('spotify:control', (_e, command, position) => spotify.command(command, position));
+  handle('spotify:signin', async () => { await account.signIn(); store.notice(`Signed in to Spotify${account.snapshot().user ? ` as ${account.snapshot().user}` : ''}.`); });
+  handle('spotify:signout', () => { account.signOut(); store.notice('Signed out of Spotify. The saved sign-in was removed from this Mac.'); });
   return async () => {
     const result = await dialog.showOpenDialog(dialogWindow(), { title: 'Add to Tray', properties: ['openFile', 'openDirectory', 'multiSelections'] });
     if (!result.canceled) await store.add(result.filePaths);
