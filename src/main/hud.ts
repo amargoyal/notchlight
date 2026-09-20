@@ -77,8 +77,13 @@ export class Hud extends EventEmitter {
    * would otherwise start a fresh helper on the way out the door.
    */
   stop(): void {
-    this.configure(false, this.optionKey);
+    // The flag goes up first: tearing down emits a change, the companion store
+    // answers it, and the answer comes straight back here.
     this.stopped = true;
+    this.wanted = false;
+    this.helper?.stop();
+    this.helper = null;
+    this.set({ ...EMPTY_HUD });
   }
 
   private build(): LineHelper<HudEvent> {
