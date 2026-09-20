@@ -215,5 +215,13 @@ export class SpotifyAccount extends EventEmitter {
       return { status: response.status, body };
     } finally { clearTimeout(timer); }
   }
+  /** The token response into a record, keeping the old refresh token when Spotify sends none. */
+  private accept(body: Record<string, unknown>, previous: TokenRecord | null): TokenRecord {
+    const access = body.access_token;
+    const refresh = typeof body.refresh_token === 'string' && body.refresh_token ? body.refresh_token : previous?.refreshToken;
+    const expiresIn = typeof body.expires_in === 'number' && body.expires_in > 0 ? body.expires_in : 3600;
+    if (typeof access !== 'string' || !access || !refresh) throw new Error('Spotify’s answer had no token in it.');
+    return { clientId: this.clientId, accessToken: access, refreshToken: refresh, expiresAt: this.now() + expiresIn * 1000, scope: typeof body.scope === 'string' ? body.scope : previous?.scope ?? '', user: previous?.user };
+  }
   stop(): void { this.signing?.cancel('Notchlight is quitting.'); }
 }
