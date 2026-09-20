@@ -31,6 +31,8 @@
 .mp-track-meta h2 { font-size: 14px; line-height: 1.25; font-weight: 600; margin: 0 0 2px; letter-spacing: -.015em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-track-meta p { font-size: 11px; color: #a69c93; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-transport { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 2px; }
+/* A Smart Shuffle pick: the mark before the artist, and its answers beside the track. */
+.mp-pick { display: inline-flex; align-items: center; vertical-align: -1px; margin-right: 5px; color: #d9c4a6; }
 .mp-play { color: #f2ede7; }
 .mp-seek { display: flex; align-items: center; gap: 8px; margin-top: 8px; font: 9px/1 ui-monospace, monospace; color: #a69c93; }
 .mp-seek span { flex: none; min-width: 28px; }
