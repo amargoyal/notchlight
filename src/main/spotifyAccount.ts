@@ -145,5 +145,16 @@ export class SpotifyAccount extends EventEmitter {
     if (this.record) logEvent('spotify', `account: found a sign-in for ${this.record.user?.name ?? 'someone'}`);
     this.settle();
   }
+  /** The Client ID from preferences. A sign-in belongs to one id; another id starts from signed out. */
+  configure(clientId: string): void {
+    const id = isClientId(clientId) ? clientId.toLowerCase() : '';
+    if (id === this.clientId) return;
+    this.clientId = id;
+    if (this.record && this.record.clientId !== id) {
+      this.record = null;
+      try { writeTokenFile(this.options.file, null, this.cipher); } catch { /* the id check hides it anyway */ }
+    }
+    this.settle();
+  }
   stop(): void { /* nothing waits yet */ }
 }
