@@ -289,6 +289,7 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'Music · missing artwork', note: 'The music symbol holds the composition together.', patch: s => ({ ...s, music: { ...s.music, missingArtwork: true } }) },
   { name: 'Music · unavailable', note: 'Explain what happened and offer a way back.', patch: s => ({ ...s, music: { ...s.music, source: 'unavailable' } }) },
   { name: 'Music · long title, wider notch', note: 'A two-line title and a 240 × 38pt camera exclusion.', notchW: 240, notchH: 38, patch: s => ({ ...s, music: { ...s.music, index: 2 } }) },
+  { name: 'Music · Smart Shuffle pick', note: 'A track Spotify slipped in: the mark by the artist, + keeps it, × moves on.', patch: s => ({ ...s, music: { ...s.music, index: 3 } }) },
   { name: 'Resting · everything on', note: 'Agent identities nearest the lens; Music and Tray use the outer space.', patch: s => ({ ...s, open: false }) },
   { name: 'Resting · music only', note: 'Album on the left. Playback on the right.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
   { name: 'Resting · Claude and music', note: 'Two faces share the bar without crowding it.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restTray: false } }) },
