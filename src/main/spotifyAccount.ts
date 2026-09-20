@@ -58,3 +58,17 @@ export function parseCallback(url: string, expectedState: string): { code: strin
   const code = parsed.searchParams.get('code');
   return code ? { code } : { error: 'Spotify did not send a code.' };
 }
+
+/** What a sign-in leaves behind. */
+export interface TokenRecord {
+  /** The app it was issued to; a different id in preferences makes it worthless. */
+  clientId: string;
+  refreshToken: string;
+  accessToken: string;
+  /** ms since epoch when the access token stops working. */
+  expiresAt: number;
+  scope: string;
+  user?: { id: string; name: string };
+}
+/** Electron's safeStorage, or anything shaped like it. */
+export interface Cipher { encrypt(text: string): Buffer; decrypt(data: Buffer): string }
