@@ -442,7 +442,8 @@ to looking at the types every half second.
 Run `npm run customize` or choose **Customize Notchlight…** from the menu bar
 for the native window. Its controls update the live notch and save preferences.
 Connect Spotify in Music; macOS may request Automation access and, separately,
-audio capture for the visualizer. No Spotify account sign-in is required here.
+audio capture for the visualizer. No Spotify account sign-in is required for
+playback; only [Smart Shuffle picks](docs/smart-shuffle.md) ask for one.
 
 Tray keeps real file references. Click selects one, Command-click adds,
 Shift-click takes a range, Command-A takes all; every action then works on
