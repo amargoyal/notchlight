@@ -62,3 +62,19 @@ export function parsePlaylist(body: unknown): PlaylistInfo | null {
   if (!snapshotId) return null;
   return { name: str(raw.name) ?? 'the playlist', snapshotId, ownerId: (owner && str(owner.id)) ?? '', collaborative: raw.collaborative === true, total: typeof tracks?.total === 'number' ? tracks.total : 0 };
 }
+/** One page of a playlist's items: every track uri on it, and where the next page is. */
+export function parsePlaylistPage(body: unknown): { uris: string[]; next: string | null } | null {
+  if (!body || typeof body !== 'object' || !Array.isArray((body as Record<string, unknown>).items)) return null;
+  const raw = body as { items: unknown[]; next?: unknown };
+  const uris: string[] = [];
+  for (const item of raw.items) {
+    const track = item && typeof item === 'object' && (item as Record<string, unknown>).track;
+    if (!track || typeof track !== 'object') continue;
+    const t = track as Record<string, unknown>;
+    const uri = str(t.uri);
+    if (uri) uris.push(uri);
+    const linked = t.linked_from && typeof t.linked_from === 'object' ? str((t.linked_from as Record<string, unknown>).uri) : null;
+    if (linked) uris.push(linked);
+  }
+  return { uris, next: str(raw.next) };
+}
