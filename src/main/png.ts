@@ -88,3 +88,47 @@ export function trayIcon(): Buffer {
   clear(20, 12, 24, 16);
   return encodePng(w, h, px);
 }
+
+/**
+ * The menu bar mark: the notch with its light on, from the 1a logo package
+ * (marketing/logo/notchlight-menubar-template.svg), 32×32 for a 16pt template
+ * image at Retina scale.
+ *
+ * The screen-edge line sits at 40% and the notch at 100%, with the light
+ * punched out as a hole so macOS can recolour the whole thing for light and
+ * dark menu bars. Rendered here rather than shipped as a bitmap: each pixel is
+ * sampled sixteen times against the same 100-unit geometry the SVG uses, so the
+ * curves stay smooth without a blob in the repo.
+ */
+export function menubarIcon(): Buffer {
+  const size = 32;
+  const px = Buffer.alloc(size * size * 4, 0);
+  // The mark spans y 28…66 in the SVG; +3 centres it in the square.
+  const notch = (u: number, v: number) => {
+    if (u < 16 || u > 84 || v < 33 || v > 69) return false;
+    if (v > 53 && u < 32 && (u - 32) ** 2 + (v - 53) ** 2 > 256) return false;
+    if (v > 53 && u > 68 && (u - 68) ** 2 + (v - 53) ** 2 > 256) return false;
+    return (u - 34) ** 2 + (v - 53) ** 2 > 42.25;
+  };
+  const bar = (u: number, v: number) => {
+    if (v < 31 || v > 35) return false;
+    if (u < 2) return (u - 2) ** 2 + (v - 33) ** 2 <= 4;
+    if (u > 98) return (u - 98) ** 2 + (v - 33) ** 2 <= 4;
+    return true;
+  };
+  const step = 100 / size;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let alpha = 0;
+      for (let sy = 0; sy < 4; sy++) {
+        for (let sx = 0; sx < 4; sx++) {
+          const u = (x + (sx + 0.5) / 4) * step;
+          const v = (y + (sy + 0.5) / 4) * step;
+          alpha += notch(u, v) ? 1 : bar(u, v) ? 0.4 : 0;
+        }
+      }
+      px[(y * size + x) * 4 + 3] = Math.round((alpha / 16) * 255);
+    }
+  }
+  return encodePng(size, size, px);
+}
