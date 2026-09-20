@@ -316,3 +316,40 @@ function AboutPane({ live, dispatch, app }: PaneProps) {
   </>;
 }
 
+/* ---- the window ---- */
+function App() {
+  const { state, dispatch } = usePreview();
+  const live = useCompanion();
+  const prefs = live.available ? live.state.preferences : state.preferences;
+  const [section, setSection] = useState<Section>('general');
+  const [query, setQuery] = useState('');
+  const app = useAppSettings(live);
+  const current = SECTIONS.find(s => s.id === section)!;
+  const pref = <K extends keyof PreviewPreferences>(key: K, value: PreviewPreferences[K]) => {
+    if (live.available) void live.run(() => window.notchlight.updatePreferences({ [key]: value }));
+    else dispatch({ type: 'preferences', patch: { [key]: value } });
+  };
+  const showView = (view: View) => { if (live.available) void live.run(() => window.notchlight.setView(view)); else dispatch({ type: 'view', view }); };
+  const navigate = (id: Section) => {
+    setSection(id);
+    if (id === 'agents' || id === 'music' || id === 'tray' || (id === 'clipboard' && prefs.clipboardEnabled)) showView(id);
+  };
+  const panes: Record<Section, (props: PaneProps) => ReactNode> = { general: GeneralPane, appearance: AppearancePane, agents: AgentsPane, music: MusicPane, tray: TrayPane, clipboard: ClipboardPane, about: AboutPane };
+  const Pane = panes[section];
+  return <div className={`customize-app theme-${prefs.theme}`}>
+    <SearchContext.Provider value={query}>
+      <Sidebar section={section} onSelect={navigate} query={query} onQuery={setQuery} live={live.available} version={app.settings.version}/>
+      <main className="settings-main">
+        <header className="settings-header"><h1>{current.label}</h1><span className="settings-pill"><i/>{live.available ? 'Saved on this Mac' : 'Preview only'}</span></header>
+        <div className="settings-content">
+          <p className="settings-description">{current.description}</p>
+          <PreviewStrip live={live} state={state} dispatch={dispatch} onCustomize={() => setSection('appearance')}/>
+          <fieldset className="settings-controls" disabled={live.available && !live.ready}>
+            <Pane live={live} state={state} dispatch={dispatch} prefs={prefs} pref={pref} app={app} showView={showView}/>
+          </fieldset>
+        </div>
+      </main>
+    </SearchContext.Provider>
+  </div>;
+}
+createRoot(document.getElementById('root')!).render(<App/>);
