@@ -77,3 +77,13 @@ export function validateAppSettings(value: unknown): AppSettingsPatch {
   }
   return result;
 }
+
+export interface AppBridge {
+  getAppSettings(): Promise<AppSettings>;
+  updateAppSettings(patch: AppSettingsPatch): Promise<AppSettingsResult>;
+  /** Ask GitHub now, and say what came back. */
+  checkForUpdates(): Promise<{ ok: boolean; error?: string }>;
+  revealConfigFolder(): Promise<{ ok: boolean; error?: string }>;
+  openGallery(): Promise<{ ok: boolean; error?: string }>;
+  installClaudeHooks(): Promise<{ ok: boolean; error?: string }>;
+}
