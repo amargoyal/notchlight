@@ -59,6 +59,10 @@ function Status({ tone = 'good', children }: { tone?: 'good' | 'wait' | 'off' | 
 function Button({ kind, children, ...rest }: { kind?: 'primary' | 'danger' | 'quiet' } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button type="button" {...rest} className={`settings-button${kind ? ` is-${kind}` : ''}`}>{children}</button>;
 }
+/** The app icon as the Dock draws it: the buddy on a black rounded square. */
+function AppIcon({ size }: { size: number }) {
+  return <span className="settings-app-icon" style={{ width: size, height: size, borderRadius: Math.round(size * 0.23) }}><Buddy size={Math.round(size * 0.64)}/></span>;
+}
 const Robot = () => <span style={{ width: 16, height: 16, borderRadius: 5, background: '#dce7ea', border: '1.5px solid #89aab5', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><i style={{ width: 8, height: 3, borderRadius: 2, background: '#15252d', display: 'block' }}/></span>;
 
 /** The Client ID, saved when it is whole: on blur or Enter, never mid-typing. */
