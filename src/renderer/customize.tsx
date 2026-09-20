@@ -26,6 +26,15 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 function Choice<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void }) {
   return <fieldset className="settings-choice"><legend>{label}</legend><div>{options.map(option => <label key={option.value} className={value === option.value ? 'selected' : ''}><input type="radio" name={label} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)}/>{option.label}</label>)}</div></fieldset>;
 }
+/** The Client ID, saved when it is whole: on blur or Enter, never mid-typing. */
+function ClientIdField({ value, onSave }: { value: string; onSave: (id: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const clean = draft.trim().toLowerCase();
+  const valid = clean === '' || /^[0-9a-f]{32}$/.test(clean);
+  const commit = () => { if (valid && clean !== value) onSave(clean); };
+  return <label className="settings-field"><span>Client ID</span><input type="text" spellCheck={false} autoCapitalize="off" autoCorrect="off" placeholder="32 characters, from your Spotify app" value={draft} aria-invalid={!valid} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); }}/>{!valid && <small>A Client ID is 32 hexadecimal characters.</small>}</label>;
+}
 function App() {
   const { state, dispatch } = usePreview();
   const live = useCompanion();
