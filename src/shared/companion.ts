@@ -283,6 +283,10 @@ export interface CompanionBridge {
   answerPick(answer: SmartShuffleAnswer): Promise<OperationResult>;
   /** Five band levels, bass first, each 0…1, while Spotify plays and the bars are on screen. */
   onMusicLevels(cb: (levels: number[]) => void): () => void;
+  /** One volume or brightness key press, the moment it lands. */
+  onHud(cb: (activity: HudActivity) => void): () => void;
+  /** Show System Settings → Privacy & Security → Accessibility. */
+  openAccessibility(): Promise<OperationResult>;
   /** Put a history item back on the clipboard. */
   copyClipboardItem(id: string): Promise<OperationResult>;
   pinClipboardItem(id: string, pinned: boolean): Promise<OperationResult>;

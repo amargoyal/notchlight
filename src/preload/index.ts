@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { ApprovalDecision, HitRect, Snapshot } from '../shared/types';
-import type { CompanionPreferences, CompanionSnapshot, CompanionView, SmartShuffleAnswer, SpotifyCommand } from '../shared/companion';
+import type { CompanionPreferences, CompanionSnapshot, CompanionView, HudActivity, SmartShuffleAnswer, SpotifyCommand } from '../shared/companion';
 import type { UpdateInfo, UpdateResponse } from '../shared/updates';
 import type { AppSettingsPatch } from '../shared/settings';
 
@@ -45,6 +45,8 @@ contextBridge.exposeInMainWorld('notchlight', {
   signOutSpotify: () => ipcRenderer.invoke('spotify:signout'),
   answerPick: (answer: SmartShuffleAnswer) => ipcRenderer.invoke('spotify:pick', answer),
   onMusicLevels: (cb: (levels: number[]) => void) => subscribe('music:levels', cb),
+  onHud: (cb: (activity: HudActivity) => void) => subscribe('hud:event', cb),
+  openAccessibility: () => ipcRenderer.invoke('hud:accessibility'),
   copyClipboardItem: (id: string) => ipcRenderer.invoke('clipboard:copy', id),
   pinClipboardItem: (id: string, pinned: boolean) => ipcRenderer.invoke('clipboard:pin', id, pinned),
   removeClipboardItem: (id: string) => ipcRenderer.invoke('clipboard:remove', id),
