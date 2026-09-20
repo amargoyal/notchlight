@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './island.css';
 import './customize.css';
@@ -7,7 +7,7 @@ import { CompanionDesktop, useCompanion } from './LiveCompanion';
 import { DEFAULT_PREFERENCES } from './previewModel';
 import { Icon, PreviewDesktop, usePreview } from './Preview';
 import type { PreviewPreferences, PreviewState } from './previewModel';
-import { describeCapture } from '../shared/companion';
+import { describeAccount, describeCapture, SPOTIFY_REDIRECT_URI } from '../shared/companion';
 
 type Section = 'appearance' | 'agents' | 'music' | 'tray' | 'clipboard';
 const sections: { id: Section; label: string; description: string }[] = [
