@@ -56,8 +56,12 @@ export class Hud extends EventEmitter {
     this.wanted = active;
     if (restart) { this.helper?.stop(); this.helper = null; }
     if (!active) { this.helper?.stop(); this.helper = null; this.set({ ...EMPTY_HUD }); return; }
+    // Every companion change calls this, so only a helper that did not exist a
+    // moment ago is starting. One that is already replacing the overlay keeps
+    // saying so; a verdict it has already reached keeps standing.
+    const fresh = this.helper === null;
     this.helper ??= this.build();
-    this.set({ ...this.state, status: 'starting', reason: null });
+    if (fresh) this.set({ ...EMPTY_HUD, status: 'starting' });
     this.helper.setActive(true);
   }
 
