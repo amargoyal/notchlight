@@ -104,7 +104,7 @@ function openGallery(): void {
     gallery.show();
     return void gallery.focus();
   }
-  void app.dock?.show();
+  showDock();
   gallery = createGalleryWindow();
   // Snapshots are only emitted on change, so a gallery opened during a quiet
   // minute would sit on "waiting for the daemon" until something moved.
@@ -147,7 +147,7 @@ function openCustomize(): void {
     customize.focus();
     return;
   }
-  void app.dock?.show();
+  showDock();
   customize = createCustomizeWindow();
   customize.webContents.on('did-finish-load', () => {
     send(customize, 'snapshot', store.current());
