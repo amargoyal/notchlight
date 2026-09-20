@@ -30,3 +30,19 @@ function matches(query: string, ...texts: (string | undefined)[]): boolean {
   return !q || texts.some(text => text?.toLowerCase().includes(q));
 }
 
+/* ---- rows and groups ---- */
+function RowText({ title, description }: { title: string; description?: string }) {
+  return <span className="settings-row-text"><span className="settings-row-title">{title}</span>{description && <span className="settings-row-description">{description}</span>}</span>;
+}
+function Row({ title, description, children }: { title: string; description?: string; children?: ReactNode }) {
+  const hit = matches(useContext(SearchContext), title, description);
+  return <div className={`settings-row${hit ? '' : ' is-dimmed'}`}><RowText title={title} description={description}/><span className="settings-row-control">{children}</span></div>;
+}
+function Group({ title, footer, children }: { title?: string; footer?: ReactNode; children: ReactNode }) {
+  return <section className="settings-group">{title && <h2>{title}</h2>}<div className="settings-group-rows">{children}</div>{footer && <p className="settings-group-footer">{footer}</p>}</section>;
+}
+function Toggle({ title, description, value, onChange, disabled, icon }: { title: string; description?: string; value: boolean; onChange: (value: boolean) => void; disabled?: boolean; icon?: ReactNode }) {
+  const hit = matches(useContext(SearchContext), title, description);
+  return <label className={`settings-row${hit ? '' : ' is-dimmed'}`}><RowText title={title} description={description}/><span className="settings-row-control">{icon}<input type="checkbox" role="switch" className="settings-switch" checked={value} disabled={disabled} onChange={e => onChange(e.target.checked)}/></span></label>;
+}
+
