@@ -131,7 +131,7 @@ function MusicFace({ state, dispatch }: Controls) {
       <Artwork state={state}/>
       <div className="mp-track-meta">
         <h2 title={track.title}>{track.title}</h2>
-        <p title={track.artist}>{track.artist}</p>
+        <p title={track.artist}>{pick && <span className="mp-pick" role="img" aria-label="Smart Shuffle pick" title={`A Smart Shuffle pick — not in ${pick} yet`}><Icon name="sparkle" size={11}/></span>}{track.artist}</p>
         <div className="mp-seek"><span>{time(state.music.position)}</span><input aria-label="Track position" aria-valuetext={`${time(state.music.position)} of ${time(track.duration)}`} type="range" min="0" max={track.duration} value={state.music.position} onChange={e => dispatch({ type: 'seek', position: Number(e.target.value) })}/><span>−{time(track.duration - state.music.position)}</span></div>
         <div className="mp-transport">
           <button className="mp-icon-button" aria-label="Previous track" onClick={() => dispatch({ type: 'skip', delta: -1 })}><Icon name="back" size={18}/></button>
