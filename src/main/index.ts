@@ -369,6 +369,8 @@ async function boot(): Promise<void> {
     send(customize, 'companion', state);
     syncLevels();
     spotify.setPlayer(state.preferences.musicPlayer);
+    account.configure(state.preferences.spotifyClientId);
+    smart.setEnabled(!DEMO && state.preferences.spotifyEnabled && state.preferences.smartShuffle);
     if (state.preferences.spotifyEnabled !== spotifyEnabled) {
       spotifyEnabled = state.preferences.spotifyEnabled;
       spotify.setEnabled(spotifyEnabled);
@@ -384,6 +386,7 @@ async function boot(): Promise<void> {
     win => !!win && (win === customize || win === notch?.win),
     () => { openCustomize(); return customize!; });
   if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
+  smart.setEnabled(!DEMO && spotifyEnabled && companion.current().preferences.smartShuffle);
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);
 
   hover = new Hover((open) => send(notch?.win ?? null, 'open', open), () => config());
