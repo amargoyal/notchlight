@@ -36,13 +36,15 @@ export interface CompanionPreferences {
   sparkline: boolean;
   /** The Client ID of your own Spotify developer app; empty until you paste one. */
   spotifyClientId: string;
+  /** Mark Smart Shuffle picks in the Music face, with a + and an × to answer them. */
+  smartShuffle: boolean;
 }
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false,
   restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
-  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: ''
+  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true
 };
 export type MusicPlayer = 'spotify' | 'apple';
 export const PLAYER_NAMES: Record<MusicPlayer, string> = { spotify: 'Spotify', apple: 'Apple Music' };
