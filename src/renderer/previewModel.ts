@@ -36,7 +36,7 @@ export interface PreviewState {
   view: PreviewView;
   open: boolean;
   preferences: PreviewPreferences;
-  music: { index: number; position: number; playing: boolean; source: 'ready' | 'empty' | 'unavailable'; missingArtwork: boolean };
+  music: { index: number; position: number; playing: boolean; source: 'ready' | 'empty' | 'unavailable'; missingArtwork: boolean; /** Picks the + has already added, by track id. */ added: string[] };
   files: PreviewFile[];
   clips: PreviewClip[];
   selected: string | null;
@@ -75,7 +75,7 @@ export const SAMPLE_FILES: PreviewFile[] = [
 ];
 export function initialPreview(): PreviewState {
   return { view: 'music', open: true, preferences: { ...DEFAULT_PREFERENCES },
-    music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false },
+    music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false, added: [] },
     files: SAMPLE_FILES.slice(0, 2), clips: SAMPLE_CLIPS, selected: null, received: [], drag: null, notice: '', codex: 'off', claude: 'working' };
 }
 export type PreviewAction =
