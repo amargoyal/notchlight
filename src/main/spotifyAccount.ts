@@ -139,5 +139,11 @@ export class SpotifyAccount extends EventEmitter {
     if (this.record?.clientId === this.clientId) return this.publish({ status: 'ready', user: this.record.user?.name, message });
     this.publish({ status: 'signed-out', message });
   }
+  /** The saved sign-in from disk, if there is one for this Client ID. */
+  load(): void {
+    this.record = readTokenFile(this.options.file, this.cipher);
+    if (this.record) logEvent('spotify', `account: found a sign-in for ${this.record.user?.name ?? 'someone'}`);
+    this.settle();
+  }
   stop(): void { /* nothing waits yet */ }
 }
