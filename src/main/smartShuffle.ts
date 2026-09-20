@@ -200,7 +200,7 @@ export class SmartShuffle extends EventEmitter {
    * moved, so a long playlist is walked once and then remembered.
    */
   private async playlist(id: string): Promise<Playlist | null> {
-    const head = await this.account.request(`/playlists/${id}?fields=name,snapshot_id,owner(id),collaborative,tracks(total)`);
+    const head = await this.account.request(`/playlists/${id}?fields=name,snapshot_id,owner(id),collaborative,items(total)`);
     const info = head.status === 200 ? parsePlaylist(head.body) : null;
     if (!info) { logEvent('spotify', `smart shuffle: playlist ${id} answered ${head.status}`); return null; }
     const cached = this.playlists.get(id);
