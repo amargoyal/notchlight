@@ -239,5 +239,18 @@ export class SmartShuffle extends EventEmitter {
       this.emit('notice', `Added to ${pick.playlistName}.`);
     } finally { this.setBusy(false); }
   }
+  /**
+   * The ×: away with it. Spotify's own × also tells the recommender it missed;
+   * there is no public door for that, so the skip is the whole of the message.
+   */
+  async dismiss(): Promise<void> {
+    const pick = this.current();
+    this.setBusy(true);
+    try {
+      await this.options.skip();
+      logEvent('spotify', `smart shuffle: skipped a pick from ${pick.playlistName}`);
+      if (this.pick === pick) this.setPick(null);
+    } finally { this.setBusy(false); }
+  }
   stop(): void { this.clearTimers(); }
 }
