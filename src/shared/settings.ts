@@ -34,3 +34,9 @@ export const STALE_CHOICES: Choice<number>[] = [
 ];
 export const LINGER_CHOICES: Choice<number>[] = [
   { value: 0, label: 'Until dismissed' }, { value: 5 * 60, label: '5 minutes' }, { value: 15 * 60, label: '15 minutes' }, { value: 60 * 60, label: '1 hour' }
+];
+/** The list with the current value in it, so an edited config.json still shows what it holds. */
+export function withCurrent(choices: Choice<number>[], value: number, label: (value: number) => string): Choice<number>[] {
+  if (choices.some(c => c.value === value)) return choices;
+  return [...choices, { value, label: label(value) }].sort((a, b) => a.value - b.value);
+}
