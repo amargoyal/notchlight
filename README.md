@@ -408,6 +408,15 @@ the track's public page once per track for the full credit, so a collaboration
 reads "Internet Money, Lil Tecca" rather than a solo record. Offline, the lead
 artist stands.
 
+A track Smart Shuffle slipped into a playlist gets Spotify's own treatment: a
+mark before the artist, a **+** that adds it to the playlist — the mark goes
+with it — and an **×** that moves on. Telling a pick from the playlist's own
+tracks takes Spotify's Web API, so this part alone needs a sign-in with a
+Client ID of your own; **Customize → Music → Spotify account** walks through
+it, and [Smart Shuffle picks](docs/smart-shuffle.md) covers what is asked for,
+what is kept where, and what the × cannot do — Spotify keeps no public door
+for "not for me", so the recommender hears only the skip.
+
 
 ## Clipboard history
 
