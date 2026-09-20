@@ -90,6 +90,11 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
   handle('spotify:control', (_e, command, position) => spotify.command(command, position));
   handle('spotify:signin', async () => { await account.signIn(); store.notice(`Signed in to Spotify${account.snapshot().user ? ` as ${account.snapshot().user}` : ''}.`); });
   handle('spotify:signout', () => { account.signOut(); store.notice('Signed out of Spotify. The saved sign-in was removed from this Mac.'); });
+  handle('spotify:pick', (_e, answer) => {
+    if (answer === 'add') return smart.add();
+    if (answer === 'dismiss') return smart.dismiss();
+    throw new Error('Unknown answer to a pick.');
+  });
   return async () => {
     const result = await dialog.showOpenDialog(dialogWindow(), { title: 'Add to Tray', properties: ['openFile', 'openDirectory', 'multiSelections'] });
     if (!result.canceled) await store.add(result.filePaths);
