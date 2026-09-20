@@ -25,6 +25,8 @@ export interface PreviewPreferences {
   artworkGlow: boolean;
   artworkPulse: boolean;
   sparkline: boolean;
+  spotifyClientId: string;
+  smartShuffle: boolean;
 }
 export interface PreviewClip { id: string; kind: 'text' | 'url' | 'image'; preview: string; meta: string; pinned: boolean; thumb?: string }
 export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string }
@@ -49,7 +51,7 @@ export const DEFAULT_PREFERENCES: PreviewPreferences = {
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true,
   restClaude: true, restCodex: true, codexBuddy: true, codexPulse: true, restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
-  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false
+  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true
 };
 export const SAMPLE_CLIPS: PreviewClip[] = [
   { id: 'clip-url', kind: 'url', preview: 'https://developer.apple.com/documentation/coreaudio', meta: 'developer.apple.com · 2m', pinned: false },
