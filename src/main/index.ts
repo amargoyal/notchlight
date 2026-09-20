@@ -21,6 +21,7 @@ import { SmartShuffle } from './smartShuffle';
 import { fetchTint } from './tint';
 import { installCompanionIpc } from './companionIpc';
 import { AudioLevels, helperArguments, wantsLevels } from './audioLevels';
+import { Hud } from './hud';
 import { fetchAppleArtwork } from './appleArtwork';
 import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
@@ -37,6 +38,7 @@ import { Updater, type Release } from './updates';
 import type { UpdateResponse } from '../shared/updates';
 import { jumpToProcess } from './terminal';
 import type { HitRect, Snapshot } from '../shared/types';
+import type { HudActivity, HudSnapshot } from '../shared/companion';
 import { validateAppSettings, type AppSettings, type AppSettingsPatch } from '../shared/settings';
 
 const DEMO = process.argv.includes('--demo');
@@ -77,6 +79,7 @@ let watcher: SpotifyWatcher;
 let account: SpotifyAccount;
 let smart: SmartShuffle;
 let levels: AudioLevels;
+let hud: Hud;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
 let hover: Hover | null = null;
@@ -319,6 +322,14 @@ async function boot(): Promise<void> {
     send(customize, 'music:levels', bands);
   });
   levels.on('status', () => companion.setCapture({ status: levels.status, reason: levels.reason, retryAt: levels.nextRetry() }));
+  // The keys are a live activity, so a press goes straight to the overlay on its
+  // own channel; the pane's readout rides the companion snapshot like everything else.
+  hud = new Hud();
+  hud.on('activity', (activity: HudActivity) => {
+    send(notch?.win ?? null, 'hud:event', activity);
+    send(customize, 'hud:event', activity);
+  });
+  hud.on('change', (state: HudSnapshot) => companion.setHud(state));
   await companion.load();
   // Electron's clipboard is asynchronous and W3C-shaped; the raw macOS markers
   // that mean "do not remember this" are asked for by name through its
@@ -380,12 +391,19 @@ async function boot(): Promise<void> {
     if (spotify.currentPlayer() !== tappedPlayer) { tappedPlayer = spotify.currentPlayer(); levels.setActive(false); }
     levels.setActive(!dark && wantsLevels(companion.current()));
   };
+  // Asleep or locked, the tap would sit on a session nobody is looking at.
+  const syncHud = () => {
+    const { hudEnabled, hudOptionKey } = companion.current().preferences;
+    hud.configure(!dark && !DEMO && hudEnabled, hudOptionKey);
+  };
+  syncHud();
   companion.on('change', state => {
     syncCodex();
     syncClipboard();
     send(notch?.win ?? null, 'companion', state);
     send(customize, 'companion', state);
     syncLevels();
+    syncHud();
     spotify.setPlayer(state.preferences.musicPlayer);
     account.configure(state.preferences.spotifyClientId);
     smart.setEnabled(!DEMO && state.preferences.spotifyEnabled && state.preferences.smartShuffle);
@@ -450,7 +468,7 @@ async function boot(): Promise<void> {
     hooks.start();
   }
 
-  watchPower(syncLevels);
+  watchPower(() => { syncLevels(); syncHud(); });
   registerShortcut();
   store.start();
   startTray();
@@ -753,6 +771,7 @@ app.on('before-quit', () => {
   pasteboardWatch?.stop();
   watcher?.stop();
   levels?.stop();
+  hud?.stop();
   store?.stop();
   hooks?.stop();
   updater?.stop();
