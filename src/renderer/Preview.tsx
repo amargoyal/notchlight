@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type D
 import { Island, Stubs, Wings } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
-import { initialPreview, previewReducer, previewAgents, SAMPLE_FILES, TRACKS,
+import { initialPreview, previewReducer, previewAgents, HUD_SAMPLES, SAMPLE_FILES, TRACKS,
   type PreviewAction, type PreviewFile, type PreviewState, type PreviewView } from './previewModel';
 import './preview.css';
 import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
@@ -338,6 +338,14 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'Resting · music only', note: 'Album on the left. Playback on the right.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
   { name: 'Resting · Claude and music', note: 'Two faces share the bar without crowding it.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restTray: false } }) },
   { name: 'Resting · Claude hidden, needs you', note: 'A hidden face still gets a word in when it must.', patch: s => ({ ...s, open: false, claude: 'asking', preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
+  { name: 'HUD · volume', note: 'The key press takes the resting bar; nothing else shares it.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[0].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'HUD · all the way up', note: 'A full bar still reads as a bar, not as a block.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[1].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'HUD · muted', note: 'The slashed speaker, and a track with nothing in it.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[2].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'HUD · brightness with the number', note: 'A/B: the level spelled out beside the bar.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[3].hud, preferences: { ...s.preferences, hudEnabled: true, hudPercentage: true } }) },
+  { name: 'HUD · gradient, no glow', note: 'A/B: the bar ramps across itself and sits flat.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[3].hud, preferences: { ...s.preferences, hudEnabled: true, hudStyle: 'gradient', hudGlow: false } }) },
+  { name: 'HUD · nearly off', note: 'Five percent has to be visible, or the key feels dead.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[4].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'HUD · wide bar', note: 'A/B: one press takes the full panel width instead of the wings.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[0].hud, preferences: { ...s.preferences, hudEnabled: true, hudClosed: 'wide' } }) },
+  { name: 'HUD · open notch', note: 'Above the tabs, whichever face you were on.', patch: s => ({ ...s, open: true, hud: HUD_SAMPLES[3].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
   { name: 'Tray · empty', note: 'A clear target for the next thing you pick up.', patch: s => ({ ...s, view: 'tray', files: [] }) },
   { name: 'Tray · populated', note: 'Recognizable thumbnails, readable names.', patch: s => ({ ...s, view: 'tray' }) },
   { name: 'Tray · selected', note: 'Select a file, then take it out with the keyboard.', patch: s => ({ ...s, view: 'tray', selected: 'brief' }) },
