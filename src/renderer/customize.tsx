@@ -61,3 +61,13 @@ function Button({ kind, children, ...rest }: { kind?: 'primary' | 'danger' | 'qu
 }
 const Robot = () => <span style={{ width: 16, height: 16, borderRadius: 5, background: '#dce7ea', border: '1.5px solid #89aab5', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><i style={{ width: 8, height: 3, borderRadius: 2, background: '#15252d', display: 'block' }}/></span>;
 
+/** The Client ID, saved when it is whole: on blur or Enter, never mid-typing. */
+function ClientIdField({ value, onSave }: { value: string; onSave: (id: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const clean = draft.trim().toLowerCase();
+  const valid = clean === '' || /^[0-9a-f]{32}$/.test(clean);
+  const commit = () => { if (valid && clean !== value) onSave(clean); };
+  return <span className="settings-field"><input type="text" spellCheck={false} autoCapitalize="off" autoCorrect="off" placeholder="32 characters, from your Spotify app" aria-label="Client ID" value={draft} aria-invalid={!valid} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); }}/>{!valid && <small>A Client ID is 32 hexadecimal characters.</small>}</span>;
+}
+
