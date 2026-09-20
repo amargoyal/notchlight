@@ -152,5 +152,34 @@ export class SmartShuffle extends EventEmitter {
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => { this.timer = null; void this.read(); }, delay);
   }
+  private reading = false;
+  private again = false;
+  /** One look at the playback state for the track the player says is current. */
+  private async read(): Promise<void> {
+    if (this.reading) { this.again = true; return; }
+    this.reading = true;
+    const trackId = this.trackId;
+    try {
+      if (!trackId || !this.enabled) return;
+      const { status, body } = await this.account.request('/me/player');
+      if (this.trackId !== trackId || !this.enabled) return;
+      if (status !== 200) { if (status !== 204) logEvent('spotify', `smart shuffle: playback state answered ${status}`); this.setPick(null); return; }
+      const playback = parsePlayback(body);
+      // The Web API and the scripting read can disagree for a beat around a skip; the heartbeat looks again.
+      if (!playback || playback.trackUri !== trackId) return;
+      if (!playback.playlistId || playback.smartShuffle === false) { this.setPick(null); return; }
+      const playlist = await this.playlist(playback.playlistId);
+      if (this.trackId !== trackId || !this.enabled) return;
+      if (!playlist) { this.setPick(null); return; }
+      const me = this.account.userId();
+      this.setPick(isPick(playback, playlist.members) ? { trackId, playlistId: playback.playlistId, playlistName: playlist.info.name, canAdd: playlist.info.collaborative || !!me && playlist.info.ownerId === me } : null);
+    } catch (error) {
+      logEvent('spotify', `smart shuffle: read failed (${(error as Error).message})`);
+    } finally {
+      this.reading = false;
+      if (this.again) { this.again = false; this.schedule(0); }
+      else if (this.enabled && this.trackId && this.playing) { if (this.heartbeat) clearTimeout(this.heartbeat); this.heartbeat = setTimeout(() => { this.heartbeat = null; void this.read(); }, this.heartbeatMs); }
+    }
+  }
   stop(): void { this.clearTimers(); }
 }
