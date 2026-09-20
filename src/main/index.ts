@@ -10,7 +10,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { APP_DIR, config, ensureDir } from './config';
+import { APP_DIR, config, ensureDir, writeConfig } from './config';
 import { CompanionStore } from './companionStore';
 import { ClipboardStore, SKIPPED_FORMATS, type Pasteboard } from './clipboardStore';
 import { LineHelper, parsePasteboardChange, type PasteboardChange } from './helperProcess';
@@ -37,6 +37,7 @@ import { Updater, type Release } from './updates';
 import type { UpdateResponse } from '../shared/updates';
 import { jumpToProcess } from './terminal';
 import type { HitRect, Snapshot } from '../shared/types';
+import { validateAppSettings, type AppSettings, type AppSettingsPatch } from '../shared/settings';
 
 const DEMO = process.argv.includes('--demo');
 const GALLERY_ONLY = process.argv.includes('--gallery');
@@ -197,11 +198,14 @@ async function checkForUpdates(): Promise<void> {
   else box("You're up to date.", `Notchlight ${updater.current} is the newest release.`);
 }
 
-function installHooks(): void {
+function installHooks(): Promise<void> {
   const script = path.join(__dirname, '..', '..', 'bin', 'install-hooks.mjs');
-  execFile(process.execPath, [script], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }, (err, out, errOut) => {
-    console.log('[hooks] install: ' + (err ? err.message : out.trim() || errOut.trim()));
-    refreshTray();
+  return new Promise(resolve => {
+    execFile(process.execPath, [script], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }, (err, out, errOut) => {
+      console.log('[hooks] install: ' + (err ? err.message : out.trim() || errOut.trim()));
+      refreshTray();
+      resolve();
+    });
   });
 }
 
