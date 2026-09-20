@@ -265,6 +265,37 @@ export class SpotifyAccount extends EventEmitter {
     } else logEvent('spotify', `account: refresh answered ${answer.status}`);
     return null;
   }
+  /**
+   * One Web API call as this account: a path under /v1, or the absolute URL a
+   * page's `next` gives. A 401 refreshes once and tries again; a 429 waits out
+   * a short Retry-After once. The status and the JSON body come back for the
+   * caller to judge; only no token and no network throw.
+   */
+  async request(target: string, init: { method?: string; body?: string } = {}): Promise<{ status: number; body: unknown }> {
+    const url = /^https:\/\//.test(target) ? target : `${API_URL}${target}`;
+    let token = await this.token();
+    if (!token) throw new Error('Sign in to Spotify first.');
+    for (let attempt = 0; ; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      let response: Response;
+      try { response = await this.fetchImpl(url, { method: init.method ?? 'GET', headers: { authorization: `Bearer ${token}`, ...(init.body ? { 'content-type': 'application/json' } : {}) }, body: init.body, signal: controller.signal }); }
+      finally { clearTimeout(timer); }
+      if (response.status === 401 && attempt === 0 && this.record) {
+        this.record = { ...this.record, expiresAt: 0 };
+        token = await this.token();
+        if (!token) throw new Error('Sign in to Spotify first.');
+        continue;
+      }
+      if (response.status === 429 && attempt === 0) {
+        const wait = Math.min(5, Number(response.headers.get('retry-after')) || 1);
+        await new Promise(resolve => setTimeout(resolve, wait * 1000));
+        continue;
+      }
+      const body = response.status === 204 ? null : await response.json().catch(() => null);
+      return { status: response.status, body };
+    }
+  }
   private persist(): void {
     try { writeTokenFile(this.options.file, this.record, this.cipher); }
     catch (error) { logEvent('spotify', `account: could not save the sign-in (${(error as Error).message})`); }
