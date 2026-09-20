@@ -288,6 +288,11 @@ async function boot(): Promise<void> {
   watcher.on('change', change => spotify.onExternalChange(change));
   // With instant word of every change, the polls are only a safety net.
   watcher.on('listening', (listening: boolean) => spotify.setPollInterval(listening ? 10_000 : 2_500));
+  // The sign-in is sealed with the keychain when Electron can; a Mac without one keeps it owner-only on disk.
+  account = new SpotifyAccount({ file: path.join(APP_DIR, 'spotify-account.json'), open: url => shell.openExternal(url), cipher: safeStorage.isEncryptionAvailable() ? { encrypt: text => safeStorage.encryptString(text), decrypt: data => safeStorage.decryptString(data) } : null });
+  smart = new SmartShuffle(account, { skip: () => spotify.command('next') });
+  smart.on('change', state => companion.setSmartShuffle(state));
+  smart.on('notice', (text: string) => companion.notice(text));
   // The tap follows the player being read; a change of player restarts it on the other app.
   let tappedPlayer = spotify.currentPlayer();
   levels = new AudioLevels(undefined, () => helperArguments(config(), spotify.currentPlayer()));
