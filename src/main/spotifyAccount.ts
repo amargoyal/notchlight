@@ -211,8 +211,19 @@ export class SpotifyAccount extends EventEmitter {
     const { status, body } = await this.accounts({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, client_id: this.clientId, code_verifier: verifier }).catch(error => { throw new Error(`Spotify could not be reached to finish the sign-in (${(error as Error).message}).`); });
     if (status !== 200 || !body) { const why = describeRefusal(body); this.settle(why); throw new Error(why); }
     this.record = this.accept(body, null);
+    this.record.user = await this.profile();
     this.persist();
+    logEvent('spotify', `account: signed in as ${this.record.user?.name ?? 'someone'}`);
     this.settle();
+  }
+  /** Who this is, for the settings pane and for telling their playlists apart. Best effort. */
+  private async profile(): Promise<TokenRecord['user']> {
+    try {
+      const { status, body } = await this.request('/me');
+      const me = body as Record<string, unknown> | null;
+      if (status !== 200 || !me || typeof me.id !== 'string') return undefined;
+      return { id: me.id, name: typeof me.display_name === 'string' && me.display_name ? me.display_name : me.id };
+    } catch { return undefined; }
   }
   /** One call to the accounts service, with a deadline; the body as JSON, or null when it is not. */
   private async accounts(form: Record<string, string>): Promise<{ status: number; body: Record<string, unknown> | null }> {
