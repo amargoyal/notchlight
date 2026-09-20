@@ -14,6 +14,7 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-search input::placeholder { color: var(--ui-muted); }
 .settings-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
 .settings-search:focus-within { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+.settings-search input:focus-visible { outline: 0; }
 .settings-sidebar nav { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; }
 .settings-sidebar nav button { display: flex; align-items: center; gap: 9px; height: 28px; padding: 0 7px; border: 0; border-radius: 6px; background: transparent; color: var(--ui-text); font-size: 13px; text-align: left; cursor: default; }
 .settings-sidebar nav button:hover { background: var(--ui-control); }
