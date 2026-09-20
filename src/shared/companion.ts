@@ -121,6 +121,28 @@ export interface CaptureSnapshot {
   retryAt: number | null;
 }
 export const EMPTY_CAPTURE: CaptureSnapshot = { status: 'idle', reason: null, retryAt: null };
+/** The two things the volume and brightness keys move. */
+export type HudChannel = 'volume' | 'brightness';
+/**
+ * Taking over the system volume and brightness overlay.
+ *
+ * The helper installs an event tap, so this is off until it is switched on and
+ * Accessibility is granted. `can` is what this Mac can actually take over: a key
+ * outside it keeps the macOS overlay rather than doing nothing, and the settings
+ * pane says so rather than claiming more than it does.
+ */
+export interface HudSnapshot {
+  status: 'off' | 'starting' | 'listening' | 'unavailable';
+  reason: 'accessibility' | 'no-tap' | 'no-output' | 'unsupported' | 'no-helper' | 'crashed' | null;
+  can: HudChannel[];
+  /** The last levels seen, 0…1, or null before the helper has said. */
+  volume: number | null;
+  muted: boolean;
+  brightness: number | null;
+}
+export const EMPTY_HUD: HudSnapshot = { status: 'off', reason: null, can: [], volume: null, muted: false, brightness: null };
+/** One key press, as the notch draws it. */
+export interface HudActivity { kind: HudChannel; value: number; muted: boolean; at: number }
 /** What the settings pane says about the Spotify account. */
 export function describeAccount(account: SpotifyAccountSnapshot): string {
   switch (account.status) {
