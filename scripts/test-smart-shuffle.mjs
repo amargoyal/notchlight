@@ -44,7 +44,7 @@ try {
   assert.deepEqual(account.parseCallback('/callback?code=c1&state=st', 'st'), { code: 'c1' });
   assert.ok('error' in account.parseCallback('/callback?code=c1&state=other', 'st'), 'a stranger’s state');
   assert.match(account.parseCallback('/callback?error=access_denied&state=st', 'st').error, /declined/);
-  assert.match(account.parseCallback('/callback?state=st', 'st').error, /no code/i);
+  assert.match(account.parseCallback('/callback?state=st', 'st').error, /did not send a code/);
   assert.ok(account.isClientId(id) && !account.isClientId('nope') && !account.isClientId(id + 'a'));
 
   // The token file, sealed and plain.
