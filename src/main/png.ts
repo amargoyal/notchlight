@@ -53,12 +53,8 @@ export function encodePng(width: number, height: number, rgba: Buffer): Buffer {
 }
 
 /**
- * The buddy, 36×36, opaque black on transparent.
- *
- * Drawn as a template image: macOS recolours it for light and dark menu bars,
- * so the only thing that matters here is the silhouette. Twice the nominal 18pt
- * because every Mac this app can run on has a Retina menu bar, and an @1x buffer
- * gets upscaled into a blur.
+ * The buddy, 36×36, opaque black on transparent: the drag image for a Tray
+ * file that has no thumbnail of its own. The menu bar shows menubarIcon below.
  */
 export function trayIcon(): Buffer {
   const w = 36;
