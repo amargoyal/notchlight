@@ -528,14 +528,16 @@ function releaseKeyboard(why: string): void {
   }
 }
 
-function registerShortcut(): void {
+function registerShortcut(): boolean {
   const accelerator = config().shortcut;
-  if (!accelerator) return;
+  if (!accelerator) return true;
   try {
     const ok = globalShortcut.register(accelerator, () => keyboard ? releaseKeyboard('shortcut') : openForKeyboard());
     logEvent('island', ok ? `shortcut ${accelerator} registered` : `shortcut ${accelerator} is taken by another app`);
+    return ok;
   } catch (error) {
     logEvent('island', `shortcut ${accelerator} rejected: ${(error as Error).message}`);
+    return false;
   }
 }
 
