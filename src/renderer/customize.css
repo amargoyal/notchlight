@@ -33,3 +33,15 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-content { flex: 1; min-height: 0; overflow: auto; padding: 0 28px 28px; display: flex; flex-direction: column; gap: 22px; }
 .settings-description { margin: 0; color: var(--ui-muted); }
 
+/* ---- the preview strip ---- */
+.settings-preview { position: sticky; top: 0; z-index: 2; border: 1px solid var(--ui-line); border-radius: 12px; overflow: hidden; background: var(--ui-group); box-shadow: 0 8px 24px -18px #00000080; }
+.settings-preview-bar { display: flex; align-items: center; justify-content: space-between; height: 38px; padding: 0 12px 0 14px; border-bottom: 1px solid var(--ui-line); }
+.settings-preview-title { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+.settings-preview-tools { display: flex; align-items: center; gap: 12px; }
+.settings-preview-note { font-size: 11px; color: var(--ui-muted); }
+.settings-preview .mp-desktop { height: 300px; border-radius: 0; border: 0; box-shadow: none; transition: height 260ms ease; }
+.settings-preview.is-collapsed .mp-desktop { height: 150px; }
+.settings-preview .mp-menubar { height: 24px; font-size: 11px; }
+.settings-preview-notice { min-height: 30px; display: flex; align-items: center; padding: 0 14px; font-size: 11px; color: var(--ui-muted); border-top: 1px solid var(--ui-line); }
+@media (prefers-reduced-motion: reduce) { .settings-preview .mp-desktop { transition: none; } }
+
