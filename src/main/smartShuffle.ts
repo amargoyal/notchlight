@@ -78,3 +78,8 @@ export function parsePlaylistPage(body: unknown): { uris: string[]; next: string
   }
   return { uris, next: str(raw.next) };
 }
+/** Playing from a playlist, Smart Shuffle not off, and the track not among the playlist's own. */
+export function isPick(playback: Playback, members: ReadonlySet<string>): boolean {
+  if (!playback.playlistId || !playback.trackUri || playback.smartShuffle === false) return false;
+  return !members.has(playback.trackUri) && !(playback.linkedUri && members.has(playback.linkedUri));
+}
