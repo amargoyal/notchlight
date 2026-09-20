@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { Island, Stubs, Wings } from './IslandView';
-import { Icon, FileThumb, RestingWings, type RestingPart } from './Preview';
+import { Icon, FileThumb, HudBar, RestingWings, hudRestingPart, type HudLook, type RestingPart } from './Preview';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import type { AgentFilter, Snapshot } from '../shared/types';
-import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type CompanionView, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
+import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type CompanionView, type HudActivity, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
 import { useReducedMotion } from './pulse';
 import { barFrame, bassOf, type EqualizerLayout } from './equalizer';
 import './preview.css';
@@ -150,6 +150,32 @@ function useVolumeWheel(live: LiveController) {
   };
   return { onWheel, shown };
 }
+/**
+ * The last volume or brightness key press, for as long as it is worth showing.
+ *
+ * A HUD is a moment, not a state: it appears on the press and goes again. Each
+ * press restarts the same timer, so holding a key down reads as one bar moving
+ * rather than a row of them arriving.
+ */
+const HUD_HOLD_MS = 1500;
+function useHudActivity(enabled: boolean): HudActivity | null {
+  const [activity, setActivity] = useState<HudActivity | null>(null);
+  useEffect(() => {
+    setActivity(null);
+    if (!enabled || !window.notchlight?.onHud) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const stop = window.notchlight.onHud(next => {
+      setActivity(next);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setActivity(null), HUD_HOLD_MS);
+    });
+    return () => { stop(); if (timer) clearTimeout(timer); };
+  }, [enabled]);
+  return activity;
+}
+export const hudLook = (preferences: { hudStyle: 'solid' | 'gradient'; hudGlow: boolean; hudPercentage: boolean }): HudLook =>
+  ({ style: preferences.hudStyle, glow: preferences.hudGlow, percentage: preferences.hudPercentage });
+
 function VolumeReadout({ level }: { level: number }) {
   return <span className="mp-volume" role="status" aria-label={`Volume ${level}`}><i style={{ width: `${level}%` }}/><b>{level}</b></span>;
 }
@@ -262,6 +288,8 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preferences = live.state.preferences;
   const volume = useVolumeWheel(live);
+  const hud = useHudActivity(preferences.hudEnabled);
+  const look = hudLook(preferences);
   const views = visibleViews(preferences.clipboardEnabled);
   const view: CompanionView = dragging ? 'tray' : live.state.view === 'clipboard' && !preferences.clipboardEnabled ? 'agents' : live.state.view;
   const expanded = open || dragging;
@@ -282,9 +310,15 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
     ...(preferences.restTray && files.length || dragging ? [{left:<span className="mp-shelf-wing"><Icon name="tray" size={16}/>{files.length}</span>,right:<Icon name="file" size={16}/>}]:[]),
     ...(preferences.clipboardEnabled && preferences.restClipboard && clipboard.items.length ? [{left:<span className="mp-shelf-wing"><Icon name="clipboard" size={16}/>{clipboard.items.length}</span>,right:<span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : clipboard.items[0].kind === 'url' ? '@' : clipboard.items[0].kind === 'image' ? '▣' : 'T'}</span>}]:[])
   ];
-  const resting = parts.length ? <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={parts}/> : snapshot.sessions.length ? (hovering ? <Stubs snap={snapshot}/> : <div style={{width:snapshot.notchW,height:snapshot.notchH}}/>) : undefined;
+  // A HUD takes the whole resting bar rather than joining the row. It answers a
+  // key press you just made, and a bar sharing the wings with three faces is not
+  // an answer — it is one more thing to find.
+  const hudResting = !hud ? undefined
+    : preferences.hudClosed === 'wide' ? <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={PANEL_W} left={<div className="mp-left-wing"><Icon name={hud.kind === 'brightness' ? 'brightness' : hud.muted || hud.value === 0 ? 'mute' : 'volume'} size={17}/></div>} right={<div className="mp-right-wing"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={look} wide/></div>}/>
+    : <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={[hudRestingPart(hud, look)]}/>;
+  const resting = hudResting ?? (parts.length ? <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={parts}/> : snapshot.sessions.length ? (hovering ? <Stubs snap={snapshot}/> : <div style={{width:snapshot.notchW,height:snapshot.notchH}}/>) : undefined);
   const navigation = <>{tabs}{view === 'agents' && <AgentFilters snapshot={snapshot} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{view === 'agents' && <AgentConnection snapshot={snapshot} filter={filter}/>}<AgentAttention sessions={snapshot.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);choose('agents');}}/>{view === 'agents' && live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</>;
-  const active = !snapshot.dormant || parts.length > 0 || keyboard;
+  const active = !snapshot.dormant || parts.length > 0 || keyboard || hud !== null;
   const left = <div className="mp-left-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{view === 'music' ? <LiveArtwork live={live} mini/> : view === 'clipboard' ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/>{clipboard.items.length}</span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
   const right = <div className="mp-right-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? live.state.music.track?.tint : undefined}/> : view === 'clipboard' ? <span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : 'T'}</span> : <Icon name="file" size={16}/>}</div>;
   const wing = (full: boolean) => <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={full ? PANEL_W : undefined} left={left} right={right}/>;
