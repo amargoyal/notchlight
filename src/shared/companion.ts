@@ -223,6 +223,10 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
       if (typeof item !== 'string' || item.length > 4096 || item.includes('\0') || item !== '' && !item.startsWith('/')) throw new Error('Choose an absolute Codex home directory.');
       result[key] = item; continue;
     }
+    if (key === 'spotifyClientId') {
+      if (typeof item !== 'string' || item !== '' && !/^[0-9a-f]{32}$/i.test(item.trim())) throw new Error('A Spotify Client ID is 32 hexadecimal characters.');
+      result[key] = item.trim().toLowerCase(); continue;
+    }
     if (choices[key] ? !choices[key].includes(String(item)) || typeof item !== 'string' : typeof item !== 'boolean') throw new Error('Invalid preference value.');
     result[key] = item;
   }
