@@ -10,7 +10,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { APP_DIR, config, ensureDir } from './config';
+import { APP_DIR, config, ensureDir, writeConfig } from './config';
 import { CompanionStore } from './companionStore';
 import { ClipboardStore, SKIPPED_FORMATS, type Pasteboard } from './clipboardStore';
 import { LineHelper, parsePasteboardChange, type PasteboardChange } from './helperProcess';
@@ -26,7 +26,7 @@ import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
 import { createGalleryWindow, createCustomizeWindow, createUpdateWindow, NotchWindow } from './notchWindow';
 import { notchState, probeNotch } from './notchProbe';
-import { trayIcon } from './png';
+import { menubarIcon } from './png';
 import { Store } from './store';
 import { CodexAdapter } from './codex';
 import { CodexApprovals } from './codexApprovals';
@@ -37,6 +37,7 @@ import { Updater, type Release } from './updates';
 import type { UpdateResponse } from '../shared/updates';
 import { jumpToProcess } from './terminal';
 import type { HitRect, Snapshot } from '../shared/types';
+import { validateAppSettings, type AppSettings, type AppSettingsPatch } from '../shared/settings';
 
 const DEMO = process.argv.includes('--demo');
 const GALLERY_ONLY = process.argv.includes('--gallery');
@@ -103,7 +104,7 @@ function openGallery(): void {
     gallery.show();
     return void gallery.focus();
   }
-  void app.dock?.show();
+  showDock();
   gallery = createGalleryWindow();
   // Snapshots are only emitted on change, so a gallery opened during a quiet
   // minute would sit on "waiting for the daemon" until something moved.
@@ -119,9 +120,23 @@ function openGallery(): void {
   });
 }
 
+/**
+ * A dev run has no app bundle, so the Dock would show Electron's own icon while
+ * a window is open. The packaged app carries build/icon.icns and needs nothing.
+ */
+let dockIconSet = false;
+function showDock(): void {
+  if (!app.isPackaged && !dockIconSet) {
+    dockIconSet = true;
+    const icon = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'build', 'icon.png'));
+    if (!icon.isEmpty()) app.dock?.setIcon(icon);
+  }
+  void app.dock?.show();
+}
+
 /** Keep the Dock available while either ordinary desktop window is open. */
 function syncDock(): void {
-  if (gallery || customize) void app.dock?.show();
+  if (gallery || customize) showDock();
   else app.dock?.hide();
 }
 
@@ -132,7 +147,7 @@ function openCustomize(): void {
     customize.focus();
     return;
   }
-  void app.dock?.show();
+  showDock();
   customize = createCustomizeWindow();
   customize.webContents.on('did-finish-load', () => {
     send(customize, 'snapshot', store.current());
@@ -197,11 +212,14 @@ async function checkForUpdates(): Promise<void> {
   else box("You're up to date.", `Notchlight ${updater.current} is the newest release.`);
 }
 
-function installHooks(): void {
+function installHooks(): Promise<void> {
   const script = path.join(__dirname, '..', '..', 'bin', 'install-hooks.mjs');
-  execFile(process.execPath, [script], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }, (err, out, errOut) => {
-    console.log('[hooks] install: ' + (err ? err.message : out.trim() || errOut.trim()));
-    refreshTray();
+  return new Promise(resolve => {
+    execFile(process.execPath, [script], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }, (err, out, errOut) => {
+      console.log('[hooks] install: ' + (err ? err.message : out.trim() || errOut.trim()));
+      refreshTray();
+      resolve();
+    });
   });
 }
 
@@ -269,7 +287,7 @@ function refreshTray(): void {
 }
 
 function startTray(): void {
-  const img = nativeImage.createFromBuffer(trayIcon(), { scaleFactor: 2 });
+  const img = nativeImage.createFromBuffer(menubarIcon(), { scaleFactor: 2 });
   img.setTemplateImage(true);
   tray = new Tray(img);
   tray.setToolTip('Notchlight');
@@ -524,14 +542,16 @@ function releaseKeyboard(why: string): void {
   }
 }
 
-function registerShortcut(): void {
+function registerShortcut(): boolean {
   const accelerator = config().shortcut;
-  if (!accelerator) return;
+  if (!accelerator) return true;
   try {
     const ok = globalShortcut.register(accelerator, () => keyboard ? releaseKeyboard('shortcut') : openForKeyboard());
     logEvent('island', ok ? `shortcut ${accelerator} registered` : `shortcut ${accelerator} is taken by another app`);
+    return ok;
   } catch (error) {
     logEvent('island', `shortcut ${accelerator} rejected: ${(error as Error).message}`);
+    return false;
   }
 }
 
@@ -607,6 +627,73 @@ ipcMain.handle('decide', (event, msg) => {
 ipcMain.on('dismiss', (event, id) => {
   if (trustedAgentWindow(event) && typeof id === 'string') store.dismiss(id);
 });
+
+/**
+ * The General and About panes: config.json values and the macOS integrations
+ * that used to live only in the menu bar. Face preferences stay in the
+ * companion store.
+ */
+function appSettings(): AppSettings {
+  const cfg = config();
+  const probe = probeNotch();
+  return {
+    version: app.getVersion(),
+    packaged: app.isPackaged,
+    loginItem: app.isPackaged && app.getLoginItemSettings().openAtLogin,
+    hoverDelay: cfg.hoverDelay,
+    shortcut: cfg.shortcut,
+    allowWithoutNotch: cfg.allowWithoutNotch,
+    staleSec: cfg.staleSec,
+    watchProcesses: cfg.watchProcesses,
+    doneLingerSec: cfg.doneLingerSec,
+    cutout: probe?.notch ? { w: Math.round(probe.notchW ?? 0), h: Math.round(probe.notchH ?? 0) } : null,
+    claudeHooks: hooksInstalled(),
+    configDir: APP_DIR
+  };
+}
+
+/** Write a validated patch: login item to macOS, the rest to config.json, and a new shortcut to the keyboard right away. */
+function applyAppSettings(patch: AppSettingsPatch): void {
+  const { loginItem, ...rest } = patch;
+  if (loginItem !== undefined) {
+    if (!app.isPackaged) throw new Error('Launch at login needs the packaged app.');
+    app.setLoginItemSettings({ openAtLogin: loginItem });
+    logEvent('notchlight', `start at login ${loginItem ? 'on' : 'off'}`);
+  }
+  if (!Object.keys(rest).length) return;
+  const before = config().shortcut;
+  writeConfig(rest);
+  if (rest.shortcut !== undefined && rest.shortcut !== before) {
+    globalShortcut.unregisterAll();
+    if (!registerShortcut()) {
+      writeConfig({ shortcut: before });
+      registerShortcut();
+      throw new Error('That shortcut is taken by another app. The old one still works.');
+    }
+  }
+}
+
+/** A settings call from the customize window: answer with the fresh settings, or with why not. */
+function settingsHandle(name: string, action: (...args: unknown[]) => Promise<unknown> | unknown): void {
+  ipcMain.handle(name, async (event, ...args) => {
+    try {
+      if (!trustedAgentWindow(event)) throw new Error('This window cannot change settings.');
+      await action(...args);
+      return { ok: true, settings: appSettings() };
+    } catch (error) {
+      return { ok: false, error: (error as Error).message || 'The action could not be completed.' };
+    }
+  });
+}
+ipcMain.handle('app:settings', event => {
+  if (!trustedAgentWindow(event)) throw new Error('This window cannot read settings.');
+  return appSettings();
+});
+settingsHandle('app:settings:update', patch => { applyAppSettings(validateAppSettings(patch)); refreshTray(); });
+settingsHandle('app:updates', () => checkForUpdates());
+settingsHandle('app:config-folder', async () => { const failure = await shell.openPath(APP_DIR); if (failure) throw new Error(failure); });
+settingsHandle('app:gallery', () => openGallery());
+settingsHandle('app:claude-hooks', () => installHooks());
 
 ipcMain.on('update:respond', (event, response: UpdateResponse) => {
   const win = BrowserWindow.fromWebContents(event.sender);

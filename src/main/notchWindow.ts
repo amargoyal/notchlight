@@ -326,6 +326,10 @@ export function createCustomizeWindow(): BrowserWindow {
     show: false,
     title: 'Notchlight — Customize',
     backgroundColor: '#F5F2ED',
+    // The traffic lights sit in the sidebar, as in System Settings; the
+    // renderer marks its own drag regions.
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 14, y: 18 },
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

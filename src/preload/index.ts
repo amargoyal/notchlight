@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { ApprovalDecision, HitRect, Snapshot } from '../shared/types';
 import type { CompanionPreferences, CompanionSnapshot, CompanionView, SmartShuffleAnswer, SpotifyCommand } from '../shared/companion';
 import type { UpdateInfo, UpdateResponse } from '../shared/updates';
+import type { AppSettingsPatch } from '../shared/settings';
 
 function subscribe<T>(channel: string, cb: (value: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, value: T) => cb(value);
@@ -50,5 +51,11 @@ contextBridge.exposeInMainWorld('notchlight', {
   clearClipboard: (includePinned: boolean) => ipcRenderer.invoke('clipboard:clear', includePinned),
   pauseClipboard: (paused: boolean) => ipcRenderer.invoke('clipboard:pause', paused),
   onUpdate: (cb: (info: UpdateInfo) => void) => subscribe('update', cb),
-  respondToUpdate: (response: UpdateResponse) => ipcRenderer.send('update:respond', response)
+  respondToUpdate: (response: UpdateResponse) => ipcRenderer.send('update:respond', response),
+  getAppSettings: () => ipcRenderer.invoke('app:settings'),
+  updateAppSettings: (patch: AppSettingsPatch) => ipcRenderer.invoke('app:settings:update', patch),
+  checkForUpdates: () => ipcRenderer.invoke('app:updates'),
+  revealConfigFolder: () => ipcRenderer.invoke('app:config-folder'),
+  openGallery: () => ipcRenderer.invoke('app:gallery'),
+  installClaudeHooks: () => ipcRenderer.invoke('app:claude-hooks')
 });
