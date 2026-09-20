@@ -247,7 +247,10 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
     {music ? <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow && state.music.source === 'ready' ? SAMPLE_TINT : undefined}/> : clips ? <span className="mp-clip-kind" aria-hidden="true">T</span> : <Icon name="file" size={16}/>}
   </div>;
   const wing = (expanded: boolean) => <Wings notchW={notchW} height={notchH} width={expanded ? PANEL_W : undefined} left={<div className="mp-left-wing">{headLeft}</div>} right={headRight}/>;
-  const nav = <>{tabs}{state.view === 'agents' && <AgentFilters snapshot={snap} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{state.view === 'agents' && <AgentConnection snapshot={snap} filter={filter}/>}<AgentAttention sessions={snap.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);dispatch({type:'view',view:'agents'});}}/></>;
+  const hudLook: HudLook = { style: prefs.hudStyle, glow: prefs.hudGlow, percentage: prefs.hudPercentage };
+  const hud = prefs.hudEnabled ? state.hud : null;
+  const hudStrip = hud && prefs.hudOpenNotch ? <div className="mp-hud-strip"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={hudLook} wide/></div> : null;
+  const nav = <>{hudStrip}{tabs}{state.view === 'agents' && <AgentFilters snapshot={snap} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{state.view === 'agents' && <AgentConnection snapshot={snap} filter={filter}/>}<AgentAttention sessions={snap.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);dispatch({type:'view',view:'agents'});}}/></>;
   const agentParts = agentRestingParts(snap,prefs,p => {setFilter(p);dispatch({type:'view',view:'agents'});});
   const parts: RestingPart[] = [
     ...agentParts,
@@ -256,8 +259,12 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
     ...(prefs.clipboardEnabled && prefs.restClipboard && state.clips.length > 0 ? [{ left: <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span>, right: <span className="mp-clip-kind" aria-hidden="true">{state.clips[0].kind === 'url' ? '@' : state.clips[0].kind === 'image' ? '▣' : 'T'}</span> }] : [])
   ];
   const attention = undefined;
-  const resting = parts.length || attention ? <RestingWings notchW={notchW} height={notchH} parts={parts} attention={attention}/>
-    : !prefs.restClaude && snap.sessions.length ? <Stubs snap={snap}/> : undefined;
+  // The HUD answers a key press, so it takes the resting bar rather than joining it.
+  const hudResting = !hud ? undefined
+    : prefs.hudClosed === 'wide' ? <Wings notchW={notchW} height={notchH} width={PANEL_W} left={<div className="mp-left-wing"><Icon name={hud.kind === 'brightness' ? 'brightness' : hud.muted || hud.value === 0 ? 'mute' : 'volume'} size={17}/></div>} right={<div className="mp-right-wing"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={hudLook} wide/></div>}/>
+    : <RestingWings notchW={notchW} height={notchH} parts={[hudRestingPart(hud, hudLook)]}/>;
+  const resting = hudResting ?? (parts.length || attention ? <RestingWings notchW={notchW} height={notchH} parts={parts} attention={attention}/>
+    : !prefs.restClaude && snap.sessions.length ? <Stubs snap={snap}/> : undefined);
   return <div className={`mp-surface ${state.preferences.density} ${state.preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!state.preferences.buddy ? 'mp-hide-buddy' : ''} ${!state.preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''}`}
     onDragOver={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; dispatch({ type: 'drag-enter' }); } }}
     onDrop={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); dispatch({ type: 'add', id: state.drag.id }); } }}>
