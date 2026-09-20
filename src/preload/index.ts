@@ -54,5 +54,7 @@ contextBridge.exposeInMainWorld('notchlight', {
   respondToUpdate: (response: UpdateResponse) => ipcRenderer.send('update:respond', response),
   getAppSettings: () => ipcRenderer.invoke('app:settings'),
   updateAppSettings: (patch: AppSettingsPatch) => ipcRenderer.invoke('app:settings:update', patch),
-  checkForUpdates: () => ipcRenderer.invoke('app:updates')
+  checkForUpdates: () => ipcRenderer.invoke('app:updates'),
+  revealConfigFolder: () => ipcRenderer.invoke('app:config-folder'),
+  openGallery: () => ipcRenderer.invoke('app:gallery')
 });
