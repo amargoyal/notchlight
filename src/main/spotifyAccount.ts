@@ -96,3 +96,48 @@ export function writeTokenFile(file: string, record: TokenRecord | null, cipher:
   fs.writeFileSync(temporary, JSON.stringify(body) + '\n', { mode: 0o600 });
   fs.renameSync(temporary, file);
 }
+
+export interface AccountOptions {
+  /** Where the sign-in is kept. */
+  file: string;
+  fetchImpl?: typeof fetch;
+  /** Show the sign-in page; the system browser in the app. */
+  open?: (url: string) => Promise<void>;
+  cipher?: Cipher | null;
+  now?: () => number;
+  /** Where to catch the browser's answer. 0 picks a free port, for tests; the app must use the registered one. */
+  port?: number;
+}
+
+/** One account: signed out until a browser says otherwise, and a bearer token for as long as the refresh token holds. */
+export class SpotifyAccount extends EventEmitter {
+  private clientId = '';
+  private record: TokenRecord | null = null;
+  private state: SpotifyAccountSnapshot = { status: 'off' };
+  private readonly cipher: Cipher | null;
+  private readonly fetchImpl: typeof fetch;
+  private readonly now: () => number;
+  constructor(private readonly options: AccountOptions) {
+    super();
+    this.cipher = options.cipher ?? null;
+    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.now = options.now ?? Date.now;
+  }
+  snapshot(): SpotifyAccountSnapshot { return this.state; }
+  signedIn(): boolean { return this.state.status === 'ready'; }
+  /** Who is signed in, by Spotify's id, for telling their playlists from everyone else's. */
+  userId(): string | null { return this.signedIn() ? this.record?.user?.id ?? null : null; }
+  private publish(next: SpotifyAccountSnapshot): void {
+    if (next.status === this.state.status && next.user === this.state.user && next.message === this.state.message) return;
+    if (next.status !== this.state.status) logEvent('spotify', `account ${this.state.status} → ${next.status}`);
+    this.state = next;
+    this.emit('change', next);
+  }
+  /** Say where things stand from the id and the record alone. */
+  private settle(message?: string): void {
+    if (!this.clientId) return this.publish({ status: 'off', message: 'Paste your Spotify app’s Client ID to sign in.' });
+    if (this.record?.clientId === this.clientId) return this.publish({ status: 'ready', user: this.record.user?.name, message });
+    this.publish({ status: 'signed-out', message });
+  }
+  stop(): void { /* nothing waits yet */ }
+}
