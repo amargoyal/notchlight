@@ -6,7 +6,10 @@
     "build": "node build.mjs",
     "preview": "python3 -m http.server 4177 --bind 127.0.0.1",
     "review": "node render.mjs --review",
-    "render": "node render.mjs"
+    "render": "node render.mjs",
+    "build:short": "node build.mjs --short",
+    "review:short": "node render.mjs --short --review",
+    "render:short": "node render.mjs --short"
   },
   "dependencies": {
     "react": "19.2.8",
