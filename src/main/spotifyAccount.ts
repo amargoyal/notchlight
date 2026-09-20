@@ -86,3 +86,13 @@ export function readTokenFile(file: string, cipher: Cipher | null): TokenRecord 
     return isRecord(record) ? record : null;
   } catch { return null; }
 }
+/** Write the sign-in for next time, sealed when a cipher is offered, or remove it. */
+export function writeTokenFile(file: string, record: TokenRecord | null, cipher: Cipher | null): void {
+  if (!record) { fs.rmSync(file, { force: true }); return; }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const text = JSON.stringify(record);
+  const body = cipher ? { sealed: cipher.encrypt(text).toString('base64') } : { plain: text };
+  const temporary = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(body) + '\n', { mode: 0o600 });
+  fs.renameSync(temporary, file);
+}
