@@ -116,6 +116,8 @@ const answerPage = (message: string) => `<!doctype html><meta charset="utf-8"><t
 export class SpotifyAccount extends EventEmitter {
   private clientId = '';
   private record: TokenRecord | null = null;
+  /** The sign-in in progress: how to stop it, and the port it listens on. */
+  private signing: { cancel: (why: string) => void; port: number } | null = null;
   private state: SpotifyAccountSnapshot = { status: 'off' };
   private readonly cipher: Cipher | null;
   private readonly fetchImpl: typeof fetch;
@@ -159,5 +161,49 @@ export class SpotifyAccount extends EventEmitter {
     }
     this.settle();
   }
-  stop(): void { /* nothing waits yet */ }
+  /**
+   * Sign in: a one-shot server on the loopback, the authorize page in the
+   * browser, and the code the browser brings back. Resolves once the account
+   * is ready; rejects with a sentence when the tab is closed, times out, or
+   * says no. Starting again cancels the one in progress.
+   */
+  async signIn(): Promise<void> {
+    if (!this.clientId) throw new Error('Paste your Spotify app’s Client ID first.');
+    this.signing?.cancel('Sign-in started over.');
+    const { verifier, challenge } = pkcePair();
+    const state = base64url(randomBytes(16));
+    const wanted = this.options.port ?? REDIRECT_PORT;
+    let redirectUri = '';
+    const code = await new Promise<string>((resolve, reject) => {
+      let done = false;
+      const server = http.createServer((request, response) => {
+        const url = new URL(request.url ?? '/', 'http://127.0.0.1');
+        if (url.pathname !== '/callback') { response.statusCode = 404; response.end(); return; }
+        const answer = parseCallback(request.url ?? '', state);
+        response.setHeader('content-type', 'text/html; charset=utf-8');
+        response.end(answerPage('code' in answer ? 'Signed in. You can close this tab and go back to Notchlight.' : answer.error));
+        if ('code' in answer) finish(null, answer.code); else finish(new Error(answer.error));
+      });
+      const timer = setTimeout(() => finish(new Error('The sign-in took too long. Try again.')), SIGN_IN_TIMEOUT_MS);
+      const finish = (error: Error | null, code?: string) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        this.signing = null;
+        server.close();
+        if (error) reject(error); else resolve(code!);
+      };
+      server.on('error', (error: NodeJS.ErrnoException) => finish(new Error(error.code === 'EADDRINUSE' ? `Port ${wanted} is in use by something else, and Spotify only answers on the registered one.` : `The sign-in could not listen for Spotify’s answer (${error.message}).`)));
+      server.listen(wanted, '127.0.0.1', () => {
+        const port = (server.address() as { port: number }).port;
+        this.signing = { cancel: why => finish(new Error(why)), port };
+        redirectUri = `http://127.0.0.1:${port}/callback`;
+        this.publish({ status: 'signing-in', message: 'Finish signing in in your browser.' });
+        const open = this.options.open ?? (async () => { throw new Error('No browser to open.'); });
+        open(authorizeUrl(this.clientId, state, challenge, redirectUri)).catch(error => finish(new Error(`The browser could not be opened (${(error as Error).message}).`)));
+      });
+    }).catch(error => { this.settle((error as Error).message); throw error; });
+    void code; void verifier; void redirectUri;
+  }
+  stop(): void { this.signing?.cancel('Notchlight is quitting.'); }
 }
