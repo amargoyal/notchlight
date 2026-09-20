@@ -121,6 +121,15 @@ export interface CaptureSnapshot {
   retryAt: number | null;
 }
 export const EMPTY_CAPTURE: CaptureSnapshot = { status: 'idle', reason: null, retryAt: null };
+/** What the settings pane says about the Spotify account. */
+export function describeAccount(account: SpotifyAccountSnapshot): string {
+  switch (account.status) {
+    case 'off': return account.message ?? 'Paste your Spotify app’s Client ID to sign in.';
+    case 'signing-in': return account.message ?? 'Finish signing in in your browser.';
+    case 'ready': return `Signed in${account.user ? ` as ${account.user}` : ''}. Picks show in Music while Spotify plays a playlist with Smart Shuffle on.`;
+    default: return account.message ?? 'Not signed in. Picks need the account; playback does not.';
+  }
+}
 /** What the settings pane says about capture. Spotify's own state is described elsewhere. */
 export function describeCapture(capture: CaptureSnapshot, music: SpotifySnapshot, preferences: { visualizer: boolean; reducedMotion: boolean }): string {
   if (!preferences.visualizer) return 'The bars are off. Turn on Move with the music to capture Spotify’s output.';
