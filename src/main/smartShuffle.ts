@@ -142,7 +142,11 @@ export class SmartShuffle extends EventEmitter {
     const changed = trackId !== this.trackId;
     this.trackId = trackId;
     this.playing = playing;
-    if (!changed) { if (!playing) { if (this.heartbeat) clearTimeout(this.heartbeat); this.heartbeat = null; } return; }
+    if (!changed) {
+      if (!playing) { if (this.heartbeat) clearTimeout(this.heartbeat); this.heartbeat = null; }
+      else if (!this.heartbeat && !this.timer && !this.reading) this.armHeartbeat();
+      return;
+    }
     this.setPick(null);
     this.clearTimers();
     if (trackId) this.schedule();
@@ -178,8 +182,13 @@ export class SmartShuffle extends EventEmitter {
     } finally {
       this.reading = false;
       if (this.again) { this.again = false; this.schedule(0); }
-      else if (this.enabled && this.trackId && this.playing) { if (this.heartbeat) clearTimeout(this.heartbeat); this.heartbeat = setTimeout(() => { this.heartbeat = null; void this.read(); }, this.heartbeatMs); }
+      else this.armHeartbeat();
     }
+  }
+  /** Look again in a while, as long as something is playing. */
+  private armHeartbeat(): void {
+    if (this.heartbeat) clearTimeout(this.heartbeat);
+    this.heartbeat = this.enabled && this.trackId && this.playing ? setTimeout(() => { this.heartbeat = null; void this.read(); }, this.heartbeatMs) : null;
   }
   private playlists = new Map<string, Playlist>();
   /**
