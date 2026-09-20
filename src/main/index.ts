@@ -614,6 +614,30 @@ ipcMain.on('dismiss', (event, id) => {
   if (trustedAgentWindow(event) && typeof id === 'string') store.dismiss(id);
 });
 
+/**
+ * The General and About panes: config.json values and the macOS integrations
+ * that used to live only in the menu bar. Face preferences stay in the
+ * companion store.
+ */
+function appSettings(): AppSettings {
+  const cfg = config();
+  const probe = probeNotch();
+  return {
+    version: app.getVersion(),
+    packaged: app.isPackaged,
+    loginItem: app.isPackaged && app.getLoginItemSettings().openAtLogin,
+    hoverDelay: cfg.hoverDelay,
+    shortcut: cfg.shortcut,
+    allowWithoutNotch: cfg.allowWithoutNotch,
+    staleSec: cfg.staleSec,
+    watchProcesses: cfg.watchProcesses,
+    doneLingerSec: cfg.doneLingerSec,
+    cutout: probe?.notch ? { w: Math.round(probe.notchW ?? 0), h: Math.round(probe.notchH ?? 0) } : null,
+    claudeHooks: hooksInstalled(),
+    configDir: APP_DIR
+  };
+}
+
 ipcMain.on('update:respond', (event, response: UpdateResponse) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (event.senderFrame !== event.sender.mainFrame || !win || win !== updateWin) return;
