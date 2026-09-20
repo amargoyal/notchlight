@@ -279,3 +279,20 @@ function TrayPane({ live, state, dispatch, prefs, pref }: PaneProps) {
   </>;
 }
 
+function ClipboardPane({ live, prefs, pref, showView }: PaneProps) {
+  const clips = live.state.clipboard;
+  const pinned = clips.items.filter(i => i.pinned).length;
+  return <>
+    <Group title="History" footer="Passwords and one-time codes marked concealed or transient by their apps are never read. Items over 20 KB are skipped; the whole history stays under 2 MB and up to 20 items can be pinned. Images are not kept yet.">
+      <Toggle title="Keep a clipboard history" description="Off until you say so. Text you copy is kept on this Mac, in a file only you can read. Nothing is sent anywhere." value={prefs.clipboardEnabled} onChange={v => { pref('clipboardEnabled', v); if (v) showView('clipboard'); }}/>
+      <Row title="Remember up to" description="Older items make room for new ones; pins stay."><Popup label="Remember up to" value={prefs.clipboardHistorySize} options={[{ value: '20', label: '20 items' }, { value: '50', label: '50 items' }, { value: '100', label: '100 items' }]} onChange={v => pref('clipboardHistorySize', v)}/></Row>
+      <Toggle title="Show on the resting bar" description="A count and the kind of the latest item on the collapsed notch." value={prefs.restClipboard} onChange={v => pref('restClipboard', v)}/>
+    </Group>
+    {live.available && prefs.clipboardEnabled && <Group title="Right now">
+      <Row title={clips.paused ? 'Capture is paused' : 'Watching the clipboard'} description={`${clips.items.length} ${clips.items.length === 1 ? 'item' : 'items'} remembered, ${pinned} pinned.`}><Status tone={clips.paused ? 'off' : 'good'}>{clips.paused ? 'Paused' : 'Capturing'}</Status><Button onClick={() => void live.run(() => window.notchlight.pauseClipboard(!clips.paused))}>{clips.paused ? 'Resume' : 'Pause'}</Button></Row>
+      <Row title="Clear history" description="Pinned items stay unless you clear everything."><Button disabled={!clips.items.length} onClick={() => void live.run(() => window.notchlight.clearClipboard(false))}>Clear, Keep Pins</Button><Button kind="danger" disabled={!clips.items.length} onClick={() => void live.run(() => window.notchlight.clearClipboard(true))}>Clear Everything</Button></Row>
+    </Group>}
+    {!live.available && <Group title="Try it out"><Row title="Sample history" description="Switch the history on to see the Clipboard face in the preview. Click a sample item to copy it again; pin what you want to keep."/></Group>}
+  </>;
+}
+
