@@ -40,3 +40,9 @@ export function withCurrent(choices: Choice<number>[], value: number, label: (va
   if (choices.some(c => c.value === value)) return choices;
   return [...choices, { value, label: label(value) }].sort((a, b) => a.value - b.value);
 }
+
+/** What the browser preview shows in General, where nothing can be applied. */
+export const SAMPLE_APP_SETTINGS: AppSettings = {
+  version: '0.2.0', packaged: false, loginItem: false, hoverDelay: 550, shortcut: 'Alt+Shift+N', allowWithoutNotch: false,
+  staleSec: 3 * 60 * 60, watchProcesses: true, doneLingerSec: 0, cutout: { w: 200, h: 32 }, claudeHooks: false, configDir: '~/.notchlight'
+};
