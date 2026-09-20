@@ -106,6 +106,8 @@ and × answer.
 - **Signed in, Smart Shuffle on, no mark** — check `~/.notchlight/island.log`
   for `smart shuffle:` lines. "playback state answered 204" means the Web API
   sees no active playback; play something from Spotify on this Mac. "too many
-  to check" is the 5,000-track limit.
+  to check" is the 5,000-track limit. "playlist items answered 403" with
+  Spotify's sentence beside it means the playlist is not yours to read, or the
+  app's API access changed.
 - **The + is dimmed** — the playlist is not yours and not collaborative;
   Spotify would refuse the add.
