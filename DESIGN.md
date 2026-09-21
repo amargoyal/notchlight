@@ -15,6 +15,25 @@ Original vector record sleeves and a landscape illustration, bundled locally. Th
 ## Boundaries
 Use the same Island shell and Claude components in previews. Sample controls must remain isolated from production state. Native appearance preferences persist separately from Claude gate configuration. Every preview has empty/error/overflow examples. Gallery remains the exhaustive visual regression surface.
 
+## Battery
+
+Off by default: the menu bar already shows a battery, and a second one that
+arrives uninvited is clutter rather than information. Switched on, the level
+takes a place on the resting bar beside Music and Tray, in the outer space.
+
+A level is a length, so it is drawn as one — a shell filled to the level, not a
+number you have to read. The percentage beside it is optional. Charging puts a
+bolt through the fill and turns it green; low turns it amber, which is the only
+state meant to catch the corner of your eye. Four percent still has to read as a
+battery rather than an empty box, so the fill never goes below a sliver.
+
+The charger going in or coming out takes the resting bar for a few seconds, the
+way a volume key does — but longer, because it is telling you something you did
+not already know. A volume bar you asked for outranks it. The low warning is
+given once and then latched: IOKit's percentage drifts back up a point now and
+then, and "crossed twenty percent" on its own would announce every wobble. The
+latch clears on the charger, or once the level is properly clear of the mark.
+
 ## Displays
 
 One island on the built-in panel is the default and the only thing a
