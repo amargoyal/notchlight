@@ -13,7 +13,7 @@
  */
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -83,6 +83,36 @@ try {
   // Everything on at once: the resting bar with every face competing for it.
   const everything = liveFor({ calendarEnabled: true, clipboardEnabled: true, batteryEnabled: true, hudEnabled: true, restToday: true });
   renders('everything on, collapsed', React.createElement(CompanionSurface, { live: everything, open: false, hovering: false, onCustomize() {} }));
+
+  // The tab row has a fixed 472pt to live in, because the cutout has to stay
+  // dead centre of the panel. Five faces and a gear do not fit at the
+  // comfortable size — they pushed the settings gear off the edge — so a
+  // crowded row has to tighten.
+  const crowded = renderToString(React.createElement(CompanionSurface, { live: everything, open: true, hovering: true, onCustomize() {} }));
+  assert.ok(crowded.includes('is-tight'), 'five faces must tighten the tab row or the gear falls off the end');
+  const roomy = liveFor({});
+  const spacious = renderToString(React.createElement(CompanionSurface, { live: roomy, open: true, hovering: true, onCustomize() {} }));
+  assert.ok(!spacious.includes('is-tight'), 'three faces have room and must not be squeezed for nothing');
+
+  // Every face the panel can show needs padding on its own wrapper, or its
+  // heading sits flush against the edge of the notch. Today shipped without
+  // one, and no amount of rendering catches that — the class is in the markup
+  // either way. So the stylesheet itself is what gets asked.
+  const css = readFileSync('src/renderer/preview.css', 'utf8');
+  const playing = { ...model.EMPTY_SPOTIFY, status: 'ready', playing: true, at: Date.now(), track: { id: 't', title: 'Late Light', artist: 'The Quiet Hours', album: 'Somewhere, Slowly', duration: 234 } };
+  const loaded = [
+    ['music', {}, 'mp-music', { music: playing }],
+    ['today', { calendarEnabled: true }, 'mp-today', { calendar: { ...model.EMPTY_CALENDAR, status: 'reading' } }],
+    ['tray', {}, 'mp-tray', {}],
+    ['clipboard', { clipboardEnabled: true }, 'mp-clip', {}]
+  ];
+  for (const [view, preferences, wrapper, over] of loaded) {
+    const live = liveFor(preferences, { view, ...over });
+    const html = renderToString(React.createElement(CompanionSurface, { live, open: true, hovering: true, onCustomize() {} }));
+    assert.ok(html.includes(wrapper), `the ${view} face must render its own .${wrapper} wrapper`);
+    const rule = new RegExp(`^\\.${wrapper} \\{[^}]*padding:`, 'm');
+    assert.ok(rule.test(css), `.${wrapper} has no padding rule, so the ${view} face sits flush against the edge of the notch`);
+  }
 
   // And the sample surface, which the settings window and the gallery both draw.
   for (const view of ['agents', 'music', 'today', 'tray', 'clipboard']) {
