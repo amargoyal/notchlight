@@ -86,6 +86,8 @@
       "extendInfo": {
         "NSAppleEventsUsageDescription": "Notchlight controls Spotify through its scripting interface to show and change what is playing.",
         "NSAudioCaptureUsageDescription": "Notchlight listens to Spotify\u2019s output so the equalizer bars can follow the music. Nothing is recorded.",
+        "NSCalendarsFullAccessUsageDescription": "Notchlight reads today\u2019s events so the notch can show what is next. Nothing is changed and nothing leaves this Mac.",
+        "NSRemindersFullAccessUsageDescription": "Notchlight reads reminders due today so the notch can show them beside your events. Nothing is changed and nothing leaves this Mac.",
         "LSUIElement": true
       }
     },
