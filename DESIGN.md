@@ -15,6 +15,27 @@ Original vector record sleeves and a landscape illustration, bundled locally. Th
 ## Boundaries
 Use the same Island shell and Claude components in previews. Sample controls must remain isolated from production state. Native appearance preferences persist separately from Claude gate configuration. Every preview has empty/error/overflow examples. Gallery remains the exhaustive visual regression surface.
 
+## Transport slots
+
+Play always keeps the middle of the row: it is the largest control, and a
+transport with no way to stop the music is not a transport. Everything else is
+chosen — previous, next, shuffle, repeat, open the player — up to four, filling
+out from the middle, left first. The default pair is previous and next, which
+reads as the transport everyone already knows. None at all is allowed; the seek
+bar and the scroll wheel still work.
+
+The row is reordered by dragging, because that is the direct way to say "this one
+goes there", and by arrows on each row, because a list that can only be
+rearranged with a mouse is one some people simply cannot rearrange. The two do
+exactly the same thing.
+
+Shuffle and repeat light up when the player says they are on, and carry a dot as
+well as a colour so the state survives at icon size. A player that did not say is
+drawn plainly off rather than guessed at, and the button's title says so — a
+control that looks off because nothing could be read is a lie. Apple Music's
+repeat is a mode rather than a flag, so it cycles off, all, one; Spotify's is a
+flag and flips.
+
 ## Sharing, peeking, and standing aside
 
 **Share.** The Tray footer hands the selection to macOS's own share sheet,
