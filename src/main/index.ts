@@ -426,10 +426,7 @@ async function boot(): Promise<void> {
   // Hover intent and the open state belong to each overlay: the cursor is only
   // ever on one screen, and an island unfolding on the display you are not
   // looking at would be worse than useless.
-  notch = new NotchWindow(
-    () => { if (keyboard) releaseKeyboard('pointer moved'); },
-    () => applyNotchGeometry()
-  );
+  notch = new NotchWindow(() => applyNotchGeometry());
 
   for (const win of notch.create()) {
     win.on('blur', () => { if (keyboard) releaseKeyboard('focus left'); });

@@ -62,7 +62,7 @@ class NotchOverlay {
   private wasActive = false;
   geometry: NotchGeometry;
 
-  constructor(public display: Display, private onHover: (inside: boolean) => void) {
+  constructor(public display: Display) {
     this.geometry = geometryFor(display);
     this.hover = new Hover(open => this.send('open', open), () => config());
     this.win = this.build();
@@ -198,9 +198,11 @@ class NotchOverlay {
     if (inside === this.engaged) return;
     this.engaged = inside;
     win.setIgnoreMouseEvents(!inside, { forward: true });
+    // Two separate facts. `hover` is the cursor arriving, which is what draws
+    // the little stubs that say "keep going"; `open` is the dwell being
+    // satisfied, which is what unfolds the panel.
     this.send('hover', inside);
     this.hover.set(inside);
-    this.onHover(inside);
   }
 
   /** Let the island take the keyboard. */
@@ -293,10 +295,7 @@ export class NotchWindow {
   private lastSignature = '';
   private held = false;
 
-  constructor(
-    private onHover: (inside: boolean) => void,
-    private onDisplaysChanged: () => void = () => {}
-  ) {
+  constructor(private onDisplaysChanged: () => void = () => {}) {
     // Bound once for the life of the process. Display events arrive in bursts —
     // waking a screen fires several — and each reposition re-measures the
     // cutouts with a blocking subprocess, so settle first and measure once.
@@ -355,7 +354,7 @@ export class NotchWindow {
     for (const display of wanted.values()) {
       const reused = spare.pop();
       if (reused) { reused.moveTo(display); keep.push(reused); continue; }
-      keep.push(new NotchOverlay(display, this.onHover));
+      keep.push(new NotchOverlay(display));
     }
     for (const gone of spare) gone.destroy();
     // Screen order, so "the first one" means the same thing between runs.
