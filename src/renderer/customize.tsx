@@ -172,6 +172,10 @@ function GeneralPane({ live, app, prefs, pref }: PaneProps) {
     <Group title="Opening the notch">
       <Row title="Hover delay" description="How long the pointer rests on the notch before it opens."><Popup label="Hover delay" value={s.hoverDelay} options={withCurrent(HOVER_DELAYS, s.hoverDelay, v => `${(v / 1000).toFixed(2)} seconds`)} onChange={v => app.update({ hoverDelay: v })}/></Row>
       <Row title="Keyboard shortcut" description="Opens the notch for the keyboard. Escape hands focus back to the app you were in."><ShortcutRecorder value={s.shortcut} onSave={v => app.update({ shortcut: v })}/></Row>
+      <Row title="Peek shortcut" description="A look rather than a visit: the notch unfolds for a couple of seconds and folds away again, without taking the keyboard. Press it again to put it away early."><ShortcutRecorder value={s.peekShortcut} onSave={v => app.update({ peekShortcut: v })}/></Row>
+      <Row title="While something is fullscreen" description="A film or a presentation has asked for the whole screen. Media only keeps your agents, which is the part worth seeing over it.">
+        <Segmented label="While something is fullscreen" value={prefs.fullscreenHide} options={[{ value: 'never', label: 'Stay' }, { value: 'media', label: 'Hide media' }, { value: 'all', label: 'Hide all' }]} onChange={v => pref('fullscreenHide', v)}/>
+      </Row>
       <Toggle title="Show on a Mac without a notch" description="The island hangs off the menu bar instead of a cutout. Takes effect the next time Notchlight starts." value={s.allowWithoutNotch} onChange={v => app.update({ allowWithoutNotch: v })}/>
       <Toggle title="Two fingers up closes it" description="A swipe up over the open notch folds it away. It stays folded until the pointer leaves and comes back." value={prefs.swipeToClose} onChange={v => pref('swipeToClose', v)}/>
       <Toggle title="Come back to the last face" description="Open on whichever face you were on, rather than on Agents every time." value={prefs.rememberTab} onChange={v => pref('rememberTab', v)}/>
@@ -382,6 +386,9 @@ function TrayPane({ live, state, dispatch, prefs, pref }: PaneProps) {
     <Group title="Shelf" footer={live.available ? 'Native drags keep the reference in Tray. Save Copy… makes a confirmed copy in a folder; originals are never deleted.' : 'Drag a sample file from the notch into another face, or click one to add it.'}>
       <Row title="Thumbnails" description="Large shows the file preview; Small keeps more items in view."><Segmented label="Thumbnails" value={prefs.thumbnails} options={[{ value: 'small', label: 'Small' }, { value: 'large', label: 'Large' }]} onChange={v => pref('thumbnails', v)}/></Row>
       <Toggle title="Remove after Save Copy" description={live.available ? 'Clears an item once a copy lands in a folder. Native drags keep the item.' : 'Clears the sample shelf when a file arrives.'} value={prefs.removeAfterTransfer} onChange={v => pref('removeAfterTransfer', v)}/>
+      <Row title="Sharing" description={live.available ? 'Share… hands the selection to macOS’s own share sheet, AirDrop included. The items stay in Tray; nothing is moved or deleted.' : 'Share… is available in the desktop app.'}>
+        <Status tone={live.available ? 'good' : 'off'}>{live.available ? 'AirDrop and Share' : 'Preview'}</Status>
+      </Row>
       <Row title="Add files" description={live.available ? 'Or drop them from Finder onto the notch.' : 'Sample files, for a look at the shelf.'}>
         {live.available ? <Button onClick={() => void live.run(() => window.notchlight.pickFiles())}><Icon name="folder" size={13}/>Add Files…</Button>
           : <><Button disabled={!nextSample} onClick={() => { if (nextSample) dispatch({ type: 'files', files: [...state.files, nextSample] }); }}>Add Sample File</Button><Button kind="quiet" disabled={state.files.length === 0} onClick={() => dispatch({ type: 'files', files: [] })}>Empty Tray</Button></>}
