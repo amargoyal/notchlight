@@ -61,7 +61,7 @@ export interface PreviewState {
   view: PreviewView;
   open: boolean;
   preferences: PreviewPreferences;
-  music: { index: number; position: number; playing: boolean; source: 'ready' | 'empty' | 'unavailable'; missingArtwork: boolean; /** Picks the + has already added, by track id. */ added: string[] };
+  music: { index: number; position: number; playing: boolean; source: 'ready' | 'empty' | 'unavailable'; missingArtwork: boolean; shuffling: boolean; repeating: boolean; /** Picks the + has already added, by track id. */ added: string[] };
   files: PreviewFile[];
   clips: PreviewClip[];
   selected: string | null;
@@ -163,7 +163,7 @@ export const SAMPLE_FILES: PreviewFile[] = [
 ];
 export function initialPreview(): PreviewState {
   return { view: 'music', open: true, preferences: { ...DEFAULT_PREFERENCES },
-    music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false, added: [] },
+    music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false, shuffling: false, repeating: false, added: [] },
     files: SAMPLE_FILES.slice(0, 2), clips: SAMPLE_CLIPS, selected: null, received: [], drag: null, notice: '', hud: null, battery: BATTERY_SAMPLES[0].battery, today: sampleDay(), codex: 'off', claude: 'working' };
 }
 export type PreviewAction =
@@ -172,6 +172,7 @@ export type PreviewAction =
   | { type: 'start-playlist' } | { type: 'play' } | { type: 'skip'; delta: number } | { type: 'seek'; position: number } | { type: 'tick' }
   | { type: 'music-state'; source: PreviewState['music']['source']; missingArtwork?: boolean }
   | { type: 'pick-add' } | { type: 'pick-dismiss' }
+  | { type: 'music-toggle'; control: MusicControl }
   | { type: 'hud'; hud: PreviewHud | null }
   | { type: 'battery'; battery: PreviewBattery | null }
   | { type: 'today'; today: CalendarEvent[] }
@@ -195,6 +196,8 @@ export function previewReducer(s: PreviewState, a: PreviewAction): PreviewState 
     case 'claude': return { ...s, claude: a.value };
     case 'music-state': return { ...s, music: { ...s.music, source: a.source, missingArtwork: !!a.missingArtwork } };
     case 'pick-add': return { ...s, music: { ...s.music, added: [...s.music.added, TRACKS[s.music.index].id] }, notice: `Added to ${TRACKS[s.music.index].pick ?? 'the playlist'}.` };
+    case 'music-toggle': return a.control === 'shuffle' ? { ...s, music: { ...s.music, shuffling: !s.music.shuffling } }
+      : a.control === 'repeat' ? { ...s, music: { ...s.music, repeating: !s.music.repeating } } : s;
     case 'pick-dismiss': return previewReducer(s, { type: 'skip', delta: 1 });
     case 'start-playlist': return { ...s, music: { ...s.music, source: 'ready', playing: true } };
     case 'play': return s.music.source !== 'ready' ? s : { ...s, music: { ...s.music, playing: !s.music.playing } };
