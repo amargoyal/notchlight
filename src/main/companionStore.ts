@@ -4,7 +4,7 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, validatePreferences, type CaptureSnapshot, type ClipboardSnapshot, type CompanionSnapshot, type CompanionView, type HudSnapshot, type ShelfFile, type SmartShuffleSnapshot, type SpotifySnapshot, type TransferProgress } from '../shared/companion';
+import { DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, validatePreferences, type CaptureSnapshot, type ClipboardSnapshot, type CompanionSnapshot, type BatterySnapshot, type CompanionView, type HudSnapshot, type ShelfFile, type SmartShuffleSnapshot, type SpotifySnapshot, type TransferProgress } from '../shared/companion';
 
 type Entry = { id: string; path: string };
 /** What Remove took away, so Undo can put it back where it was. */
@@ -29,7 +29,7 @@ export class CompanionStore extends EventEmitter {
   private removed: Removed | null = null;
   constructor(private file: string, private icon: (file: string) => Promise<string>, pulse = true) {
     super();
-    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, hud: { ...EMPTY_HUD }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' };
+    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, hud: { ...EMPTY_HUD }, battery: { ...EMPTY_BATTERY }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' };
   }
   current(): CompanionSnapshot { return this.state; }
   private emitState() { this.emit('change', this.state); }
@@ -90,6 +90,13 @@ export class CompanionStore extends EventEmitter {
       && current.muted === hud.muted && current.brightness === hud.brightness
       && current.can.length === hud.can.length && current.can.every((channel, i) => channel === hud.can[i])) return;
     this.state = { ...this.state, hud }; this.emitState();
+  }
+  setBattery(battery: BatterySnapshot): void {
+    const current = this.state.battery;
+    if (current.status === battery.status && current.reason === battery.reason && current.percent === battery.percent
+      && current.charging === battery.charging && current.plugged === battery.plugged
+      && current.charged === battery.charged && current.minutes === battery.minutes) return;
+    this.state = { ...this.state, battery }; this.emitState();
   }
   setClipboard(clipboard: ClipboardSnapshot): void { this.state = { ...this.state, clipboard }; this.emitState(); }
   setSmartShuffle(smartShuffle: SmartShuffleSnapshot): void { this.state = { ...this.state, smartShuffle }; this.emitState(); }
