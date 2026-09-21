@@ -10,6 +10,8 @@ type Entry = { id: string; path: string };
 /** What Remove took away, so Undo can put it back where it was. */
 type Removed = { entries: { entry: Entry; index: number }[]; at: number };
 
+const isView = (value: unknown): value is CompanionView => value === 'agents' || value === 'music' || value === 'tray' || value === 'clipboard';
+
 /** Every id in the argument, in order, or a clear complaint. */
 function idList(value: unknown): string[] {
   const list = Array.isArray(value) ? value : [value];
@@ -42,6 +44,12 @@ export class CompanionStore extends EventEmitter {
     try {
       const raw = JSON.parse(await fs.readFile(this.file, 'utf8'));
       this.state.preferences = { ...this.state.preferences, ...validatePreferences(raw.preferences) };
+      // The face you were last on, when you asked to come back to it. A face
+      // whose feature has since been switched off falls back to Agents rather
+      // than opening on a tab that is no longer there.
+      if (this.state.preferences.rememberTab && isView(raw.view) && (raw.view !== 'clipboard' || this.state.preferences.clipboardEnabled)) {
+        this.state.view = raw.view;
+      }
       if (Array.isArray(raw.entries)) {
         const seen = new Set<string>();
         this.entries = raw.entries.filter((v: unknown): v is Entry => {
@@ -56,11 +64,11 @@ export class CompanionStore extends EventEmitter {
     }
     await this.refresh();
   }
-  private async persist(preferences = this.state.preferences, entries = this.entries): Promise<void> {
+  private async persist(preferences = this.state.preferences, entries = this.entries, view = this.state.view): Promise<void> {
     await fs.mkdir(path.dirname(this.file), { recursive: true });
     const temporary = `${this.file}.${randomUUID()}.tmp`;
     try {
-      await fs.writeFile(temporary, JSON.stringify({ preferences, entries }, null, 2) + '\n', { mode: 0o600 });
+      await fs.writeFile(temporary, JSON.stringify({ preferences, entries, view }, null, 2) + '\n', { mode: 0o600 });
       await fs.rename(temporary, this.file);
     } finally { await fs.rm(temporary, { force: true }).catch(() => {}); }
   }
@@ -75,8 +83,12 @@ export class CompanionStore extends EventEmitter {
   }
   setView(view: unknown): void {
     if (view === 'claude') view = 'agents';
-    if (view !== 'agents' && view !== 'music' && view !== 'tray' && view !== 'clipboard') throw new Error('Unknown view.');
-    this.state = { ...this.state, view: view as CompanionView }; this.emitState();
+    if (!isView(view)) throw new Error('Unknown view.');
+    if (this.state.view === view) return;
+    this.state = { ...this.state, view }; this.emitState();
+    // Written on the way past, not on a timer: a tab change is a deliberate
+    // act and there is no state worth losing if the app goes away next second.
+    if (this.state.preferences.rememberTab) void this.serial(() => this.persist()).catch(() => {});
   }
   setMusic(music: SpotifySnapshot): void { this.state = { ...this.state, music }; this.emitState(); }
   setCapture(capture: CaptureSnapshot): void {
