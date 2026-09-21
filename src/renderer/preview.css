@@ -60,6 +60,18 @@
 .mp-equalizer { border-radius: 6px; padding: 0 3px; }
 .mp-equalizer[style*="--mp-tint"] { box-shadow: 0 0 10px var(--mp-tint, transparent); }
 .mp-equalizer[style*="--mp-tint"] i { background: color-mix(in srgb, var(--mp-tint) 45%, #c9b79d); }
+/* The battery: a level drawn as a length, because that is what a level is. */
+.mp-battery { display: inline-flex; align-items: center; gap: 6px; color: #c7beb2; }
+.mp-battery-shell { position: relative; display: inline-flex; align-items: center; width: 26px; height: 13px; padding: 2px; border-radius: 4px; border: 1.5px solid #ffffff5c; box-sizing: border-box; }
+/* The terminal nub, so the shape reads as a battery at 13 pixels tall. */
+.mp-battery-shell::after { content: ''; position: absolute; left: 100%; top: 50%; width: 2px; height: 5px; margin-top: -2.5px; border-radius: 0 2px 2px 0; background: #ffffff5c; }
+.mp-battery-shell i { display: block; height: 100%; border-radius: 2px; background: #e6dccd; }
+.mp-battery-shell svg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #15130f; }
+.mp-battery.is-charging .mp-battery-shell i { background: #7fc08a; }
+.mp-battery.is-low .mp-battery-shell i { background: #d9a441; }
+.mp-battery.is-low .mp-battery-shell { border-color: #d9a44188; }
+.mp-battery b { font: 600 9px/1 ui-monospace, monospace; color: #f2ede7; min-width: 18px; }
+.mp-battery-note { display: inline-flex; align-items: center; gap: 8px; font: 500 11px/1 ui-monospace, monospace; color: #c7beb2; }
 /* The system HUD: one bar standing in for the grey square macOS draws. */
 .mp-hud { display: inline-flex; align-items: center; gap: 7px; color: #c7beb2; }
 .mp-hud .mp-hud-track { position: relative; width: 60px; height: 5px; border-radius: 3px; background: #ffffff26; overflow: hidden; }

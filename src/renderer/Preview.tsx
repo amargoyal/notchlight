@@ -37,6 +37,8 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     copy: <><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></>,
     volume: <><path d="M4 9h3l5-4v14l-5-4H4Z"/><path d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10"/></>,
     mute: <><path d="M4 9h3l5-4v14l-5-4H4Z"/><path d="m16 9.5 5 5m0-5-5 5"/></>,
+    bolt: <path d="M13 2 4 14h6l-1 8 9-12h-6Z" fill="currentColor" stroke="none"/>,
+    plug: <><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0Z"/><path d="M12 17v4"/></>,
     brightness: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></>
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.file}</svg>;
@@ -124,6 +126,29 @@ export function hudRestingPart(activity: { kind: 'volume' | 'brightness'; value:
   return {
     left: <span className="mp-shelf-wing"><Icon name={icon} size={16}/></span>,
     right: <HudBar kind={activity.kind} value={activity.value} muted={activity.muted} look={look}/>
+  };
+}
+/**
+ * The battery, drawn the way the hardware reads.
+ *
+ * A level is a length, so it is a length here too rather than a number you have
+ * to parse. Charging puts a bolt through it; low turns it amber, which is the
+ * one state that should catch your eye from the corner of it. The number beside
+ * it is optional, because the shape already says roughly what it needs to.
+ */
+export function BatteryGlyph({ percent, charging, plugged, low, showPercent = false }: { percent: number; charging: boolean; plugged?: boolean; low?: boolean; showPercent?: boolean }) {
+  const level = Math.max(0, Math.min(1, percent));
+  const shown = Math.round(level * 100);
+  return <span className={`mp-battery ${charging ? 'is-charging' : ''} ${low ? 'is-low' : ''} ${plugged && !charging ? 'is-plugged' : ''}`} role="img" aria-label={`Battery ${shown}%${charging ? ', charging' : plugged ? ', on the charger' : ''}`}>
+    <span className="mp-battery-shell"><i style={{ width: `${Math.max(shown ? 6 : 0, shown)}%` }}/>{charging && <Icon name="bolt" size={9}/>}</span>
+    {showPercent && <b>{shown}</b>}
+  </span>;
+}
+/** The battery on the resting bar: the glyph on the right, where the hardware one sits. */
+export function batteryRestingPart(battery: { percent: number; charging: boolean; plugged: boolean; low: boolean }, showPercent: boolean): RestingPart {
+  return {
+    left: <span className="mp-shelf-wing"><Icon name={battery.plugged ? 'plug' : 'bolt'} size={14}/></span>,
+    right: <BatteryGlyph percent={battery.percent} charging={battery.charging} plugged={battery.plugged} low={battery.low} showPercent={showPercent}/>
   };
 }
 export interface RestingPart { left: ReactNode; right: ReactNode; provider?: boolean }
