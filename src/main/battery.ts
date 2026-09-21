@@ -14,7 +14,7 @@ import { EventEmitter } from 'node:events';
 import { LineHelper, parsePowerEvent, type PowerEvent } from './helperProcess';
 import { ensureHelper } from './helpers';
 import { logEvent } from './lifecycle';
-import { batteryIsLow, EMPTY_BATTERY, type BatteryActivity, type BatteryEvent, type BatterySnapshot } from '../shared/companion';
+import { batteryIsLow, EMPTY_BATTERY, LOW_BATTERY, type BatteryActivity, type BatteryEvent, type BatterySnapshot } from '../shared/companion';
 
 /** The helper's ready line: a reading, or why there is none. */
 export function parsePowerReady(line: string): { ok: boolean; reason?: BatterySnapshot['reason']; reading?: PowerEvent } {
@@ -27,20 +27,30 @@ export function parsePowerReady(line: string): { ok: boolean; reason?: BatterySn
   } catch { return { ok: false, reason: 'crashed' }; }
 }
 
+/** Once warned, stay quiet until the battery is properly back above the mark. */
+export const REARM_BATTERY = LOW_BATTERY + 0.05;
+
 /**
- * What, if anything, this reading is worth interrupting for.
+ * What, if anything, this reading is worth interrupting for, and whether the
+ * low warning has been spent.
  *
- * Crossing the low mark is announced once, on the way down. Coming back up past
- * it silently re-arms, so a battery hovering at twenty percent does not ask for
- * attention every time it wobbles.
+ * The charger outranks the level: unplugging at eight percent says the charger
+ * came out, not that the battery is low — you know it is low, you just took the
+ * cable out. The warning itself is announced once and then latched, because
+ * IOKit's percentage does not fall cleanly: it drifts back up a point now and
+ * then, and "crossed twenty percent" on its own would announce every wobble.
+ * The latch clears on the charger, or once the level is properly clear of the
+ * mark again.
  */
-export function batteryEventFor(before: BatterySnapshot, after: BatterySnapshot): BatteryEvent | null {
-  if (before.percent === null) return null;
-  if (after.plugged && !before.plugged) return 'plugged';
-  if (!after.plugged && before.plugged) return 'unplugged';
-  if (after.charged && !before.charged) return 'charged';
-  if (batteryIsLow(after) && !batteryIsLow(before)) return 'low';
-  return null;
+export function batteryEventFor(before: BatterySnapshot, after: BatterySnapshot, warned: boolean): { event: BatteryEvent | null; warned: boolean } {
+  const clear = after.plugged || (after.percent ?? 1) > REARM_BATTERY;
+  const armed = warned && !clear;
+  if (before.percent === null) return { event: null, warned: armed };
+  if (after.plugged && !before.plugged) return { event: 'plugged', warned: false };
+  if (!after.plugged && before.plugged) return { event: 'unplugged', warned: armed };
+  if (after.charged && !before.charged) return { event: 'charged', warned: false };
+  if (batteryIsLow(after) && !armed) return { event: 'low', warned: true };
+  return { event: null, warned: armed };
 }
 
 export class Battery extends EventEmitter {
@@ -48,6 +58,8 @@ export class Battery extends EventEmitter {
   private wanted = false;
   private stopped = false;
   private state: BatterySnapshot = { ...EMPTY_BATTERY };
+  /** The low warning has been given and not yet earned back. */
+  private warned = false;
   constructor(private locate: () => Promise<string | null> = () => ensureHelper('powerwatch')) { super(); }
 
   snapshot(): BatterySnapshot { return this.state; }
@@ -104,9 +116,9 @@ export class Battery extends EventEmitter {
     const before = this.state;
     const next: BatterySnapshot = { status: 'reading', reason: null, ...reading };
     this.set(next);
-    if (!announce) return;
-    const event = batteryEventFor(before, next);
-    if (!event) return;
+    const { event, warned } = batteryEventFor(before, next, this.warned);
+    this.warned = warned;
+    if (!announce || !event) return;
     logEvent('power', `${event} at ${Math.round(reading.percent * 100)}%`);
     const activity: BatteryActivity = { event, percent: next.percent ?? 0, minutes: next.minutes, at: Date.now() };
     this.emit('activity', activity);
