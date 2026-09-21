@@ -9,7 +9,7 @@
  * with push access, so a README badge cannot fetch them and nothing older than
  * a fortnight can be recovered once it has gone. The only way to have a graph
  * that grows is to write the numbers down before they expire: this merges each
- * day's figures into docs/traffic.json and redraws docs/traffic.svg, and a
+ * day's figures into docs/clones.json and redraws docs/clones.svg, and a
  * daily workflow commits the result.
  *
  * Merging is by date and takes the larger count, because the same day is seen
@@ -19,8 +19,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const DATA = 'docs/traffic.json';
-const CHART = 'docs/traffic.svg';
+const DATA = 'docs/clones.json';
+const CHART = 'docs/clones.svg';
 
 /** The clone counts GitHub still has, via whatever credentials gh is using. */
 function fetchClones(repo) {
