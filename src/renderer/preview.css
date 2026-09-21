@@ -6,7 +6,19 @@
 .mp-surface button, .mp-finder button, .mp-preview-toolbar button, .mp-walkthrough button { font: inherit; }
 .mp-surface button { color: inherit; border: 0; }
 .mp-nav { height: 43px; display: flex; align-items: center; justify-content: space-between; padding: 0 13px; border-bottom: 1px solid #24211e; }
-.mp-nav [role=tablist] { display: flex; gap: 4px; }
+.mp-nav [role=tablist] { display: flex; gap: 4px; min-width: 0; }
+/* The gear is never the thing that gives way; the tabs are. */
+.mp-nav > .mp-icon-button { flex: none; }
+/**
+ * Five faces and a gear do not fit 472pt at the comfortable size, and the panel
+ * is a fixed width because the cutout has to stay dead centre of it. So a
+ * crowded row tightens rather than pushing the gear off the end: less padding,
+ * smaller type, and the counts go — the face itself still says how many.
+ */
+.mp-nav.is-tight { padding: 0 9px; }
+.mp-nav.is-tight [role=tablist] { gap: 2px; }
+.mp-nav.is-tight [role=tab] { padding: 5px 7px; gap: 5px; font-size: 11.5px; }
+.mp-nav.is-tight .mp-count { display: none; }
 .mp-nav [role=tab] { background: transparent; color: #a69c93; display: flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 7px; cursor: pointer; font-size: 12px; }
 .mp-nav [role=tab][aria-selected=true] { background: #26221f; color: #f2ede7; }
 .mp-nav [role=tab]:hover { background: #1c1917; color: #f2ede7; }
