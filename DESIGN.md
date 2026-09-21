@@ -15,6 +15,33 @@ Original vector record sleeves and a landscape illustration, bundled locally. Th
 ## Boundaries
 Use the same Island shell and Claude components in previews. Sample controls must remain isolated from production state. Native appearance preferences persist separately from Claude gate configuration. Every preview has empty/error/overflow examples. Gallery remains the exhaustive visual regression surface.
 
+## Small touches
+
+**Sneak peek.** A new track shows its title and artist on the resting bar for a
+moment. The notch does not open — you did not ask it to, you just pressed next.
+Only a change of track counts: not a pause, not a seek, and not the first track
+after connecting, which is where the music already was.
+
+**Standing down.** Paused music keeps its place on the bar for a while, because
+you are coming back to it. After the chosen quiet it gives the space to whatever
+else is there, and playing again brings it straight back. Never is the default.
+
+**The last face.** The open notch returns to the face you were on rather than to
+Agents. A face whose feature has since been switched off falls back rather than
+opening on a tab that is no longer there.
+
+**Two fingers up.** A swipe up over the open notch folds it away, and it stays
+folded while the pointer sits there: a swipe means "not now", and an island that
+sprang back open half a second later would be answering the opposite question. A
+swipe and a scroll are the same event, so they are told apart by shape — a run of
+upward deltas close together that adds up to real distance. A downward flick
+abandons the run outright, so reading a long panel never closes it.
+
+**Out of recordings.** macOS can leave the island out of screen captures
+entirely. Off by default, because a window that does not appear in a recording is
+surprising if you did not ask for it — and worth having, because a session title
+or a clipboard preview is not something to leak into a meeting.
+
 ## Battery
 
 Off by default: the menu bar already shows a battery, and a second one that
