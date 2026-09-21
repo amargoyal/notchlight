@@ -458,6 +458,17 @@ export class NotchWindow {
     this.overlays.find(o => o.win === win)?.setHitRect(r);
   }
 
+  /**
+   * Fold one island up now, without waiting for the cursor to leave.
+   *
+   * The dwell is not re-armed while the pointer stays where it is: a swipe means
+   * "not now", and an island that sprang back open half a second later would be
+   * answering the opposite question.
+   */
+  close(win: BrowserWindow | null): void {
+    this.overlays.find(o => o.win === win)?.hover.set(false, true);
+  }
+
   takeKeyboard(): void { this.focused()?.takeKeyboard(); }
   releaseKeyboard(): boolean {
     let cameForward = false;

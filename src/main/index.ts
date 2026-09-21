@@ -612,6 +612,13 @@ ipcMain.handle('session:focus', async (event, sessionId) => {
   } catch (error) { return { ok: false, error: (error as Error).message }; }
 });
 
+ipcMain.on('island:close', event => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!notch?.owns(win)) return;
+  if (keyboard) releaseKeyboard('swiped away');
+  notch.close(win);
+});
+
 ipcMain.on('keyboard:done', (event) => {
   if (notch?.owns(BrowserWindow.fromWebContents(event.sender))) releaseKeyboard('escape');
 });
