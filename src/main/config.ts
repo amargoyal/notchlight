@@ -26,6 +26,14 @@ export interface Config {
   /** Show the island on a Mac with no cutout — it hangs off the menu bar. */
   allowWithoutNotch: boolean;
   /**
+   * The version whose first run has been walked through.
+   *
+   * A string rather than a flag, so a release that adds something worth
+   * introducing can show the welcome again to people who already have the app.
+   * Empty means it has never been shown.
+   */
+  onboardedVersion: string;
+  /**
    * Keep the island out of screen recordings and screen sharing.
    *
    * macOS excludes the window from capture entirely, so a shared screen shows
@@ -126,6 +134,7 @@ const DEFAULTS: Config = {
   notchH: 32,
   pulse: true,
   allowWithoutNotch: false,
+  onboardedVersion: '',
   contentProtection: false,
   displays: 'built-in',
   displayId: 0,
@@ -174,6 +183,7 @@ export function config(): Config {
   // become a blocking hook by accident.
   if (!Array.isArray(cached.gateTools)) cached.gateTools = [];
   if (typeof cached.shortcut !== 'string') cached.shortcut = DEFAULTS.shortcut;
+  if (typeof cached.onboardedVersion !== 'string') cached.onboardedVersion = '';
   if (typeof cached.levelsOffsetMs !== 'number' || !Number.isFinite(cached.levelsOffsetMs)) cached.levelsOffsetMs = 0;
   cached.levelsOffsetMs = Math.max(-2000, Math.min(2000, Math.round(cached.levelsOffsetMs)));
   if (typeof cached.levelsFps !== 'number' || !Number.isFinite(cached.levelsFps)) cached.levelsFps = DEFAULTS.levelsFps;
