@@ -16,6 +16,11 @@ function run(argv) {
       var level = Number(argv[1]);
       if (!isFinite(level) || level < 0 || level > 100) throw new Error('Invalid volume.');
       music.soundVolume = Math.round(level);
+    } else if (command === 'shuffle') music.shuffleEnabled = !music.shuffleEnabled();
+    else if (command === 'repeat') {
+      // Music cycles a mode rather than flipping a flag: off, all, one, off.
+      var mode = String(music.songRepeat());
+      music.songRepeat = mode === 'off' ? 'all' : mode === 'all' ? 'one' : 'off';
     } else if (command !== 'status') throw new Error('Unknown music command.');
     var playing = music.playerState() === 'playing';
     var track;
@@ -31,7 +36,11 @@ function run(argv) {
     try { volume = music.soundVolume(); } catch (_) {}
     var position = 0;
     try { position = music.playerPosition() || 0; } catch (_) {}
+    var shuffling = null, repeating = null;
+    try { shuffling = music.shuffleEnabled(); } catch (_) {}
+    try { repeating = String(music.songRepeat()) !== 'off'; } catch (_) {}
     return JSON.stringify({ status: 'ready', player: 'apple', playing: playing, position: position, volume: volume,
+      shuffling: shuffling, repeating: repeating,
       track: { id: id, title: title, artist: track.artist(), album: track.album(), durationMs: Math.round((track.duration() || 0) * 1000), artwork: '', hasArtwork: hasArtwork } });
   } catch (error) {
     return JSON.stringify({ status: Number(error.errorNumber) === -1743 ? 'permission' : 'error', code: Number(error.errorNumber) || 0 });

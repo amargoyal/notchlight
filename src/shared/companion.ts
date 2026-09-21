@@ -56,6 +56,8 @@ export interface CompanionPreferences {
   swipeToClose: boolean;
   /** What the island does while something is fullscreen over it. */
   fullscreenHide: 'never' | 'media' | 'all';
+  /** The transport row, in order. Play always sits in the middle of them. */
+  musicSlots: MusicControl[];
   /** Read today's events at all. Off until switched on. */
   calendarEnabled: boolean;
   /** Reminders due today, beside the events. A separate macOS permission. */
@@ -94,6 +96,7 @@ export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
   batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true,
   rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true, fullscreenHide: 'never',
+  musicSlots: ['previous', 'next'],
   calendarEnabled: false, calendarReminders: false, restToday: true, calendarHidden: [], hideAllDay: false, hideDone: true, fullEventTitles: false
 };
 export type MusicPlayer = 'spotify' | 'apple';
@@ -118,6 +121,9 @@ export interface SpotifySnapshot {
   at: number;
   /** Spotify's own volume, 0–100, or -1 when it did not say. */
   volume: number;
+  /** Shuffle and repeat, or null when the player did not say. */
+  shuffling: boolean | null;
+  repeating: boolean | null;
   track: MusicTrack | null;
   busy: boolean;
   message?: string;
@@ -151,7 +157,7 @@ export const EMPTY_SMART_SHUFFLE: SmartShuffleSnapshot = { account: { status: 'o
 /** Where the browser brings the sign-in back to. Spotify wants this exact address registered on the app. */
 export const SPOTIFY_REDIRECT_PORT = 41739;
 export const SPOTIFY_REDIRECT_URI = `http://127.0.0.1:${SPOTIFY_REDIRECT_PORT}/callback`;
-export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', player: 'spotify', playing: false, position: 0, at: 0, volume: -1, track: null, busy: false };
+export const EMPTY_SPOTIFY: SpotifySnapshot = { status: 'disconnected', player: 'spotify', playing: false, position: 0, at: 0, volume: -1, shuffling: null, repeating: null, track: null, busy: false };
 /** Where playback is now, given the last read and the clock. Paused stays put; nothing runs past the end. */
 export function playhead(music: SpotifySnapshot, now: number): number {
   if (!music.track) return 0;
@@ -413,7 +419,28 @@ export interface CompanionSnapshot {
   notice: string;
 }
 export interface OperationResult { ok: boolean; error?: string }
-export type SpotifyCommand = 'toggle' | 'next' | 'previous' | 'seek' | 'volume';
+export type SpotifyCommand = 'toggle' | 'next' | 'previous' | 'seek' | 'volume' | 'shuffle' | 'repeat';
+/**
+ * What can sit in a transport slot.
+ *
+ * Play is not in the list: it is the middle of the row, it is larger than its
+ * neighbours, and a transport with no way to stop the music is not a transport.
+ */
+export type MusicControl = 'previous' | 'next' | 'shuffle' | 'repeat' | 'open';
+export const MUSIC_CONTROLS: MusicControl[] = ['previous', 'next', 'shuffle', 'repeat', 'open'];
+export const MUSIC_CONTROL_NAMES: Record<MusicControl, string> = {
+  previous: 'Previous', next: 'Next', shuffle: 'Shuffle', repeat: 'Repeat', open: 'Open the player'
+};
+/** Only known controls, each at most once, and never more than the row can hold. */
+export function validMusicSlots(value: unknown): MusicControl[] {
+  if (!Array.isArray(value)) return [...DEFAULT_MUSIC_SLOTS];
+  const seen = new Set<MusicControl>();
+  for (const item of value) {
+    if (typeof item === 'string' && (MUSIC_CONTROLS as string[]).includes(item)) seen.add(item as MusicControl);
+  }
+  return [...seen].slice(0, 4);
+}
+export const DEFAULT_MUSIC_SLOTS: MusicControl[] = ['previous', 'next'];
 export type SmartShuffleAnswer = 'add' | 'dismiss';
 export interface CompanionBridge {
   installCodexHooks(remove?: boolean): Promise<OperationResult>;
@@ -478,6 +505,9 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
     if (key === 'codexHome') {
       if (typeof item !== 'string' || item.length > 4096 || item.includes('\0') || item !== '' && !item.startsWith('/')) throw new Error('Choose an absolute Codex home directory.');
       result[key] = item; continue;
+    }
+    if (key === 'musicSlots') {
+      result[key] = validMusicSlots(item); continue;
     }
     if (key === 'calendarHidden') {
       if (!Array.isArray(item) || item.length > 100 || item.some(id => typeof id !== 'string' || id.length > 256)) throw new Error('Invalid calendar list.');
