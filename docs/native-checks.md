@@ -98,3 +98,30 @@ What the numbers say:
   dictionary to label the row; it never starts or stops playback.
 - Native drag, TCC permission recovery and audio synchronization are judged
   by eye; nothing here proves them.
+
+## Helper identity and macOS permissions
+
+A helper that asks macOS for anything needs two things a bare command-line
+binary does not have: the usage-description string for what it is asking for,
+and a stable name for the answer to be remembered against. macOS reads both from
+the **calling** process, so putting the strings in the app's Info.plist does
+nothing for a helper running beside it — the request is refused outright, with no
+prompt and nothing in any log but the refusal.
+
+So each helper that asks for something carries its own Info.plist in
+`native/info/<name>.plist`, linked into the binary's `__TEXT,__info_plist`
+section and bound by an ad-hoc signature with the identifier
+`com.notchlight.<name>`. `scripts/build-helpers.mjs` and `src/main/helpers.ts`
+both do this, and the manifest hash covers the plist as well as the source, so
+editing either rebuilds the binary.
+
+To check a helper has its identity:
+
+```
+codesign -dv ~/.notchlight/bin/calendarwatch 2>&1 | grep -E 'Identifier|Info.plist'
+```
+
+Expect `Identifier=com.notchlight.calendarwatch` and `Info.plist entries=6`.
+`Info.plist=not bound` means the signature was not replaced and macOS will ignore
+the strings. `notchprobe`, `spotifywatch`, `pasteboardwatch` and `powerwatch` ask
+for nothing and have no plist by design.
