@@ -4,17 +4,17 @@ import './island.css';
 import './customize.css';
 import { Buddy } from './Buddy';
 import { CompanionSurface, useCompanion, type LiveController } from './LiveCompanion';
-import { DEFAULT_PREFERENCES, HUD_SAMPLES, SAMPLE_FILES } from './previewModel';
+import { BATTERY_SAMPLES, DEFAULT_PREFERENCES, HUD_SAMPLES, SAMPLE_FILES } from './previewModel';
 import { Icon, PreviewSurface, usePreview } from './Preview';
 import type { PreviewAction, PreviewPreferences, PreviewState } from './previewModel';
-import { describeAccount, describeCapture, describeHud, HUD_NAMES, PLAYER_NAMES, SPOTIFY_REDIRECT_URI, type HudChannel } from '../shared/companion';
+import { batteryIsLow, batteryTime, describeAccount, describeBattery, describeCapture, describeHud, HUD_NAMES, PLAYER_NAMES, SPOTIFY_REDIRECT_URI, type HudChannel } from '../shared/companion';
 import { DISPLAY_CHOICES, HOVER_DELAYS, LINGER_CHOICES, NOTCH_HEIGHT_CHOICES, SAMPLE_APP_SETTINGS, STALE_CHOICES, describeScreen, shortcutLabel, withCurrent, type AppSettings, type AppSettingsPatch } from '../shared/settings';
 
 /* ---- sections ---- */
 type Section = 'general' | 'appearance' | 'hud' | 'agents' | 'music' | 'tray' | 'clipboard' | 'about';
 const SECTIONS: { id: Section; label: string; description: string; icon: string; tile: string; keywords: string }[] = [
   { id: 'general', label: 'General', description: 'Startup, how the notch opens, which displays carry it, and how long sessions stay on the bar.', icon: 'settings', tile: '#8d8a84', keywords: 'login startup updates hover delay shortcut keyboard sessions forget stale terminal finished displays monitor screen external height cutout size' },
-  { id: 'appearance', label: 'Appearance', description: 'How this window and the notch look. The notch stays black, like the hardware.', icon: 'appearance', tile: '#5f83a8', keywords: 'theme light dark system spacing compact comfortable motion resting bar collapsed' },
+  { id: 'appearance', label: 'Appearance', description: 'How this window and the notch look, and what rests on the collapsed bar. The notch stays black, like the hardware.', icon: 'appearance', tile: '#5f83a8', keywords: 'theme light dark system spacing compact comfortable motion resting bar collapsed battery charge charger power percentage' },
   { id: 'hud', label: 'HUD', description: 'The volume and brightness keys, answered in the notch instead of the middle of the screen.', icon: 'volume', tile: '#6f7f8c', keywords: 'volume brightness hud overlay osd keys media accessibility mute percentage' },
   { id: 'agents', label: 'Agents', description: 'Claude Code and Codex sessions on this Mac, and how each one shows up.', icon: 'face', tile: '#c97c5c', keywords: 'claude codex buddy robot pulse tokens hooks approvals home' },
   { id: 'music', label: 'Music', description: 'Which player the notch follows, and what the Music face shows.', icon: 'music', tile: '#c2606c', keywords: 'spotify apple player artwork glow bars visualizer capture smart shuffle client id' },
@@ -201,7 +201,7 @@ function GeneralPane({ live, app }: PaneProps) {
   </>;
 }
 
-function AppearancePane({ prefs, pref }: PaneProps) {
+function AppearancePane({ live, state, dispatch, prefs, pref }: PaneProps) {
   return <>
     <Group title="Settings window">
       <Row title="Theme">
@@ -218,6 +218,19 @@ function AppearancePane({ prefs, pref }: PaneProps) {
       <Toggle title="Music" description="Artwork and the bars while a track is ready." value={prefs.restMusic} onChange={v => pref('restMusic', v)}/>
       <Toggle title="Tray" description="A count of what you have set aside." value={prefs.restTray} onChange={v => pref('restTray', v)}/>
       <Toggle title="Clipboard" description={prefs.clipboardEnabled ? 'The kind of the latest item and a count.' : 'Turn on the clipboard history to show it here.'} value={prefs.clipboardEnabled && prefs.restClipboard} disabled={!prefs.clipboardEnabled} onChange={v => pref('restClipboard', v)}/>
+      <Toggle title="Battery" description={prefs.batteryEnabled ? 'The level, and a bolt while it charges.' : 'Turn on the battery below to show it here.'} value={prefs.batteryEnabled && prefs.restBattery} disabled={!prefs.batteryEnabled} onChange={v => pref('restBattery', v)}/>
+    </Group>
+    <Group title="Battery" footer={live.available ? 'Read from IOKit, the same place the menu bar reads it from. Nothing is written and no power setting is changed.' : 'Sample only. This Mac’s real battery is not read in the preview.'}>
+      <Toggle title="Show the battery" description="Off by default — the menu bar already has one. On, the level takes a place on the resting bar and the charger gets a moment of the notch." value={prefs.batteryEnabled} onChange={v => pref('batteryEnabled', v)}/>
+      <Toggle title="Show the percentage" description="The level as a number beside the glyph. The shape alone already says roughly where it is." value={prefs.batteryPercentage} onChange={v => pref('batteryPercentage', v)}/>
+      <Toggle title="Say when the charger moves" description="A moment in the notch when the cable goes in or comes out, when the charge finishes, and once when the last of it is going." value={prefs.batteryAlerts} onChange={v => pref('batteryAlerts', v)}/>
+      {live.available && prefs.batteryEnabled && <Row title="Right now" description={describeBattery(live.state.battery, prefs.batteryEnabled)}>
+        <Status tone={live.state.battery.status === 'reading' ? (batteryIsLow(live.state.battery) ? 'bad' : 'good') : live.state.battery.status === 'unavailable' ? 'off' : 'wait'}>
+          {live.state.battery.status === 'reading' && live.state.battery.percent !== null ? `${Math.round(live.state.battery.percent * 100)}%` : live.state.battery.status === 'unavailable' ? (live.state.battery.reason === 'no-battery' ? 'No battery' : 'Unavailable') : 'Reading'}
+        </Status>
+      </Row>}
+      {live.available && prefs.batteryEnabled && live.state.battery.status === 'reading' && batteryTime(live.state.battery) && <Row title="Estimate" description="macOS works this out from recent use, so it moves about for a minute after anything changes."><span className="settings-path">{batteryTime(live.state.battery)}</span></Row>}
+      {!live.available && <Row title="Sample battery" description="Show a reading in the preview above."><Popup label="Sample battery" value={BATTERY_SAMPLES.find(item => state.battery && item.battery.percent === state.battery.percent)?.id ?? 'off'} options={[{ value: 'off', label: 'No battery' }, ...BATTERY_SAMPLES.map(item => ({ value: item.id, label: item.label }))]} onChange={id => dispatch({ type: 'battery', battery: BATTERY_SAMPLES.find(item => item.id === id)?.battery ?? null })}/></Row>}
     </Group>
   </>;
 }
