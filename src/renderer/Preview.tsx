@@ -76,7 +76,7 @@ const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.flo
 function Navigation({ state, onNavigate, onCustomize, id, attention }: { state: PreviewState; onNavigate: (view: PreviewView) => void; onCustomize: () => void; id: string; attention: boolean }) {
   const views = allViews.filter(view =>
     (view !== 'clipboard' || state.preferences.clipboardEnabled) && (view !== 'today' || state.preferences.calendarEnabled));
-  return <nav className="mp-nav" aria-label="Notch views">
+  return <nav className={`mp-nav ${views.length > 4 ? 'is-tight' : ''}`} aria-label="Notch views">
     <div role="tablist" aria-label="Preview view">
       {views.map((view, index) => <button key={view} role="tab" id={`${id}-${view}`} aria-controls={`${id}-panel`}
         aria-selected={state.view === view} tabIndex={state.view === view ? 0 : -1}
