@@ -414,7 +414,10 @@ function LiveToday({ live }: { live: LiveController }) {
       <Icon name={calendar.status === 'unavailable' ? 'warning' : 'today'} size={30}/>
       <p>{asking ? 'Asking macOS…' : calendar.reason === 'denied' ? 'Notchlight cannot see your calendar.' : 'Your day, when you want it.'}</p>
       <span>{describeCalendar(calendar, preferences.calendarEnabled)}</span>
-      {calendar.reason === 'denied' && <button className="mp-soft-button" onClick={() => void live.run(() => window.notchlight.openCalendarPrivacy())}>Open Privacy Settings</button>}
+      {calendar.status === 'unavailable' && <span className="mp-empty-actions">
+        {calendar.reason === 'denied' && <button className="mp-soft-button" onClick={() => void live.run(() => window.notchlight.openCalendarPrivacy())}>Open Privacy Settings</button>}
+        <button className="mp-soft-button" onClick={() => void live.run(() => window.notchlight.retryHelper('calendar'))}>Try Again</button>
+      </span>}
     </div>;
   }
   const hidden = calendar.events.length - events.length;

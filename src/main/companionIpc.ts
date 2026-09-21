@@ -15,7 +15,7 @@ import { logEvent } from './lifecycle';
 import type { OperationResult } from '../shared/companion';
 
 type Event = IpcMainInvokeEvent | IpcMainEvent;
-export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlayer, clips: ClipboardStore, trusted: (win: BrowserWindow | null) => boolean, dialogWindow: () => BrowserWindow, account: SpotifyAccount, smart: SmartShuffle, shareAnchor: () => { x: number; y: number }) {
+export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlayer, clips: ClipboardStore, trusted: (win: BrowserWindow | null) => boolean, dialogWindow: () => BrowserWindow, account: SpotifyAccount, smart: SmartShuffle, shareAnchor: () => { x: number; y: number }, retryHelper: (which: 'hud' | 'calendar' | 'battery') => void) {
   function check(event: Event) {
     if (event.senderFrame !== event.sender.mainFrame || !trusted(BrowserWindow.fromWebContents(event.sender))) throw new Error('This window cannot change the companion.');
   }
@@ -110,6 +110,13 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
   // back from a refusal is the pane it was recorded in.
   handle('calendar:privacy', () => shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars'));
   handle('calendar:open', () => promisify(execFile)('open', ['-b', 'com.apple.iCal'], { timeout: 5000 }).then(() => undefined));
+  // A refused helper waits minutes between attempts, because nothing changes a
+  // refusal but a visit to System Settings — and only the owner knows when they
+  // have made one.
+  handle('helper:retry', (_e, which) => {
+    if (which !== 'hud' && which !== 'calendar' && which !== 'battery') throw new Error('Unknown helper.');
+    retryHelper(which);
+  });
   handle('hud:accessibility', () => shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'));
   handle('clipboard:copy', async (_e, id) => { await clips.copy(id); store.notice('Copied. Paste it wherever you like.'); });
   handle('clipboard:pin', (_e, id, pinned) => clips.pin(id, pinned));
