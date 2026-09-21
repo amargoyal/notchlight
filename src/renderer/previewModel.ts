@@ -1,5 +1,5 @@
 import type { Snapshot, Status } from '../shared/types';
-import type { CalendarEvent, CalendarInfo } from '../shared/companion';
+import type { CalendarEvent, CalendarInfo, MusicControl } from '../shared/companion';
 
 export type PreviewView = 'agents' | 'music' | 'tray' | 'clipboard' | 'today';
 export interface PreviewPreferences {
@@ -44,6 +44,7 @@ export interface PreviewPreferences {
   musicIdleHide: 'never' | '30' | '120' | '600';
   swipeToClose: boolean;
   fullscreenHide: 'never' | 'media' | 'all';
+  musicSlots: MusicControl[];
   calendarEnabled: boolean;
   calendarReminders: boolean;
   restToday: boolean;
@@ -84,7 +85,7 @@ export const DEFAULT_PREFERENCES: PreviewPreferences = {
   musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
   hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
   batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true,
-  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true, fullscreenHide: 'never',
+  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true, fullscreenHide: 'never', musicSlots: ['previous', 'next'],
   calendarEnabled: false, calendarReminders: false, restToday: true, calendarHidden: [], hideAllDay: false, hideDone: true, fullEventTitles: false
 };
 /**
