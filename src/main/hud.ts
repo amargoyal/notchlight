@@ -76,6 +76,17 @@ export class Hud extends EventEmitter {
    * while the companion store is still listening, and its answering change
    * would otherwise start a fresh helper on the way out the door.
    */
+  /**
+   * Look again now, rather than waiting out the backoff. What a refusal is
+   * waiting for is someone visiting System Settings, and only they know when
+   * they have.
+   */
+  retry(): void {
+    if (!this.helper) return;
+    this.set({ ...this.state, status: 'starting', reason: null });
+    this.helper.retryNow();
+  }
+
   stop(): void {
     // The flag goes up first: tearing down emits a change, the companion store
     // answers it, and the answer comes straight back here.
@@ -95,6 +106,7 @@ export class Hud extends EventEmitter {
     helper.on('ready', (line: string) => {
       const head = parseHudReady(line);
       if (!head.ok) {
+        helper.markRefused();
         logEvent('hud', `hudwatch refused: ${head.reason}`);
         this.set({ ...EMPTY_HUD, status: 'unavailable', reason: head.reason ?? 'crashed' });
         return;
