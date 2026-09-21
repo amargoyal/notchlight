@@ -375,7 +375,7 @@ function LiveClipboard({ live }: { live: LiveController }) {
  */
 function LiveToday({ live }: { live: LiveController }) {
   const { calendar, preferences } = live.state;
-  const events = visibleEvents(calendar, preferences);
+  const events = visibleEvents(calendar.events, preferences);
   const colorOf = (id: string) => calendar.calendars.find(c => c.id === id)?.color ?? '#8d8a84';
   if (calendar.status !== 'reading') {
     const asking = calendar.status === 'starting';
@@ -437,7 +437,7 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const hudStrip = hud && preferences.hudOpenNotch ? <div className="mp-hud-strip"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={look} wide/></div> : null;
   const tabs = <nav className="mp-nav" aria-label="Notch views"><div role="tablist" aria-label="Companion view">{views.map((item,index) => <button key={item} role="tab" id={`${id}-${item}`} aria-controls={`${id}-panel`} aria-selected={view === item} tabIndex={view === item ? 0 : -1} onClick={() => choose(item,true)} onKeyDown={e => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return; e.preventDefault(); choose(views[e.key === 'Home' ? 0 : e.key === 'End' ? views.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : views.length - 1)) % views.length],true); }}>{item === 'agents' ? <Buddy size={15}/> : <Icon name={item} size={14}/>} {names[item]}{item === 'today' && upNext && <span className="mp-count">{today.length}</span>}{item === 'agents' && snapshot.overall === 'asking' && <span className="mp-attention-dot" aria-label="Needs your attention"/>}{item === 'tray' && <span className="mp-count">{live.state.files.length}</span>}{item === 'clipboard' && <span className="mp-count">{live.state.clipboard.items.length}</span>}</button>)}</div><button className="mp-icon-button" aria-label="Open customization" onClick={onCustomize}><Icon name="settings" size={16}/></button></nav>;
   const { music, files, clipboard, calendar } = live.state;
-  const today = preferences.calendarEnabled ? visibleEvents(calendar, preferences) : [];
+  const today = preferences.calendarEnabled ? visibleEvents(calendar.events, preferences) : [];
   const upNext = nextEvent(today);
   const musicRested = useMusicRested(preferences.musicIdleHide, music.playing, music.status === 'ready' && !!music.track);
   const selectProvider = (provider: 'claude' | 'codex') => { setFilter(provider); choose('agents'); };

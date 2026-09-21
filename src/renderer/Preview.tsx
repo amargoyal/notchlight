@@ -1,9 +1,10 @@
 import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type Dispatch, type DragEvent, type ReactNode } from 'react';
 import { nextIndex, span, until } from './today';
+import { nextEvent, visibleEvents } from '../shared/companion';
 import { Island, Stubs, Wings } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
-import { initialPreview, previewReducer, previewAgents, BATTERY_SAMPLES, HUD_SAMPLES, SAMPLE_FILES, TRACKS,
+import { initialPreview, previewReducer, previewAgents, BATTERY_SAMPLES, HUD_SAMPLES, SAMPLE_CALENDARS, SAMPLE_FILES, TRACKS,
   type PreviewAction, type PreviewFile, type PreviewState, type PreviewView } from './previewModel';
 import './preview.css';
 import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
@@ -296,6 +297,22 @@ function ClipboardFace({ state, dispatch }: Controls) {
     <div className="mp-tray-footer"><span>Click an item to copy it again.</span>{ordered.length > 0 && <button className="mp-text-button" onClick={() => dispatch({ type: 'clip-clear' })}>Clear{pins ? ' unpinned' : ''}</button>}</div></div>;
 }
 
+/** Today, with the sample day. Reminders can be ticked; events cannot. */
+function TodayFace({ state, dispatch }: Controls) {
+  const events = visibleEvents(state.today, state.preferences);
+  const colorOf = (id: string) => SAMPLE_CALENDARS.find(c => c.id === id)?.color ?? '#8d8a84';
+  const hidden = state.today.length - events.length;
+  return <div className="mp-today">
+    <div className="mp-tray-heading">
+      <span>{events.length ? `${events.length} today` : 'Nothing today'}{hidden ? ` · ${hidden} hidden` : ''}</span>
+      <button className="mp-text-button" onClick={() => dispatch({ type: 'today', today: [] })}>Clear the day</button>
+    </div>
+    <DayList events={events} colorOf={colorOf} full={state.preferences.fullEventTitles}
+      onToggle={event => dispatch({ type: 'today', today: state.today.map(e => e.id === event.id ? { ...e, done: !e.done } : e) })}
+      empty={<div className="mp-empty mp-empty-tray"><Icon name="today" size={32}/><p>{state.today.length ? 'Everything today is hidden.' : 'Nothing in the diary.'}</p><span>{state.today.length ? 'Some calendars are switched off, or all-day events are hidden.' : 'A clear day. Sample events return with Reset.'}</span></div>}/>
+  </div>;
+}
+
 export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, notchH = 34 }: Controls & { onCustomize: () => void; notchW?: number; notchH?: number }) {
   const id = useId();
   const [filter,setFilter] = useState<AgentFilter>(state.codexConnection ? 'codex' : 'all');
@@ -313,10 +330,13 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
   const prefs = state.preferences;
   const music = state.view === 'music';
   const clips = state.view === 'clipboard';
-  const headLeft = music ? <Artwork state={state} mini/> : clips ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>;
+  const today = state.view === 'today';
+  const shownToday = prefs.calendarEnabled ? visibleEvents(state.today, prefs) : [];
+  const upNext = nextEvent(shownToday);
+  const headLeft = music ? <Artwork state={state} mini/> : today ? <span className="mp-shelf-wing"><Icon name="today" size={17}/><span>{shownToday.length}</span></span> : clips ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>;
   const headRight = <div className="mp-right-wing">
     {snap.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" title="Agents need attention" onClick={() => dispatch({ type: 'view', view: 'agents' })}><span className="mp-attention-dot"/></button>}
-    {music ? <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow && state.music.source === 'ready' ? SAMPLE_TINT : undefined}/> : clips ? <span className="mp-clip-kind" aria-hidden="true">T</span> : <Icon name="file" size={16}/>}
+    {music ? <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow && state.music.source === 'ready' ? SAMPLE_TINT : undefined}/> : today ? <Icon name="today" size={16}/> : clips ? <span className="mp-clip-kind" aria-hidden="true">T</span> : <Icon name="file" size={16}/>}
   </div>;
   const wing = (expanded: boolean) => <Wings notchW={notchW} height={notchH} width={expanded ? PANEL_W : undefined} left={<div className="mp-left-wing">{headLeft}</div>} right={headRight}/>;
   const hudLook: HudLook = { style: prefs.hudStyle, glow: prefs.hudGlow, percentage: prefs.hudPercentage };
@@ -328,6 +348,7 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
     ...agentParts,
     ...(prefs.restMusic && state.music.source === 'ready' ? [{ left: <Artwork state={state} mini/>, right: <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow ? SAMPLE_TINT : undefined}/> }] : []),
     ...(prefs.restTray && state.files.length > 0 || state.drag?.origin === 'finder' ? [{ left: <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>, right: <Icon name="file" size={16}/> }] : []),
+    ...(prefs.calendarEnabled && prefs.restToday && upNext ? [todayRestingPart(upNext, SAMPLE_CALENDARS.find(c => c.id === upNext.calendarId)?.color ?? '#8d8a84', Date.now())] : []),
     ...(prefs.batteryEnabled && prefs.restBattery && state.battery ? [batteryRestingPart(state.battery, prefs.batteryPercentage)] : []),
     ...(prefs.clipboardEnabled && prefs.restClipboard && state.clips.length > 0 ? [{ left: <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span>, right: <span className="mp-clip-kind" aria-hidden="true">{state.clips[0].kind === 'url' ? '@' : state.clips[0].kind === 'image' ? '▣' : 'T'}</span> }] : [])
   ];
@@ -345,7 +366,7 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
       onDismiss={id => dispatch(id.startsWith('codex:') ? {type:'codex',value:'off'} : {type:'claude',value:'idle'})}
       onDecide={id => dispatch(id.startsWith('codex:') ? {type:'codex',value:'done'} : {type:'claude',value:'done'})}
       surface={{ selectedSession:target,navigation: nav, active: true, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${state.view}` },
-        expanded: state.view === 'agents' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{nav}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${state.view}`}>{music ? <MusicFace state={state} dispatch={dispatch}/> : clips ? <ClipboardFace state={state} dispatch={dispatch}/> : <TrayFace state={state} dispatch={dispatch}/>}</div></div>,
+        expanded: state.view === 'agents' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{nav}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${state.view}`}>{music ? <MusicFace state={state} dispatch={dispatch}/> : today ? <TodayFace state={state} dispatch={dispatch}/> : clips ? <ClipboardFace state={state} dispatch={dispatch}/> : <TrayFace state={state} dispatch={dispatch}/>}</div></div>,
         collapsed: resting }}/>
   </div>;
 }
@@ -419,6 +440,13 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'HUD · nearly off', note: 'Five percent has to be visible, or the key feels dead.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[4].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
   { name: 'HUD · wide bar', note: 'A/B: one press takes the full panel width instead of the wings.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[0].hud, preferences: { ...s.preferences, hudEnabled: true, hudClosed: 'wide' } }) },
   { name: 'HUD · open notch', note: 'Above the tabs, whichever face you were on.', patch: s => ({ ...s, open: true, hud: HUD_SAMPLES[3].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'Today · the day', note: 'The whole day in order, scrolled to the next thing. What is behind you is dimmed, not removed.', patch: s => ({ ...s, view: 'today', open: true, preferences: { ...s.preferences, calendarEnabled: true } }) },
+  { name: 'Today · full titles', note: 'A/B: long titles wrap to two lines instead of ending in an ellipsis.', patch: s => ({ ...s, view: 'today', open: true, preferences: { ...s.preferences, calendarEnabled: true, fullEventTitles: true } }) },
+  { name: 'Today · all-day hidden', note: 'A/B: the birthday goes, the count says how many are hidden.', patch: s => ({ ...s, view: 'today', open: true, preferences: { ...s.preferences, calendarEnabled: true, hideAllDay: true } }) },
+  { name: 'Today · one calendar off', note: 'Home is switched off; Work and Reminders stay.', patch: s => ({ ...s, view: 'today', open: true, preferences: { ...s.preferences, calendarEnabled: true, calendarHidden: ['home'] } }) },
+  { name: 'Today · a clear day', note: 'An empty diary is an answer, not an error state.', patch: s => ({ ...s, view: 'today', open: true, today: [], preferences: { ...s.preferences, calendarEnabled: true } }) },
+  { name: 'Today · everything hidden', note: 'A day with things in it and nothing showing says which rule did it.', patch: s => ({ ...s, view: 'today', open: true, preferences: { ...s.preferences, calendarEnabled: true, calendarHidden: ['work', 'home', 'later'] } }) },
+  { name: 'Today · on the resting bar', note: 'The next thing, and how long until it.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, calendarEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
   { name: 'Battery · on the resting bar', note: 'A level is a length; the number beside it is optional.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[0].battery, preferences: { ...s.preferences, batteryEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
   { name: 'Battery · charging', note: 'A bolt through the level, and green rather than ivory.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[1].battery, preferences: { ...s.preferences, batteryEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
   { name: 'Battery · low', note: 'Amber is the one state meant to catch the corner of your eye.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[3].battery, preferences: { ...s.preferences, batteryEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },

@@ -278,10 +278,13 @@ export interface CalendarSnapshot {
   reminders: boolean;
 }
 export const EMPTY_CALENDAR: CalendarSnapshot = { status: 'off', reason: null, day: '', calendars: [], events: [], reminders: false };
-/** The events worth showing, given what has been hidden. */
-export function visibleEvents(calendar: CalendarSnapshot, preferences: { calendarHidden: string[]; hideAllDay: boolean; hideDone: boolean }): CalendarEvent[] {
+/**
+ * The events worth showing, given what has been hidden. Takes a list rather
+ * than a snapshot, so the sample day can be filtered by the same rules.
+ */
+export function visibleEvents(events: CalendarEvent[], preferences: { calendarHidden: string[]; hideAllDay: boolean; hideDone: boolean }): CalendarEvent[] {
   const hidden = new Set(preferences.calendarHidden);
-  return calendar.events.filter(event =>
+  return events.filter(event =>
     !hidden.has(event.calendarId)
     && !(preferences.hideAllDay && event.allDay)
     && !(preferences.hideDone && event.done));

@@ -60,7 +60,7 @@ assert.equal(nextIndex([at('10:00', { kind: 'reminder', done: true }), at('11:00
 
 // What gets left out.
 const mixed = [at('09:30'), at('00:00', { id: 'all', allDay: true }), at('10:00', { id: 'r', kind: 'reminder', done: true }), at('11:00', { id: 'home', calendarId: 'home' })];
-const show = (over = {}) => visibleEvents({ events: mixed }, { calendarHidden: [], hideAllDay: false, hideDone: false, ...over }).map(e => e.id);
+const show = (over = {}) => visibleEvents(mixed, { calendarHidden: [], hideAllDay: false, hideDone: false, ...over }).map(e => e.id);
 assert.equal(show().length, 4, 'nothing hidden by default');
 assert.ok(!show({ hideAllDay: true }).includes('all'));
 assert.ok(!show({ hideDone: true }).includes('r'));
