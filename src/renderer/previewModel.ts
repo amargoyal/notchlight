@@ -1,6 +1,7 @@
 import type { Snapshot, Status } from '../shared/types';
+import type { CalendarEvent, CalendarInfo } from '../shared/companion';
 
-export type PreviewView = 'agents' | 'music' | 'tray' | 'clipboard';
+export type PreviewView = 'agents' | 'music' | 'tray' | 'clipboard' | 'today';
 export interface PreviewPreferences {
   theme: 'system' | 'light' | 'dark';
   density: 'compact' | 'comfortable';
@@ -42,6 +43,13 @@ export interface PreviewPreferences {
   sneakPeek: boolean;
   musicIdleHide: 'never' | '30' | '120' | '600';
   swipeToClose: boolean;
+  calendarEnabled: boolean;
+  calendarReminders: boolean;
+  restToday: boolean;
+  calendarHidden: string[];
+  hideAllDay: boolean;
+  hideDone: boolean;
+  fullEventTitles: boolean;
 }
 export interface PreviewClip { id: string; kind: 'text' | 'url' | 'image'; preview: string; meta: string; pinned: boolean; thumb?: string }
 export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string; /** A Smart Shuffle pick, and the playlist it is not in yet. */ pick?: string }
@@ -62,6 +70,8 @@ export interface PreviewState {
   hud: PreviewHud | null;
   /** What the sample battery reads, or nothing on a Mac without one. */
   battery: PreviewBattery | null;
+  /** The sample day, or an empty one. */
+  today: CalendarEvent[];
   codex: 'off' | Status | 'many';
   claude: 'working' | 'asking' | 'done' | 'idle' | 'many';
 }
@@ -73,8 +83,35 @@ export const DEFAULT_PREFERENCES: PreviewPreferences = {
   musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
   hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
   batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true,
-  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true
+  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true,
+  calendarEnabled: false, calendarReminders: false, restToday: true, calendarHidden: [], hideAllDay: false, hideDone: true, fullEventTitles: false
 };
+/**
+ * A sample day, written against the clock rather than against fixed times: the
+ * preview has to show something behind you, something imminent and something
+ * later whatever hour it is opened at, or half the states never appear.
+ */
+export const SAMPLE_CALENDARS: CalendarInfo[] = [
+  { id: 'work', title: 'Work', color: '#5f83a8', kind: 'event' },
+  { id: 'home', title: 'Home', color: '#7f9a6b', kind: 'event' },
+  { id: 'later', title: 'Reminders', color: '#c97c5c', kind: 'reminder' }
+];
+export function sampleDay(now = Date.now()): CalendarEvent[] {
+  const at = (minutes: number) => new Date(now + minutes * 60000).toISOString();
+  const day = new Date(now);
+  day.setHours(0, 0, 0, 0);
+  const event = (id: string, calendarId: string, title: string, from: number, to: number, over: Partial<CalendarEvent> = {}): CalendarEvent =>
+    ({ id, calendarId, title, start: at(from), end: at(to), allDay: false, location: '', kind: 'event', done: false, past: to < 0, ...over });
+  return [
+    { id: 'sample-allday', calendarId: 'home', title: 'Anna’s birthday', start: day.toISOString(), allDay: true, location: '', kind: 'event' as const, done: false, past: false },
+    event('sample-standup', 'work', 'Standup', -145, -130, { location: 'Zoom' }),
+    event('sample-review', 'work', 'Design review — the notch faces, end to end', -40, -10, { location: 'Studio' }),
+    event('sample-next', 'work', 'One-to-one', 12, 42, { location: 'Room 3' }),
+    { id: 'sample-reminder', calendarId: 'later', title: 'Send the handoff notes', start: at(75), allDay: false, location: '', kind: 'reminder' as const, done: false, past: false },
+    event('sample-evening', 'home', 'Dinner', 260, 350, { location: 'The corner place' }),
+    { id: 'sample-done', calendarId: 'later', title: 'Book the flights', start: at(-200), allDay: false, location: '', kind: 'reminder' as const, done: true, past: true }
+  ].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+}
 /** The battery, as the sample notch shows it. */
 export interface PreviewBattery { percent: number; charging: boolean; plugged: boolean; low: boolean }
 /**
@@ -125,7 +162,7 @@ export const SAMPLE_FILES: PreviewFile[] = [
 export function initialPreview(): PreviewState {
   return { view: 'music', open: true, preferences: { ...DEFAULT_PREFERENCES },
     music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false, added: [] },
-    files: SAMPLE_FILES.slice(0, 2), clips: SAMPLE_CLIPS, selected: null, received: [], drag: null, notice: '', hud: null, battery: BATTERY_SAMPLES[0].battery, codex: 'off', claude: 'working' };
+    files: SAMPLE_FILES.slice(0, 2), clips: SAMPLE_CLIPS, selected: null, received: [], drag: null, notice: '', hud: null, battery: BATTERY_SAMPLES[0].battery, today: sampleDay(), codex: 'off', claude: 'working' };
 }
 export type PreviewAction =
   | { type: 'view'; view: PreviewView } | { type: 'open'; value: boolean }
@@ -135,6 +172,7 @@ export type PreviewAction =
   | { type: 'pick-add' } | { type: 'pick-dismiss' }
   | { type: 'hud'; hud: PreviewHud | null }
   | { type: 'battery'; battery: PreviewBattery | null }
+  | { type: 'today'; today: CalendarEvent[] }
   | { type: 'codex'; value: PreviewState['codex'] }
   | { type: 'claude'; value: PreviewState['claude'] }
   | { type: 'add'; id: string } | { type: 'remove'; id: string } | { type: 'select'; id: string }
@@ -150,6 +188,7 @@ export function previewReducer(s: PreviewState, a: PreviewAction): PreviewState 
     case 'preferences': return { ...s, preferences: { ...s.preferences, ...a.patch } };
     case 'hud': return { ...s, hud: a.hud };
     case 'battery': return { ...s, battery: a.battery };
+    case 'today': return { ...s, today: a.today };
     case 'codex': return { ...s, codex: a.value };
     case 'claude': return { ...s, claude: a.value };
     case 'music-state': return { ...s, music: { ...s.music, source: a.source, missingArtwork: !!a.missingArtwork } };

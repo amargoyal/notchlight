@@ -64,12 +64,13 @@ export function usePreview(seed?: PreviewState, clock = true) {
 }
 
 type Controls = { state: PreviewState; dispatch: Dispatch<PreviewAction> };
-const viewNames: Record<PreviewView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray', clipboard: 'Clipboard' };
-const allViews: PreviewView[] = ['agents', 'music', 'tray', 'clipboard'];
+const viewNames: Record<PreviewView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray', clipboard: 'Clipboard', today: 'Today' };
+const allViews: PreviewView[] = ['agents', 'music', 'today', 'tray', 'clipboard'];
 const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
 function Navigation({ state, onNavigate, onCustomize, id, attention }: { state: PreviewState; onNavigate: (view: PreviewView) => void; onCustomize: () => void; id: string; attention: boolean }) {
-  const views = state.preferences.clipboardEnabled ? allViews : allViews.filter(v => v !== 'clipboard');
+  const views = allViews.filter(view =>
+    (view !== 'clipboard' || state.preferences.clipboardEnabled) && (view !== 'today' || state.preferences.calendarEnabled));
   return <nav className="mp-nav" aria-label="Notch views">
     <div role="tablist" aria-label="Preview view">
       {views.map((view, index) => <button key={view} role="tab" id={`${id}-${view}`} aria-controls={`${id}-panel`}
