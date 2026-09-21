@@ -38,5 +38,13 @@
       "host": "Darwin 27.0.0",
       "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)"
     }
+  },
+  "powerwatch": {
+    "arm64": {
+      "sha256": "40032ac58d89516b8a305886fc7f486c9b68a28d27edaa487fb95c68493aa319",
+      "builtAt": "2026-09-21T02:26:23.476Z",
+      "host": "Darwin 27.0.0",
+      "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)"
+    }
   }
 }
