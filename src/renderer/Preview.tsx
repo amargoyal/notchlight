@@ -43,6 +43,9 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     plug: <><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0Z"/><path d="M12 17v4"/></>,
     today: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></>,
     share: <><path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"/></>,
+    shuffle: <><path d="M3 6h3l4 12h4M3 18h3l1.5-4.5"/><path d="M14 6h4M18 6l-2.5-2.5M18 6l-2.5 2.5M14 18h4M18 18l-2.5-2.5M18 18l-2.5 2.5"/></>,
+    repeat: <><path d="M5 9a3 3 0 0 1 3-3h11M19 6l-2.5-2.5M19 6l-2.5 2.5"/><path d="M19 15a3 3 0 0 1-3 3H5M5 18l2.5-2.5M5 18l2.5 2.5"/></>,
+    launch: <><path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></>,
     pin2: <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>,
     brightness: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></>
   };

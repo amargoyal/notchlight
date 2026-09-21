@@ -4,7 +4,7 @@ import { Icon, BatteryGlyph, DayList, FileThumb, HudBar, RestingWings, batteryRe
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import type { AgentFilter, Snapshot } from '../shared/types';
-import { batteryIsLow, describeCalendar, nextEvent, visibleEvents, DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CALENDAR, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type BatteryActivity, type CompanionView, type HudActivity, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
+import { batteryIsLow, describeCalendar, nextEvent, visibleEvents, MUSIC_CONTROL_NAMES, DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CALENDAR, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type BatteryActivity, type CompanionView, type HudActivity, type MusicControl, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
 import { useReducedMotion } from './pulse';
 import { barFrame, bassOf, type EqualizerLayout } from './equalizer';
 import { NO_SWIPE, swipeStep } from './swipe';
@@ -282,6 +282,30 @@ function usePlayhead(music: SpotifySnapshot): number {
   }, [music.playing, music.status, music.at]);
   return playhead(music, now);
 }
+/**
+ * One slot in the transport row.
+ *
+ * Shuffle and repeat light up when the player says they are on and stay unlit
+ * when it did not say — a button that looks off because nothing could be read
+ * is a lie, so the unread state is drawn as plainly off and the title says so.
+ */
+function TransportSlot({ control, live, busy }: { control: MusicControl; live: LiveController; busy: boolean }) {
+  const { music } = live.state;
+  const send = (command: 'previous' | 'next' | 'shuffle' | 'repeat') => void live.run(() => window.notchlight.controlSpotify(command));
+  const name = MUSIC_CONTROL_NAMES[control];
+  if (control === 'open') {
+    return <button className="mp-icon-button" aria-label={`Open ${PLAYER_NAMES[music.player]}`} title={`Open ${PLAYER_NAMES[music.player]}`} onClick={() => void live.run(() => window.notchlight.openSpotify())}><Icon name="launch" size={17}/></button>;
+  }
+  if (control === 'previous' || control === 'next') {
+    return <button className="mp-icon-button" disabled={busy} aria-label={`${name} track`} onClick={() => send(control)}><Icon name={control === 'next' ? 'next' : 'back'} size={18}/></button>;
+  }
+  const on = control === 'shuffle' ? music.shuffling : music.repeating;
+  const unknown = on === null;
+  return <button className={`mp-icon-button mp-toggle ${on ? 'is-on' : ''}`} disabled={busy} aria-pressed={on === true}
+    aria-label={name} title={unknown ? `${name} — ${PLAYER_NAMES[music.player]} did not say whether it is on` : `${name} ${on ? 'on' : 'off'}`}
+    onClick={() => send(control)}><Icon name={control} size={17}/></button>;
+}
+
 function LiveMusic({ live }: { live: LiveController }) {
   const { music } = live.state;
   const [seek, setSeek] = useState<number | null>(null);
@@ -307,7 +331,13 @@ function LiveMusic({ live }: { live: LiveController }) {
   const pick = smart.pick && smart.pick.trackId === track.id ? smart.pick : null;
   const answer = (choice: 'add' | 'dismiss') => void live.run(() => window.notchlight.answerPick(choice));
   const position = seek ?? current;
-  return <div className="mp-music"><div className="mp-track-row"><LiveArtwork live={live}/><div className="mp-track-meta"><h2 title={track.title}>{track.title}</h2><p title={track.artist}>{pick && <span className="mp-pick" role="img" aria-label="Smart Shuffle pick" title={`A Smart Shuffle pick — not in ${pick.playlistName} yet`}><Icon name="sparkle" size={11}/></span>}{track.artist}</p><div className="mp-seek"><span>{time(position)}</span><input aria-label="Track position" aria-valuetext={`${time(position)} of ${time(track.duration)}`} type="range" min="0" max={track.duration} step="any" value={position} disabled={music.busy || !track.duration} onChange={e => setSeek(Number(e.target.value))} onPointerUp={e => commitSeek(Number(e.currentTarget.value))} onPointerCancel={() => setSeek(null)} onKeyUp={e => { if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key)) commitSeek(Number(e.currentTarget.value)); }}/><span>−{time(Math.max(0,track.duration-position))}</span></div><div className="mp-transport"><button className="mp-icon-button" disabled={music.busy} aria-label="Previous track" onClick={() => command('previous')}><Icon name="back" size={18}/></button><button className="mp-icon-button mp-play" disabled={music.busy} aria-label={playing ? `Pause ${PLAYER_NAMES[music.player]}` : `Play ${PLAYER_NAMES[music.player]}`} onClick={() => command('toggle')}><Icon name={playing ? 'pause' : 'play'} size={18}/></button><button className="mp-icon-button" disabled={music.busy} aria-label="Next track" onClick={() => command('next')}><Icon name="next" size={18}/></button></div></div>{pick && <div className="mp-track-actions"><button className="mp-icon-button mp-pick-button" disabled={smart.busy || music.busy} aria-label="Not for me: skip this pick" title="Not for me" onClick={() => answer('dismiss')}><Icon name="close" size={16}/></button><button className="mp-icon-button mp-pick-button" disabled={smart.busy || !pick.canAdd} aria-label={pick.canAdd ? `Add to ${pick.playlistName}` : `${pick.playlistName} is not yours to add to`} title={pick.canAdd ? `Add to ${pick.playlistName}` : `${pick.playlistName} is not yours to add to`} onClick={() => answer('add')}><Icon name="plus" size={16}/></button></div>}</div></div>;
+  // Play keeps the middle. The chosen controls fill out from it, left first, so
+  // the default pair reads as the transport everyone already knows.
+  const slots = live.state.preferences.musicSlots;
+  const half = Math.ceil(slots.length / 2);
+  const leftSlots = slots.slice(0, half);
+  const rightSlots = slots.slice(half);
+  return <div className="mp-music"><div className="mp-track-row"><LiveArtwork live={live}/><div className="mp-track-meta"><h2 title={track.title}>{track.title}</h2><p title={track.artist}>{pick && <span className="mp-pick" role="img" aria-label="Smart Shuffle pick" title={`A Smart Shuffle pick — not in ${pick.playlistName} yet`}><Icon name="sparkle" size={11}/></span>}{track.artist}</p><div className="mp-seek"><span>{time(position)}</span><input aria-label="Track position" aria-valuetext={`${time(position)} of ${time(track.duration)}`} type="range" min="0" max={track.duration} step="any" value={position} disabled={music.busy || !track.duration} onChange={e => setSeek(Number(e.target.value))} onPointerUp={e => commitSeek(Number(e.currentTarget.value))} onPointerCancel={() => setSeek(null)} onKeyUp={e => { if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key)) commitSeek(Number(e.currentTarget.value)); }}/><span>−{time(Math.max(0,track.duration-position))}</span></div><div className="mp-transport">{leftSlots.map(control => <TransportSlot key={control} control={control} live={live} busy={music.busy}/>)}<button className="mp-icon-button mp-play" disabled={music.busy} aria-label={playing ? `Pause ${PLAYER_NAMES[music.player]}` : `Play ${PLAYER_NAMES[music.player]}`} onClick={() => command('toggle')}><Icon name={playing ? 'pause' : 'play'} size={18}/></button>{rightSlots.map(control => <TransportSlot key={control} control={control} live={live} busy={music.busy}/>)}</div></div>{pick && <div className="mp-track-actions"><button className="mp-icon-button mp-pick-button" disabled={smart.busy || music.busy} aria-label="Not for me: skip this pick" title="Not for me" onClick={() => answer('dismiss')}><Icon name="close" size={16}/></button><button className="mp-icon-button mp-pick-button" disabled={smart.busy || !pick.canAdd} aria-label={pick.canAdd ? `Add to ${pick.playlistName}` : `${pick.playlistName} is not yours to add to`} title={pick.canAdd ? `Add to ${pick.playlistName}` : `${pick.playlistName} is not yours to add to`} onClick={() => answer('add')}><Icon name="plus" size={16}/></button></div>}</div></div>;
 }
 function FileButton({ file, live, selected, dragIds, onSelect }: { file: ShelfFile; live: LiveController; selected: boolean; dragIds: string[]; onSelect: (e: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }) => void }) {
   return <div className={`mp-shelf-item ${selected ? 'is-selected' : ''} ${file.unavailable ? 'is-unavailable' : ''}`}><button className="mp-file-button" aria-label={`Select ${file.name}${file.unavailable ? ', unavailable' : ''}`} aria-pressed={selected} draggable={!file.unavailable} onDragStart={e => { e.preventDefault(); window.notchlight.startFileDrag(dragIds); }} onClick={e => onSelect(e)} onDoubleClick={() => void live.run(() => file.unavailable ? window.notchlight.locateFile(file.id) : window.notchlight.revealFile(file.id))}><FileThumb file={file} small={live.state.preferences.thumbnails === 'small'} sample={false}/><span title={file.name}>{file.name}</span><small>{file.unavailable ? 'Missing' : file.size}</small></button><button className="mp-remove" aria-label={`Remove ${file.name} from Tray`} onClick={() => void live.run(() => window.notchlight.removeFiles([file.id]))}><Icon name="close" size={12}/></button></div>;
