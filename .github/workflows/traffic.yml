@@ -1,0 +1,40 @@
+name: clone graph
+
+# GitHub keeps clone counts for fourteen days and then discards them, so a
+# graph that goes back further has to be written down before they expire. This
+# reads them daily, merges them into docs/traffic.json and redraws the chart in
+# the README. Nothing else in the repository depends on it, and a failed run
+# costs at most one day of history.
+
+on:
+  schedule:
+    # Early morning UTC, after GitHub has settled the previous day's figures.
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  clones:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read the clone counts
+        run: node scripts/traffic.mjs
+        env:
+          # The traffic API needs push access, which the workflow token has on
+          # its own repository. A fork will get a 403 and that is correct.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+      - name: Commit the day
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/traffic.json docs/traffic.svg
+          # Most days the numbers move; on a quiet one there is nothing to say.
+          git diff --cached --quiet || git commit -m "chore(traffic): clone counts for $(date -u +%F)"
+          git push
