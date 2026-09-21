@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type D
 import { Island, Stubs, Wings } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
-import { initialPreview, previewReducer, previewAgents, HUD_SAMPLES, SAMPLE_FILES, TRACKS,
+import { initialPreview, previewReducer, previewAgents, BATTERY_SAMPLES, HUD_SAMPLES, SAMPLE_FILES, TRACKS,
   type PreviewAction, type PreviewFile, type PreviewState, type PreviewView } from './previewModel';
 import './preview.css';
 import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
@@ -281,6 +281,7 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
     ...agentParts,
     ...(prefs.restMusic && state.music.source === 'ready' ? [{ left: <Artwork state={state} mini/>, right: <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow ? SAMPLE_TINT : undefined}/> }] : []),
     ...(prefs.restTray && state.files.length > 0 || state.drag?.origin === 'finder' ? [{ left: <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>, right: <Icon name="file" size={16}/> }] : []),
+    ...(prefs.batteryEnabled && prefs.restBattery && state.battery ? [batteryRestingPart(state.battery, prefs.batteryPercentage)] : []),
     ...(prefs.clipboardEnabled && prefs.restClipboard && state.clips.length > 0 ? [{ left: <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span>, right: <span className="mp-clip-kind" aria-hidden="true">{state.clips[0].kind === 'url' ? '@' : state.clips[0].kind === 'image' ? '▣' : 'T'}</span> }] : [])
   ];
   const attention = undefined;
@@ -371,6 +372,11 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'HUD · nearly off', note: 'Five percent has to be visible, or the key feels dead.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[4].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
   { name: 'HUD · wide bar', note: 'A/B: one press takes the full panel width instead of the wings.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[0].hud, preferences: { ...s.preferences, hudEnabled: true, hudClosed: 'wide' } }) },
   { name: 'HUD · open notch', note: 'Above the tabs, whichever face you were on.', patch: s => ({ ...s, open: true, hud: HUD_SAMPLES[3].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'Battery · on the resting bar', note: 'A level is a length; the number beside it is optional.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[0].battery, preferences: { ...s.preferences, batteryEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
+  { name: 'Battery · charging', note: 'A bolt through the level, and green rather than ivory.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[1].battery, preferences: { ...s.preferences, batteryEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
+  { name: 'Battery · low', note: 'Amber is the one state meant to catch the corner of your eye.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[3].battery, preferences: { ...s.preferences, batteryEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
+  { name: 'Battery · nearly flat', note: 'Four percent still reads as a battery, not an empty box.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[4].battery, preferences: { ...s.preferences, batteryEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
+  { name: 'Battery · beside the other faces', note: 'It takes the outer space, like Music and Tray.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[0].battery, preferences: { ...s.preferences, batteryEnabled: true } }) },
   { name: 'Tray · empty', note: 'A clear target for the next thing you pick up.', patch: s => ({ ...s, view: 'tray', files: [] }) },
   { name: 'Tray · populated', note: 'Recognizable thumbnails, readable names.', patch: s => ({ ...s, view: 'tray' }) },
   { name: 'Tray · selected', note: 'Select a file, then take it out with the keyboard.', patch: s => ({ ...s, view: 'tray', selected: 'brief' }) },
