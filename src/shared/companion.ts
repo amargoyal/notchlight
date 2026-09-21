@@ -511,6 +511,8 @@ export interface CompanionBridge {
   closeIsland(): void;
   /** Show System Settings → Privacy & Security → Accessibility. */
   openAccessibility(): Promise<OperationResult>;
+  /** Look again now: a permission was just granted and the helper is waiting out its backoff. */
+  retryHelper(which: 'hud' | 'calendar' | 'battery'): Promise<OperationResult>;
   /** Show System Settings → Privacy & Security → Calendars, where a refusal can be undone. */
   openCalendarPrivacy(): Promise<OperationResult>;
   /** Open Calendar, for the things the notch cannot do. */

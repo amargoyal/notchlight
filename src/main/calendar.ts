@@ -112,6 +112,17 @@ export class Calendar extends EventEmitter {
     this.helper.setActive(true);
   }
 
+  /**
+   * Look again now, rather than waiting out the backoff. What a refusal is
+   * waiting for is someone visiting System Settings, and only they know when
+   * they have.
+   */
+  retry(): void {
+    if (!this.helper) return;
+    this.set({ ...this.state, status: 'starting', reason: null });
+    this.helper.retryNow();
+  }
+
   stop(): void {
     // The flag goes up first: tearing down emits a change, the companion store
     // answers it, and the answer comes straight back here.
@@ -131,6 +142,7 @@ export class Calendar extends EventEmitter {
     helper.on('ready', (line: string) => {
       const head = parseCalendarReady(line);
       if (!head.ok) {
+        helper.markRefused();
         logEvent('calendar', `calendarwatch refused: ${head.reason}`);
         this.set({ ...EMPTY_CALENDAR, status: 'unavailable', reason: head.reason ?? 'crashed' });
         return;

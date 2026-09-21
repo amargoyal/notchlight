@@ -310,6 +310,7 @@ function HudPane({ live, state, dispatch, prefs, pref }: PaneProps) {
       {live.available && <Row title="Permission" description={describeHud(hud, prefs.hudEnabled)}>
         <Status tone={hud.status === 'listening' ? 'good' : hud.status === 'unavailable' ? 'bad' : hud.status === 'starting' ? 'wait' : 'off'}>{hud.status === 'listening' ? 'Replacing' : hud.status === 'starting' ? 'Starting' : hud.status === 'unavailable' ? (hud.reason === 'accessibility' ? 'Needs permission' : 'Unavailable') : 'Off'}</Status>
         <Button onClick={() => void live.run(() => window.notchlight.openAccessibility())}>Open Accessibility…</Button>
+        {hud.status === 'unavailable' && <Button kind="quiet" onClick={() => void live.run(() => window.notchlight.retryHelper('hud'))}>Try Again</Button>}
       </Row>}
       <Row title="Option key" description="macOS opens the matching settings pane when Option is held. Keep that, or let Option move the level like any other press."><Segmented label="Option key" value={prefs.hudOptionKey} options={[{ value: 'settings', label: 'Opens Settings' }, { value: 'replace', label: 'Changes the level' }]} onChange={v => pref('hudOptionKey', v)}/></Row>
     </Group>
@@ -420,6 +421,7 @@ function TodayPane({ live, state, dispatch, prefs, pref, showView }: PaneProps) 
           {calendar.status === 'reading' ? 'Reading' : calendar.status === 'starting' ? 'Asking' : calendar.reason === 'denied' ? 'Not allowed' : 'Unavailable'}
         </Status>
         {calendar.reason === 'denied' && <Button onClick={() => void live.run(() => window.notchlight.openCalendarPrivacy())}>Open Privacy…</Button>}
+        {calendar.status === 'unavailable' && <Button kind="quiet" onClick={() => void live.run(() => window.notchlight.retryHelper('calendar'))}>Try Again</Button>}
       </Row>}
     </Group>
     <Group title="What to show" footer="Hiding a calendar here changes nothing in Calendar itself; it only leaves those events out of the notch.">

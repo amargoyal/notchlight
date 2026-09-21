@@ -500,7 +500,8 @@ async function boot(): Promise<void> {
     () => {
       const bounds = notch?.win?.getBounds();
       return bounds ? { x: Math.round(bounds.x + bounds.width / 2), y: bounds.y + 36 } : { x: 0, y: 40 };
-    });
+    },
+    which => { if (which === 'hud') hud.retry(); else if (which === 'calendar') calendar.retry(); else battery.retry(); });
   if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
   smart.setEnabled(!DEMO && spotifyEnabled && companion.current().preferences.smartShuffle);
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);

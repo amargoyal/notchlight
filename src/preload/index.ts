@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('notchlight', {
   onMusicLevels: (cb: (levels: number[]) => void) => subscribe('music:levels', cb),
   onHud: (cb: (activity: HudActivity) => void) => subscribe('hud:event', cb),
   openAccessibility: () => ipcRenderer.invoke('hud:accessibility'),
+  retryHelper: (which: 'hud' | 'calendar' | 'battery') => ipcRenderer.invoke('helper:retry', which),
   openCalendarPrivacy: () => ipcRenderer.invoke('calendar:privacy'),
   openCalendarApp: () => ipcRenderer.invoke('calendar:open'),
   onBattery: (cb: (activity: BatteryActivity) => void) => subscribe('battery:event', cb),
