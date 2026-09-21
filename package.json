@@ -2,7 +2,7 @@
   "name": "notchlight",
   "version": "0.2.0",
   "private": true,
-  "description": "Notchlight — Claude and Codex activity, Spotify, and a file shelf, within reach.",
+  "description": "Notchlight \u2014 Claude and Codex activity, Spotify, and a file shelf, within reach.",
   "author": "Amar Goyal",
   "main": "dist/main/index.js",
   "type": "commonjs",
@@ -13,6 +13,7 @@
     "watch": "node scripts/build.mjs --watch",
     "test:companion": "node scripts/test-companion.mjs",
     "test:preview": "node scripts/test-preview.mjs",
+    "test:displays": "node scripts/test-displays.mjs",
     "typecheck": "tsc --noEmit",
     "start": "npm run build && electron .",
     "demo": "npm run build && electron . --demo",
@@ -81,7 +82,7 @@
       "gatekeeperAssess": false,
       "extendInfo": {
         "NSAppleEventsUsageDescription": "Notchlight controls Spotify through its scripting interface to show and change what is playing.",
-        "NSAudioCaptureUsageDescription": "Notchlight listens to Spotify’s output so the equalizer bars can follow the music. Nothing is recorded.",
+        "NSAudioCaptureUsageDescription": "Notchlight listens to Spotify\u2019s output so the equalizer bars can follow the music. Nothing is recorded.",
         "LSUIElement": true
       }
     },

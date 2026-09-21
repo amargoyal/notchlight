@@ -26,6 +26,31 @@ export interface Config {
   /** Show the island on a Mac with no cutout — it hangs off the menu bar. */
   allowWithoutNotch: boolean;
   /**
+   * Which screens carry an island.
+   *
+   * `built-in` is the notched panel and nothing else, which is what Notchlight
+   * has always done. `all` puts one on every screen. `cursor` keeps a single
+   * island and moves it to whichever screen the pointer is on. `chosen` pins it
+   * to `displayId`, and falls back to the built-in one when that screen is
+   * unplugged.
+   */
+  displays: 'built-in' | 'all' | 'cursor' | 'chosen';
+  /** The screen `displays: "chosen"` means, as a CGDirectDisplayID. 0 until one is picked. */
+  displayId: number;
+  /**
+   * How tall the collapsed bar is on a screen with a cutout: the cutout itself,
+   * the menu bar it sits in, or a figure of your own.
+   */
+  notchHeight: 'cutout' | 'menu-bar' | 'custom';
+  /** The figure `notchHeight: "custom"` means, in points, 15 to 45. */
+  notchHeightCustom: number;
+  /**
+   * The bar's height on a screen with no cutout, in points, 0 to 40. There is
+   * no hole to match there, so the island hangs off the menu bar at whatever
+   * height reads best. 0 leaves those screens alone.
+   */
+  plainNotchHeight: number;
+  /**
    * Tool names whose calls the daemon holds open until the island answers.
    *
    * Empty by default, and that is the whole safety story: with nothing listed,
@@ -92,6 +117,11 @@ const DEFAULTS: Config = {
   notchH: 32,
   pulse: true,
   allowWithoutNotch: false,
+  displays: 'built-in',
+  displayId: 0,
+  notchHeight: 'cutout',
+  notchHeightCustom: 32,
+  plainNotchHeight: 32,
   gateTools: [],
   gateTimeoutSec: 55,
   /**
@@ -140,6 +170,16 @@ export function config(): Config {
   // The helper refuses anything outside 5…60 and would fall back to its own
   // default, so clamp here rather than hand it a figure it will ignore.
   cached.levelsFps = Math.max(12, Math.min(60, Math.round(cached.levelsFps)));
+  // A display rule out of range would leave the island on no screen at all, or
+  // at a height that cannot cover the menu bar. Fall back rather than obey.
+  if (!['built-in', 'all', 'cursor', 'chosen'].includes(cached.displays)) cached.displays = DEFAULTS.displays;
+  if (typeof cached.displayId !== 'number' || !Number.isFinite(cached.displayId) || cached.displayId < 0) cached.displayId = 0;
+  cached.displayId = Math.round(cached.displayId);
+  if (!['cutout', 'menu-bar', 'custom'].includes(cached.notchHeight)) cached.notchHeight = DEFAULTS.notchHeight;
+  if (typeof cached.notchHeightCustom !== 'number' || !Number.isFinite(cached.notchHeightCustom)) cached.notchHeightCustom = DEFAULTS.notchHeightCustom;
+  cached.notchHeightCustom = Math.max(15, Math.min(45, Math.round(cached.notchHeightCustom)));
+  if (typeof cached.plainNotchHeight !== 'number' || !Number.isFinite(cached.plainNotchHeight)) cached.plainNotchHeight = DEFAULTS.plainNotchHeight;
+  cached.plainNotchHeight = Math.max(0, Math.min(40, Math.round(cached.plainNotchHeight)));
   return cached;
 }
 

@@ -22,6 +22,14 @@ export function useCompanion() {
     try { const result = await operation(); if (!result.ok) setError(result.error || 'The action could not be completed.'); }
     catch { setError('The app could not complete that action. Try again.'); }
   }, []);
+  // Each overlay sits on its own screen, and screens do not share a cutout. The
+  // store's figures describe the first one, so a window that has been told its
+  // own measurements uses those instead.
+  const [geometry, setGeometry] = useState<{ notchW: number; notchH: number } | null>(null);
+  useEffect(() => {
+    if (!window.notchlight?.onGeometry) return;
+    return window.notchlight.onGeometry(setGeometry);
+  }, []);
   useEffect(() => {
     if (!available) return;
     const bridge = window.notchlight;
@@ -32,7 +40,7 @@ export function useCompanion() {
     void bridge.getSnapshot().then(s => { if (active && !gotSnapshot) setSnapshot(s); }).catch(() => {});
     return () => { active = false; stop(); stopSnapshot(); };
   }, [available]);
-  return { available, state, snapshot, ready, error, run };
+  return { available, state, snapshot: geometry ? { ...snapshot, ...geometry } : snapshot, ready, error, run };
 }
 export type LiveController = ReturnType<typeof useCompanion>;
 const names: Record<CompanionView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray', clipboard: 'Clipboard' };
