@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="260" viewBox="0 0 880 260" role="img" aria-label="Clones per day since 6 Sep: 524 clones in 14 days">
+  <style>
+    .bg { fill: #fbf9f6; }
+    .grid { stroke: #e2dbd1; stroke-width: 1; }
+    .axis { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #8a817a; }
+    .title { font: 600 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; fill: #302922; }
+    .key { font: 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; fill: #6b6258; }
+    .total { fill: #c97c5c; }
+    .unique { fill: #8a5238; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #1d1b19; }
+      .grid { stroke: #332e29; }
+      .axis { fill: #8d8279; }
+      .title { fill: #f0e7dc; }
+      .key { fill: #b3a79a; }
+      .total { fill: #d4896a; }
+      .unique { fill: #e6b9a4; }
+    }
+  </style>
+  <rect width="880" height="260" rx="8" class="bg"/>
+  <text x="44" y="15" class="title">Clones per day</text>
+  <text x="864" y="15" class="key" text-anchor="end">524 clones since 6 Sep</text>
+  <g transform="translate(152, 8)">
+    <rect width="9" height="9" rx="2" class="total"/><text x="14" y="8" class="key">clones</text>
+    <rect x="66" width="9" height="9" rx="2" class="unique"/><text x="80" y="8" class="key">unique that day</text>
+  </g>
+  <line x1="44" y1="226.0" x2="864" y2="226.0" class="grid"/><text x="36" y="230.0" class="axis" text-anchor="end">0</text><line x1="44" y1="175.0" x2="864" y2="175.0" class="grid"/><text x="36" y="179.0" class="axis" text-anchor="end">55</text><line x1="44" y1="124.0" x2="864" y2="124.0" class="grid"/><text x="36" y="128.0" class="axis" text-anchor="end">110</text><line x1="44" y1="73.0" x2="864" y2="73.0" class="grid"/><text x="36" y="77.0" class="axis" text-anchor="end">165</text><line x1="44" y1="22.0" x2="864" y2="22.0" class="grid"/><text x="36" y="26.0" class="axis" text-anchor="end">220</text>
+  <g><title>2026-09-06: 0 clones, 0 unique</title><rect x="66.3" y="226.0" width="14.0" height="0.0" rx="2" class="total"/><rect x="66.3" y="226.0" width="14.0" height="0.0" rx="2" class="unique"/></g><g><title>2026-09-07: 0 clones, 0 unique</title><rect x="124.9" y="226.0" width="14.0" height="0.0" rx="2" class="total"/><rect x="124.9" y="226.0" width="14.0" height="0.0" rx="2" class="unique"/></g><g><title>2026-09-08: 0 clones, 0 unique</title><rect x="183.4" y="226.0" width="14.0" height="0.0" rx="2" class="total"/><rect x="183.4" y="226.0" width="14.0" height="0.0" rx="2" class="unique"/></g><g><title>2026-09-09: 54 clones, 24 unique</title><rect x="242.0" y="175.9" width="14.0" height="50.1" rx="2" class="total"/><rect x="242.0" y="203.7" width="14.0" height="22.3" rx="2" class="unique"/></g><g><title>2026-09-10: 220 clones, 77 unique</title><rect x="300.6" y="22.0" width="14.0" height="204.0" rx="2" class="total"/><rect x="300.6" y="154.6" width="14.0" height="71.4" rx="2" class="unique"/></g><g><title>2026-09-11: 136 clones, 24 unique</title><rect x="359.1" y="99.9" width="14.0" height="126.1" rx="2" class="total"/><rect x="359.1" y="203.7" width="14.0" height="22.3" rx="2" class="unique"/></g><g><title>2026-09-12: 56 clones, 19 unique</title><rect x="417.7" y="174.1" width="14.0" height="51.9" rx="2" class="total"/><rect x="417.7" y="208.4" width="14.0" height="17.6" rx="2" class="unique"/></g><g><title>2026-09-13: 9 clones, 7 unique</title><rect x="476.3" y="217.7" width="14.0" height="8.3" rx="2" class="total"/><rect x="476.3" y="219.5" width="14.0" height="6.5" rx="2" class="unique"/></g><g><title>2026-09-14: 13 clones, 7 unique</title><rect x="534.9" y="213.9" width="14.0" height="12.1" rx="2" class="total"/><rect x="534.9" y="219.5" width="14.0" height="6.5" rx="2" class="unique"/></g><g><title>2026-09-15: 5 clones, 4 unique</title><rect x="593.4" y="221.4" width="14.0" height="4.6" rx="2" class="total"/><rect x="593.4" y="222.3" width="14.0" height="3.7" rx="2" class="unique"/></g><g><title>2026-09-16: 17 clones, 9 unique</title><rect x="652.0" y="210.2" width="14.0" height="15.8" rx="2" class="total"/><rect x="652.0" y="217.7" width="14.0" height="8.3" rx="2" class="unique"/></g><g><title>2026-09-17: 4 clones, 4 unique</title><rect x="710.6" y="222.3" width="14.0" height="3.7" rx="2" class="total"/><rect x="710.6" y="222.3" width="14.0" height="3.7" rx="2" class="unique"/></g><g><title>2026-09-18: 10 clones, 10 unique</title><rect x="769.1" y="216.7" width="14.0" height="9.3" rx="2" class="total"/><rect x="769.1" y="216.7" width="14.0" height="9.3" rx="2" class="unique"/></g><g><title>2026-09-19: 0 clones, 0 unique</title><rect x="827.7" y="226.0" width="14.0" height="0.0" rx="2" class="total"/><rect x="827.7" y="226.0" width="14.0" height="0.0" rx="2" class="unique"/></g>
+  <text x="73.3" y="248" class="axis" text-anchor="middle">6 Sep</text><text x="190.4" y="248" class="axis" text-anchor="middle">8 Sep</text><text x="307.6" y="248" class="axis" text-anchor="middle">10 Sep</text><text x="424.7" y="248" class="axis" text-anchor="middle">12 Sep</text><text x="541.9" y="248" class="axis" text-anchor="middle">14 Sep</text><text x="659.0" y="248" class="axis" text-anchor="middle">16 Sep</text><text x="776.1" y="248" class="axis" text-anchor="middle">18 Sep</text><text x="834.7" y="248" class="axis" text-anchor="middle">19 Sep</text>
+</svg>
