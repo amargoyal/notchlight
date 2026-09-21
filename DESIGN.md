@@ -15,6 +15,34 @@ Original vector record sleeves and a landscape illustration, bundled locally. Th
 ## Boundaries
 Use the same Island shell and Claude components in previews. Sample controls must remain isolated from production state. Native appearance preferences persist separately from Claude gate configuration. Every preview has empty/error/overflow examples. Gallery remains the exhaustive visual regression surface.
 
+## Today
+
+A fourth face, between Music and Tray. It reads your calendar and never writes
+to it — the one exception is ticking off a reminder, which goes back through
+Reminders because that is a thing the row is already showing you the state of.
+
+The panel is the whole day in the order it happens, scrolled to the next thing
+rather than to the top. What is behind you is dimmed rather than removed: a day
+reads better with its shape intact, and "three meetings already gone" is
+information. Each row carries its calendar's own colour on the left, which is
+the only ornament — it is what makes a row belong to Work or Home at a glance,
+and it is a decision someone already made in the app they keep their calendar in.
+Reminders take a dot rather than a bar, so the two kinds never have to be read.
+
+The resting bar carries the next thing and how long until it — `in 8m`, `now`,
+`All day`. Something already under way says `now`, never a negative countdown.
+
+Three rules can hide things, and the heading says how many they took: all-day
+events, finished reminders, and any calendar switched off. Hiding a calendar here
+changes nothing in Calendar itself. A day with things in it and nothing showing
+says which rule did it, because an empty panel that is empty for a reason you set
+last week is the worst kind of empty.
+
+Access is asked for once and macOS remembers the answer, so a refusal is a state
+rather than something to retry into. The pane says so and names the pane where it
+can be changed. Reminders are a second permission, and asking for them starts a
+fresh helper: a process that has already asked for less cannot ask for more.
+
 ## The first run
 
 Everything Notchlight can do is off until someone says otherwise. That is the
