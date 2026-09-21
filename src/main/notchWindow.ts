@@ -10,9 +10,9 @@
  */
 import { app, BrowserWindow, screen, type Display } from 'electron';
 import path from 'node:path';
-import { config } from './config';
+import { config, type Config } from './config';
 import { Hover } from './hover';
-import { probeFor, resetProbe } from './notchProbe';
+import { probeFor, resetProbe, type DisplayProbe } from './notchProbe';
 import { logEvent } from './lifecycle';
 import type { HitRect } from '../shared/types';
 
@@ -33,14 +33,14 @@ function menuBarHeightOf(d: Display): number {
  * the taller of the two wins. A screen with no cutout has no hole to match, so
  * it takes the plain height the owner chose.
  */
-export function geometryFor(d: Display, cfg = config()): NotchGeometry {
-  const probe = probeFor(d.id);
+export function geometryFor(d: Display, cfg: Pick<Config, 'notchHeight' | 'notchHeightCustom' | 'plainNotchHeight' | 'notchW' | 'notchH'> = config(), probe: (id: number) => DisplayProbe | null = probeFor): NotchGeometry {
+  const measured = probe(d.id);
   const menuBar = menuBarHeightOf(d);
-  if (probe?.notch) {
+  if (measured?.notch) {
     const height = cfg.notchHeight === 'menu-bar' ? menuBar
       : cfg.notchHeight === 'custom' ? cfg.notchHeightCustom
-      : Math.max(Math.round(probe.notchH ?? cfg.notchH), menuBar);
-    return { notchW: Math.round(probe.notchW ?? cfg.notchW), notchH: height };
+      : Math.max(Math.round(measured.notchH ?? cfg.notchH), menuBar);
+    return { notchW: Math.round(measured.notchW ?? cfg.notchW), notchH: height };
   }
   return { notchW: cfg.notchW, notchH: cfg.plainNotchHeight || menuBar };
 }
@@ -244,6 +244,36 @@ function windowHeight(d: Display): number {
 }
 
 /**
+ * Which screens carry an island, given what is attached and what was asked for.
+ *
+ * A screen with no cutout only qualifies when the owner has asked for one
+ * there: it is a bar hanging off a menu bar rather than a hole being filled,
+ * and nobody wants that by surprise on a second monitor. Whatever the rule, a
+ * screen that has been unplugged falls back to the built-in one rather than
+ * leaving the island on nothing at all.
+ *
+ * Pure, and separately testable: everything Electron knows arrives as an
+ * argument.
+ */
+export function chooseDisplayIds(
+  all: number[],
+  probe: (id: number) => DisplayProbe | null,
+  cfg: Pick<Config, 'displays' | 'displayId' | 'allowWithoutNotch' | 'plainNotchHeight'>,
+  cursor: number
+): number[] {
+  const plain = cfg.allowWithoutNotch && cfg.plainNotchHeight > 0;
+  const eligible = all.filter(id => probe(id)?.notch || plain);
+  if (!eligible.length) return [];
+  const preferred = eligible.find(id => probe(id)?.builtin) ?? eligible.find(id => probe(id)?.notch) ?? eligible[0];
+  switch (cfg.displays) {
+    case 'all': return eligible;
+    case 'cursor': return [eligible.includes(cursor) ? cursor : preferred];
+    case 'chosen': return [eligible.includes(cfg.displayId) ? cfg.displayId : preferred];
+    default: return [preferred];
+  }
+}
+
+/**
  * Every overlay, and which screens deserve one.
  *
  * One island on the built-in panel is still the default, and on a single-screen
@@ -297,31 +327,12 @@ export class NotchWindow {
     return this.windows();
   }
 
-  /**
-   * The screens that should carry an island right now.
-   *
-   * A screen with no cutout only qualifies when the owner has asked for one
-   * there: it is a bar hanging off a menu bar rather than a hole being filled,
-   * and nobody wants that by surprise on a second monitor.
-   */
+  /** The screens that should carry an island right now. */
   private targets(): Display[] {
-    const cfg = config();
     const all = screen.getAllDisplays();
-    const plain = cfg.allowWithoutNotch && cfg.plainNotchHeight > 0;
-    const eligible = all.filter(d => probeFor(d.id)?.notch || plain);
-    if (!eligible.length) return [];
-    const preferred = () => eligible.find(d => probeFor(d.id)?.builtin) ?? eligible.find(d => probeFor(d.id)?.notch) ?? eligible[0];
-    switch (cfg.displays) {
-      case 'all': return eligible;
-      case 'cursor': {
-        const under = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-        return [eligible.find(d => d.id === under.id) ?? preferred()];
-      }
-      // A screen that has been unplugged falls back rather than leaving the
-      // island on nothing at all.
-      case 'chosen': return [eligible.find(d => d.id === cfg.displayId) ?? preferred()];
-      default: return [preferred()];
-    }
+    const cursor = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id;
+    const chosen = new Set(chooseDisplayIds(all.map(d => d.id), probeFor, config(), cursor));
+    return all.filter(d => chosen.has(d.id));
   }
 
   /**
