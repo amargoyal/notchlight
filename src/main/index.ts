@@ -26,20 +26,19 @@ import { fetchAppleArtwork } from './appleArtwork';
 import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
 import { createGalleryWindow, createCustomizeWindow, createUpdateWindow, NotchWindow } from './notchWindow';
-import { notchState, probeNotch } from './notchProbe';
+import { notchState, probeDisplays, probeNotch } from './notchProbe';
 import { menubarIcon } from './png';
 import { Store } from './store';
 import { CodexAdapter } from './codex';
 import { CodexApprovals } from './codexApprovals';
 import { AgentCoordinator } from './agentCoordinator';
 import { logEvent } from './lifecycle';
-import { Hover } from './hover';
 import { Updater, type Release } from './updates';
 import type { UpdateResponse } from '../shared/updates';
 import { jumpToProcess } from './terminal';
 import type { HitRect, Snapshot } from '../shared/types';
 import type { HudActivity, HudSnapshot } from '../shared/companion';
-import { validateAppSettings, type AppSettings, type AppSettingsPatch } from '../shared/settings';
+import { validateAppSettings, type AppSettings, type AppSettingsPatch, type ScreenInfo } from '../shared/settings';
 
 const DEMO = process.argv.includes('--demo');
 const GALLERY_ONLY = process.argv.includes('--gallery');
@@ -82,7 +81,6 @@ let levels: AudioLevels;
 let hud: Hud;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
-let hover: Hover | null = null;
 let claudeStore: Store | null = null;
 /** Asleep or locked: nobody is looking, so no helper should be running. */
 let dark = false;
@@ -318,7 +316,7 @@ async function boot(): Promise<void> {
   let tappedPlayer = spotify.currentPlayer();
   levels = new AudioLevels(undefined, () => helperArguments(config(), spotify.currentPlayer()));
   levels.on('levels', (bands: number[]) => {
-    send(notch?.win ?? null, 'music:levels', bands);
+    notch?.broadcast('music:levels', bands);
     send(customize, 'music:levels', bands);
   });
   levels.on('status', () => companion.setCapture({ status: levels.status, reason: levels.reason, retryAt: levels.nextRetry() }));
@@ -326,7 +324,7 @@ async function boot(): Promise<void> {
   // own channel; the pane's readout rides the companion snapshot like everything else.
   hud = new Hud();
   hud.on('activity', (activity: HudActivity) => {
-    send(notch?.win ?? null, 'hud:event', activity);
+    notch?.broadcast('hud:event', activity);
     send(customize, 'hud:event', activity);
   });
   hud.on('change', (state: HudSnapshot) => companion.setHud(state));
@@ -400,7 +398,7 @@ async function boot(): Promise<void> {
   companion.on('change', state => {
     syncCodex();
     syncClipboard();
-    send(notch?.win ?? null, 'companion', state);
+    notch?.broadcast('companion', state);
     send(customize, 'companion', state);
     syncLevels();
     syncHud();
@@ -415,38 +413,35 @@ async function boot(): Promise<void> {
   });
   ipcMain.handle('snapshot:get', event => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (event.senderFrame !== event.sender.mainFrame || !win || win !== customize && win !== notch?.win) throw new Error('Unknown snapshot consumer.');
+    if (event.senderFrame !== event.sender.mainFrame || !win || win !== customize && !notch?.owns(win)) throw new Error('Unknown snapshot consumer.');
     return store.current();
   });
   pickFiles = installCompanionIpc(companion, spotify, clips,
-    win => !!win && (win === customize || win === notch?.win),
+    win => !!win && (win === customize || !!notch?.owns(win)),
     () => { openCustomize(); return customize!; }, account, smart);
   if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
   smart.setEnabled(!DEMO && spotifyEnabled && companion.current().preferences.smartShuffle);
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);
 
-  hover = new Hover((open) => send(notch?.win ?? null, 'open', open), () => config());
+  // Hover intent and the open state belong to each overlay: the cursor is only
+  // ever on one screen, and an island unfolding on the display you are not
+  // looking at would be worse than useless.
   notch = new NotchWindow(
-    (inside) => {
-      // Two separate facts. `hover` is the cursor arriving, which is what draws
-      // the little stubs that say "keep going"; `open` is the dwell being
-      // satisfied, which is what unfolds the panel.
-      send(notch?.win ?? null, 'hover', inside);
-      hover?.set(inside);
-    },
+    () => { if (keyboard) releaseKeyboard('pointer moved'); },
     () => applyNotchGeometry()
   );
 
-  const win = notch.create();
-  win.on('blur', () => { if (keyboard) releaseKeyboard('focus left'); });
-  win.webContents.on('did-finish-load', () => {
-    applyNotchGeometry();
-    send(win, 'snapshot', store.current());
-    send(win, 'companion', companion.current());
-  });
+  for (const win of notch.create()) {
+    win.on('blur', () => { if (keyboard) releaseKeyboard('focus left'); });
+    win.webContents.on('did-finish-load', () => {
+      applyNotchGeometry();
+      send(win, 'snapshot', store.current());
+      send(win, 'companion', companion.current());
+    });
+  }
 
   store.on('snapshot', (s: Snapshot) => {
-    send(notch?.win ?? null, 'snapshot', s);
+    notch?.broadcast('snapshot', s);
     send(gallery, 'snapshot', s);
     send(customize, 'snapshot', s);
     refreshTray();
@@ -538,8 +533,8 @@ function openForKeyboard(): void {
   if (!notch?.win || notch.win.isDestroyed()) return;
   keyboard = true;
   logEvent('island', 'keyboard taken');
-  hover?.hold(true);
-  send(notch.win, 'keyboard', true);
+  notch.hold(true);
+  notch.broadcast('keyboard', true);
   notch.takeKeyboard();
 }
 
@@ -547,16 +542,15 @@ function releaseKeyboard(why: string): void {
   if (!keyboard) return;
   keyboard = false;
   logEvent('island', `keyboard released: ${why}`);
-  send(notch?.win ?? null, 'keyboard', false);
+  notch?.broadcast('keyboard', false);
   const cameForward = notch?.releaseKeyboard() ?? false;
-  hover?.hold(false);
+  notch?.hold(false);
   // Hiding an active app is how macOS hands focus back to the previous one.
   // Only when no ordinary window is open: those belong to this app and would
   // vanish with it.
   if (cameForward && !gallery && !customize) {
     app.hide();
-    notch?.win?.showInactive();
-    notch?.assertLevel();
+    for (const win of notch?.windows() ?? []) win.showInactive();
   }
 }
 
@@ -609,31 +603,29 @@ ipcMain.handle('session:focus', async (event, sessionId) => {
 });
 
 ipcMain.on('keyboard:done', (event) => {
-  if (BrowserWindow.fromWebContents(event.sender) === notch?.win) releaseKeyboard('escape');
+  if (notch?.owns(BrowserWindow.fromWebContents(event.sender))) releaseKeyboard('escape');
 });
 
 /** Hand the measured cutout to both the store and the window's own sizing. */
 function applyNotchGeometry(): void {
-  const p = probeNotch();
+  // Each overlay is told its own screen's geometry. The store keeps the first
+  // one, which is what the gallery and the settings preview draw when they have
+  // no screen of their own to measure.
+  const geometry = notch?.applyGeometry();
   const cfg = config();
-  const w = p?.notchW ?? cfg.notchW;
-  // The cutout can measure a point shorter than the menu bar it sits in — 32
-  // against 33 on a 14" — and a collapsed bar that misses by a pixel leaves a
-  // sliver of menu bar showing above it. Cover the taller of the two.
-  const h = Math.max(p?.notchH ?? cfg.notchH, notch?.menuBarHeight() ?? 0);
-  store.setNotch(w, h);
+  store.setNotch(geometry?.notchW ?? cfg.notchW, geometry?.notchH ?? cfg.notchH);
 }
 
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 
-ipcMain.on('hit-rect', (_e, r: HitRect) => {
+ipcMain.on('hit-rect', (event, r: HitRect) => {
   if (!r || !finite(r.x) || !finite(r.y) || !finite(r.w) || !finite(r.h)) return;
-  notch?.setHitRect(r);
+  notch?.setHitRect(BrowserWindow.fromWebContents(event.sender), r);
 });
 
 function trustedAgentWindow(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) {
   const win = BrowserWindow.fromWebContents(event.sender);
-  return event.senderFrame === event.sender.mainFrame && !!win && (win === notch?.win || win === customize);
+  return event.senderFrame === event.sender.mainFrame && !!win && (!!notch?.owns(win) || win === customize);
 }
 ipcMain.handle('decide', (event, msg) => {
   try {
@@ -651,6 +643,18 @@ ipcMain.on('dismiss', (event, id) => {
  * that used to live only in the menu bar. Face preferences stay in the
  * companion store.
  */
+/** Every attached screen, named and measured, with a mark on the ones carrying an island. */
+function screenList(): ScreenInfo[] {
+  const showing = new Set(notch?.displayIds() ?? []);
+  return probeDisplays().map(d => ({
+    id: d.id,
+    name: d.name,
+    builtin: d.builtin,
+    cutout: d.notch ? { w: Math.round(d.notchW ?? 0), h: Math.round(d.notchH ?? 0) } : null,
+    active: showing.has(d.id)
+  }));
+}
+
 function appSettings(): AppSettings {
   const cfg = config();
   const probe = probeNotch();
@@ -661,6 +665,12 @@ function appSettings(): AppSettings {
     hoverDelay: cfg.hoverDelay,
     shortcut: cfg.shortcut,
     allowWithoutNotch: cfg.allowWithoutNotch,
+    displays: cfg.displays,
+    displayId: cfg.displayId,
+    notchHeight: cfg.notchHeight,
+    notchHeightCustom: cfg.notchHeightCustom,
+    plainNotchHeight: cfg.plainNotchHeight,
+    screens: screenList(),
     staleSec: cfg.staleSec,
     watchProcesses: cfg.watchProcesses,
     doneLingerSec: cfg.doneLingerSec,
@@ -681,6 +691,12 @@ function applyAppSettings(patch: AppSettingsPatch): void {
   if (!Object.keys(rest).length) return;
   const before = config().shortcut;
   writeConfig(rest);
+  // A display rule is the whole arrangement of windows, so it takes effect at
+  // once rather than at the next launch.
+  if (['displays', 'displayId', 'notchHeight', 'notchHeightCustom', 'plainNotchHeight', 'allowWithoutNotch'].some(key => key in rest)) {
+    notch?.reconfigure();
+    applyNotchGeometry();
+  }
   if (rest.shortcut !== undefined && rest.shortcut !== before) {
     globalShortcut.unregisterAll();
     if (!registerShortcut()) {
@@ -734,7 +750,7 @@ function sampleRelease(): Release {
 
 ipcMain.on('open-customize', (event) => {
   const sender = BrowserWindow.fromWebContents(event.sender);
-  if (sender === gallery || sender === customize || sender === notch?.win) openCustomize();
+  if (sender === gallery || sender === customize || notch?.owns(sender)) openCustomize();
 });
 
 let ready = false;
