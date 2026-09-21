@@ -36,8 +36,42 @@ export function defaultPaths(): HelperPaths {
 
 export const helperSource = (name: HelperName, paths = defaultPaths()) => path.join(paths.sourceDir, `${name}.swift`);
 export const helperBinary = (name: HelperName, paths = defaultPaths()) => path.join(paths.binDir, name);
+/**
+ * A helper's Info.plist, when it has one.
+ *
+ * macOS reads the usage-description strings and the bundle identifier from the
+ * calling process, and a bare command-line binary has neither — so a helper that
+ * asks for the calendar is refused without anyone being asked. The plist is
+ * linked into the binary's own section and bound by an ad-hoc signature, which
+ * also gives TCC a stable name to remember the answer against.
+ */
+export const helperInfo = (name: HelperName, paths = defaultPaths()) => path.join(paths.sourceDir, 'info', `${name}.plist`);
 
-const sha256 = (file: string) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+/** The source and its Info.plist together: either changing means a stale binary. */
+function sha256(file: string, also?: string): string {
+  const hash = createHash('sha256').update(fs.readFileSync(file));
+  if (also && fs.existsSync(also)) hash.update(fs.readFileSync(also));
+  return hash.digest('hex');
+}
+const sourceHash = (name: HelperName, paths: HelperPaths) => sha256(helperSource(name, paths), helperInfo(name, paths));
+
+/** What swiftc is given, which is the source plus the plist when there is one. */
+function buildArgs(name: HelperName, source: string, binary: string, paths: HelperPaths): string[] {
+  const info = helperInfo(name, paths);
+  return ['-O', '-o', binary, source,
+    ...(fs.existsSync(info) ? ['-Xlinker', '-sectcreate', '-Xlinker', '__TEXT', '-Xlinker', '__info_plist', '-Xlinker', info] : [])];
+}
+
+/**
+ * Bind the plist and name the binary. swiftc leaves a linker-signed signature
+ * that binds nothing, so it is replaced — without this the plist is present in
+ * the file and ignored by macOS.
+ */
+function sign(name: HelperName, binary: string, paths: HelperPaths): void {
+  if (!fs.existsSync(helperInfo(name, paths))) return;
+  try { execFileSync('codesign', ['--force', '--sign', '-', '--identifier', `com.notchlight.${name}`, binary], { stdio: 'ignore', timeout: 20_000 }); }
+  catch { logEvent('notchlight', `helper ${name}: could not be signed; permissions may be refused without a prompt`); }
+}
 
 /** The shipped binary for this source and architecture, if the manifest vouches for it. */
 export function prebuiltFor(name: HelperName, paths = defaultPaths()): string | null {
@@ -46,7 +80,7 @@ export function prebuiltFor(name: HelperName, paths = defaultPaths()): string | 
     const record = manifest?.[name]?.[paths.arch];
     const binary = path.join(paths.prebuiltDir, paths.arch, name);
     if (!record?.sha256 || !fs.existsSync(binary)) return null;
-    return record.sha256 === sha256(helperSource(name, paths)) ? binary : null;
+    return record.sha256 === sourceHash(name, paths) ? binary : null;
   } catch { return null; }
 }
 
@@ -60,7 +94,7 @@ export function planHelper(name: HelperName, paths = defaultPaths()): { action: 
   const bin = helperBinary(name, paths);
   if (!fs.existsSync(source)) return fs.existsSync(bin) ? { action: 'ready' } : { action: 'none' };
   const prebuilt = prebuiltFor(name, paths);
-  const hash = sha256(source);
+  const hash = sourceHash(name, paths);
   const installedHash = readSidecar(bin);
   // A binary this app installed from a matching prebuilt, or compiled from this very source, is current.
   if (fs.existsSync(bin) && installedHash === hash) return { action: 'ready' };
@@ -74,8 +108,8 @@ const sidecar = (bin: string) => `${bin}.source-sha256`;
 function readSidecar(bin: string): string | null {
   try { return fs.readFileSync(sidecar(bin), 'utf8').trim() || null; } catch { return null; }
 }
-function writeSidecar(bin: string, source: string) {
-  try { fs.writeFileSync(sidecar(bin), sha256(source) + '\n'); } catch { /* the mtime check still works */ }
+function writeSidecar(name: HelperName, bin: string, paths: HelperPaths) {
+  try { fs.writeFileSync(sidecar(bin), sourceHash(name, paths) + '\n'); } catch { /* the mtime check still works */ }
 }
 
 function prepare(name: HelperName, paths: HelperPaths): { action: 'ready' | 'compile' | 'none'; source: string; bin: string } {
@@ -88,7 +122,10 @@ function prepare(name: HelperName, paths: HelperPaths): { action: 'ready' | 'com
       fs.mkdirSync(paths.binDir, { recursive: true });
       fs.copyFileSync(plan.from!, bin);
       fs.chmodSync(bin, 0o755);
-      writeSidecar(bin, source);
+      // Copying strips nothing, but the signature is checked against the file's
+      // location for some checks, so it is re-applied where it will be run from.
+      sign(name, bin, paths);
+      writeSidecar(name, bin, paths);
       logEvent('notchlight', `helper ${name}: installed prebuilt for ${paths.arch}`);
       return { action: 'ready', source, bin };
     } catch (error) {
@@ -108,9 +145,10 @@ export function ensureHelper(name: HelperName, paths = defaultPaths()): Promise<
     if (action === 'ready') return resolve(bin);
     if (action === 'none') return resolve(null);
     logEvent('notchlight', `helper ${name}: compiling`);
-    execFile('swiftc', ['-O', '-o', bin, source], { timeout: 120_000 }, error => {
+    execFile('swiftc', buildArgs(name, source, bin, paths), { timeout: 120_000 }, error => {
       if (error) { logEvent('notchlight', `helper ${name}: compile failed (${error.message.split('\n')[0]})`); return resolve(null); }
-      writeSidecar(bin, source);
+      sign(name, bin, paths);
+      writeSidecar(name, bin, paths);
       resolve(bin);
     });
   });
@@ -123,8 +161,9 @@ export function ensureHelperSync(name: HelperName, paths = defaultPaths()): stri
   if (action === 'none') return null;
   try {
     logEvent('notchlight', `helper ${name}: compiling`);
-    execFileSync('swiftc', ['-O', '-o', bin, source], { stdio: 'ignore', timeout: 90_000 });
-    writeSidecar(bin, source);
+    execFileSync('swiftc', buildArgs(name, source, bin, paths), { stdio: 'ignore', timeout: 90_000 });
+    sign(name, bin, paths);
+    writeSidecar(name, bin, paths);
     return bin;
   } catch (error) {
     logEvent('notchlight', `helper ${name}: compile failed (${(error as Error).message.split('\n')[0]})`);
