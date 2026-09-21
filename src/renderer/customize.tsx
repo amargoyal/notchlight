@@ -160,7 +160,7 @@ function PreviewStrip({ live, state, dispatch, onCustomize }: { live: LiveContro
 /* ---- panes ---- */
 interface PaneProps { live: LiveController; state: PreviewState; dispatch: Dispatch<PreviewAction>; prefs: PreviewPreferences; pref: <K extends keyof PreviewPreferences>(key: K, value: PreviewPreferences[K]) => void; app: AppSettingsController; showView: (view: View) => void }
 
-function GeneralPane({ live, app }: PaneProps) {
+function GeneralPane({ live, app, prefs, pref }: PaneProps) {
   const s = app.settings;
   const noLogin = live.available && !s.packaged;
   return <>
@@ -172,6 +172,9 @@ function GeneralPane({ live, app }: PaneProps) {
       <Row title="Hover delay" description="How long the pointer rests on the notch before it opens."><Popup label="Hover delay" value={s.hoverDelay} options={withCurrent(HOVER_DELAYS, s.hoverDelay, v => `${(v / 1000).toFixed(2)} seconds`)} onChange={v => app.update({ hoverDelay: v })}/></Row>
       <Row title="Keyboard shortcut" description="Opens the notch for the keyboard. Escape hands focus back to the app you were in."><ShortcutRecorder value={s.shortcut} onSave={v => app.update({ shortcut: v })}/></Row>
       <Toggle title="Show on a Mac without a notch" description="The island hangs off the menu bar instead of a cutout. Takes effect the next time Notchlight starts." value={s.allowWithoutNotch} onChange={v => app.update({ allowWithoutNotch: v })}/>
+      <Toggle title="Two fingers up closes it" description="A swipe up over the open notch folds it away. It stays folded until the pointer leaves and comes back." value={prefs.swipeToClose} onChange={v => pref('swipeToClose', v)}/>
+      <Toggle title="Come back to the last face" description="Open on whichever face you were on, rather than on Agents every time." value={prefs.rememberTab} onChange={v => pref('rememberTab', v)}/>
+      <Toggle title="Hide from screen recording" description="macOS leaves the island out of recordings and screen sharing entirely. You still see it; a shared screen shows the menu bar underneath." value={s.contentProtection} onChange={v => app.update({ contentProtection: v })}/>
     </Group>
     <Group title="Displays" footer={live.available ? 'A display with no cutout needs “Show on a Mac without a notch” above; the island hangs off its menu bar instead of filling a hole.' : 'These apply in the desktop app. Here they only change the preview.'}>
       <Row title="Show the notch on" description="One island on the built-in display is the default. Every display gives each screen its own; following the pointer keeps one and moves it across screen edges.">
@@ -309,6 +312,10 @@ function MusicPane({ live, state, dispatch, prefs, pref }: PaneProps) {
       <Row title="Sample state" description="Try the states the Music face can show."><Popup label="Sample player state" value={state.music.missingArtwork ? 'missing' : state.music.source} options={[{ value: 'ready', label: 'Ready to play' }, { value: 'empty', label: 'Nothing playing' }, { value: 'missing', label: 'Missing artwork' }, { value: 'unavailable', label: 'Player unavailable' }]} onChange={value => dispatch({ type: 'music-state', source: value === 'missing' ? 'ready' : value as PreviewState['music']['source'], missingArtwork: value === 'missing' })}/></Row>
     </Group>}
     <Group title="Now playing">
+      <Toggle title="Say what just started" description="A new track shows its title and artist on the resting bar for a moment. The notch does not open." value={prefs.sneakPeek} onChange={v => pref('sneakPeek', v)}/>
+      <Row title="Stand down after" description="Paused music keeps its place for a while — you are coming back to it. After this, the space goes to whatever else is on the bar.">
+        <Popup label="Stand down after" value={prefs.musicIdleHide} options={[{ value: 'never', label: 'Never' }, { value: '30', label: '30 seconds' }, { value: '120', label: '2 minutes' }, { value: '600', label: '10 minutes' }]} onChange={v => pref('musicIdleHide', v)}/>
+      </Row>
       <Toggle title="Album artwork" description="Give each track a familiar face." value={prefs.artwork} onChange={v => pref('artwork', v)}/>
       <Toggle title="Glow in the artwork’s colour" description="A soft light behind the artwork and the bars, taken from the record sleeve." value={prefs.artworkGlow} onChange={v => pref('artworkGlow', v)}/>
       <Toggle title="Breathe with the bass" description="The small artwork moves with the low end while the bars are live. Still under Reduce motion." value={prefs.artworkPulse} onChange={v => pref('artworkPulse', v)}/>

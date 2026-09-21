@@ -104,6 +104,7 @@ class NotchOverlay {
       }
     });
     win.setIgnoreMouseEvents(true, { forward: true });
+    win.setContentProtection(config().contentProtection);
     this.assertLevel();
     win.loadFile(path.join(__dirname, '../renderer/island.html'));
     win.once('ready-to-show', () => {
@@ -173,6 +174,11 @@ class NotchOverlay {
     this.applyGeometry();
   }
 
+  /** Out of screen recordings, or back into them. */
+  setContentProtection(on: boolean): void {
+    if (this.win && !this.win.isDestroyed()) this.win.setContentProtection(on);
+  }
+
   /** Re-measure this screen and tell the island what it is sitting in. */
   applyGeometry(): NotchGeometry {
     this.geometry = geometryFor(this.display);
@@ -227,6 +233,7 @@ class NotchOverlay {
     // Let the cursor poll decide whether the island stays engaged.
     this.engaged = false;
     win.setIgnoreMouseEvents(true, { forward: true });
+    win.setContentProtection(config().contentProtection);
     this.assertLevel();
     return cameForward;
   }
@@ -363,6 +370,11 @@ export class NotchWindow {
     if (this.held) this.hold(true);
   }
 
+  setContentProtection(on: boolean): void {
+    for (const overlay of this.overlays) overlay.setContentProtection(on);
+    logEvent('island', `screen recording ${on ? 'excluded' : 'included'}`);
+  }
+
   /** Reopen the overlays against the current preferences — a Displays row changed. */
   reconfigure(): void {
     if (!this.overlays.length && !this.cursorPoll) return;
@@ -444,6 +456,17 @@ export class NotchWindow {
 
   setHitRect(win: BrowserWindow | null, r: HitRect): void {
     this.overlays.find(o => o.win === win)?.setHitRect(r);
+  }
+
+  /**
+   * Fold one island up now, without waiting for the cursor to leave.
+   *
+   * The dwell is not re-armed while the pointer stays where it is: a swipe means
+   * "not now", and an island that sprang back open half a second later would be
+   * answering the opposite question.
+   */
+  close(win: BrowserWindow | null): void {
+    this.overlays.find(o => o.win === win)?.hover.set(false, true);
   }
 
   takeKeyboard(): void { this.focused()?.takeKeyboard(); }

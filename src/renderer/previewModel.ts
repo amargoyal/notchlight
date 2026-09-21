@@ -38,6 +38,10 @@ export interface PreviewPreferences {
   restBattery: boolean;
   batteryPercentage: boolean;
   batteryAlerts: boolean;
+  rememberTab: boolean;
+  sneakPeek: boolean;
+  musicIdleHide: 'never' | '30' | '120' | '600';
+  swipeToClose: boolean;
 }
 export interface PreviewClip { id: string; kind: 'text' | 'url' | 'image'; preview: string; meta: string; pinned: boolean; thumb?: string }
 export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string; /** A Smart Shuffle pick, and the playlist it is not in yet. */ pick?: string }
@@ -68,7 +72,8 @@ export const DEFAULT_PREFERENCES: PreviewPreferences = {
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
   musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
   hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
-  batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true
+  batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true,
+  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true
 };
 /** The battery, as the sample notch shows it. */
 export interface PreviewBattery { percent: number; charging: boolean; plugged: boolean; low: boolean }

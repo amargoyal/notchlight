@@ -46,6 +46,14 @@ export interface CompanionPreferences {
   batteryPercentage: boolean;
   /** A moment in the notch when the charger goes in or comes out, and when the last of it is going. */
   batteryAlerts: boolean;
+  /** Come back to the face you were last on, rather than to Agents. */
+  rememberTab: boolean;
+  /** A new track shows its title and artist for a moment, without opening the notch. */
+  sneakPeek: boolean;
+  /** Drop Music from the resting bar this long after playback stops. `never` keeps it. */
+  musicIdleHide: 'never' | '30' | '120' | '600';
+  /** Two fingers up over the open notch closes it. */
+  swipeToClose: boolean;
   /** Answer the volume and brightness keys in the notch instead of the macOS square. Needs Accessibility. */
   hudEnabled: boolean;
   /** Option held keeps its macOS meaning — open the matching settings pane — or moves the level like any other press. */
@@ -68,7 +76,8 @@ export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
   musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
   hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
-  batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true
+  batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true,
+  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true
 };
 export type MusicPlayer = 'spotify' | 'apple';
 export const PLAYER_NAMES: Record<MusicPlayer, string> = { spotify: 'Spotify', apple: 'Apple Music' };
@@ -350,6 +359,8 @@ export interface CompanionBridge {
   onHud(cb: (activity: HudActivity) => void): () => void;
   /** The charger going in or coming out, or the last of the battery going. */
   onBattery(cb: (activity: BatteryActivity) => void): () => void;
+  /** Fold this island up now — a swipe, rather than the cursor leaving. */
+  closeIsland(): void;
   /** Show System Settings → Privacy & Security → Accessibility. */
   openAccessibility(): Promise<OperationResult>;
   /** Put a history item back on the clipboard. */
@@ -367,7 +378,8 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
   const result: Record<string, unknown> = {};
   const choices: Record<string, readonly string[]> = {
     theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100'], equalizerLayout: ['rising', 'mirrored'], musicPlayer: ['spotify', 'apple', 'auto'],
-    hudOptionKey: ['settings', 'replace'], hudStyle: ['solid', 'gradient'], hudClosed: ['inline', 'wide']
+    hudOptionKey: ['settings', 'replace'], hudStyle: ['solid', 'gradient'], hudClosed: ['inline', 'wide'],
+    musicIdleHide: ['never', '30', '120', '600']
   };
   for (const [key, item] of Object.entries(value)) {
     if (!Object.hasOwn(DEFAULT_COMPANION_PREFERENCES, key)) throw new Error('Unknown preference.');
