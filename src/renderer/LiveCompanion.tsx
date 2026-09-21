@@ -451,6 +451,11 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const batteryLow = batteryIsLow(battery);
   const look = hudLook(preferences);
   const views = visibleViews(preferences.clipboardEnabled, preferences.calendarEnabled);
+  // Before the tab row, which reads them: `tabs` is a const holding JSX, so it
+  // runs the moment it is assigned, and anything it touches has to exist by then.
+  const { calendar } = live.state;
+  const today = preferences.calendarEnabled ? visibleEvents(calendar.events, preferences) : [];
+  const upNext = nextEvent(today);
   // A face whose feature was switched off while it was selected falls back
   // rather than leaving the panel on a tab that is no longer in the row.
   const view: CompanionView = dragging ? 'tray' : views.includes(live.state.view) ? live.state.view : 'agents';
@@ -467,15 +472,13 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   // already has, without taking the face you were looking at away from you.
   const hudStrip = hud && preferences.hudOpenNotch ? <div className="mp-hud-strip"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={look} wide/></div> : null;
   const tabs = <nav className="mp-nav" aria-label="Notch views"><div role="tablist" aria-label="Companion view">{views.map((item,index) => <button key={item} role="tab" id={`${id}-${item}`} aria-controls={`${id}-panel`} aria-selected={view === item} tabIndex={view === item ? 0 : -1} onClick={() => choose(item,true)} onKeyDown={e => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return; e.preventDefault(); choose(views[e.key === 'Home' ? 0 : e.key === 'End' ? views.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : views.length - 1)) % views.length],true); }}>{item === 'agents' ? <Buddy size={15}/> : <Icon name={item} size={14}/>} {names[item]}{item === 'today' && upNext && <span className="mp-count">{today.length}</span>}{item === 'agents' && snapshot.overall === 'asking' && <span className="mp-attention-dot" aria-label="Needs your attention"/>}{item === 'tray' && <span className="mp-count">{live.state.files.length}</span>}{item === 'clipboard' && <span className="mp-count">{live.state.clipboard.items.length}</span>}</button>)}</div><button className="mp-icon-button" aria-label="Open customization" onClick={onCustomize}><Icon name="settings" size={16}/></button></nav>;
-  const { music, files, clipboard, calendar } = live.state;
+  const { music, files, clipboard } = live.state;
   // Something fullscreen has asked for the whole screen. `all` takes the
   // island off it entirely; `media` keeps the agents, which are the part you
   // would actually want to see over a film or a presentation.
   const buried = live.fullscreen && preferences.fullscreenHide !== 'never';
   const hideMedia = buried;
   const hideAll = buried && preferences.fullscreenHide === 'all';
-  const today = preferences.calendarEnabled ? visibleEvents(calendar.events, preferences) : [];
-  const upNext = nextEvent(today);
   const musicRested = useMusicRested(preferences.musicIdleHide, music.playing, music.status === 'ready' && !!music.track);
   const selectProvider = (provider: 'claude' | 'codex') => { setFilter(provider); choose('agents'); };
   const agents = agentRestingParts(snapshot, { ...preferences, pulse: preferences.pulse && motion, codexPulse: preferences.codexPulse && motion }, selectProvider);
