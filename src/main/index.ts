@@ -22,6 +22,7 @@ import { fetchTint } from './tint';
 import { installCompanionIpc } from './companionIpc';
 import { AudioLevels, helperArguments, wantsLevels } from './audioLevels';
 import { Hud } from './hud';
+import { Battery } from './battery';
 import { fetchAppleArtwork } from './appleArtwork';
 import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
@@ -37,7 +38,7 @@ import { Updater, type Release } from './updates';
 import type { UpdateResponse } from '../shared/updates';
 import { jumpToProcess } from './terminal';
 import type { HitRect, Snapshot } from '../shared/types';
-import type { HudActivity, HudSnapshot } from '../shared/companion';
+import type { BatteryActivity, BatterySnapshot, HudActivity, HudSnapshot } from '../shared/companion';
 import { validateAppSettings, type AppSettings, type AppSettingsPatch, type ScreenInfo } from '../shared/settings';
 
 const DEMO = process.argv.includes('--demo');
@@ -79,6 +80,7 @@ let account: SpotifyAccount;
 let smart: SmartShuffle;
 let levels: AudioLevels;
 let hud: Hud;
+let battery: Battery;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
 let claudeStore: Store | null = null;
@@ -328,6 +330,12 @@ async function boot(): Promise<void> {
     send(customize, 'hud:event', activity);
   });
   hud.on('change', (state: HudSnapshot) => companion.setHud(state));
+  battery = new Battery();
+  battery.on('activity', (activity: BatteryActivity) => {
+    notch?.broadcast('battery:event', activity);
+    send(customize, 'battery:event', activity);
+  });
+  battery.on('change', (state: BatterySnapshot) => companion.setBattery(state));
   await companion.load();
   // Electron's clipboard is asynchronous and W3C-shaped; the raw macOS markers
   // that mean "do not remember this" are asked for by name through its
@@ -395,6 +403,10 @@ async function boot(): Promise<void> {
     hud.configure(!dark && !DEMO && hudEnabled, hudOptionKey);
   };
   syncHud();
+  // The battery keeps reading while the screen is off: waking up to find the
+  // level where it was an hour ago is worse than one quiet helper.
+  const syncBattery = () => battery.setActive(!DEMO && companion.current().preferences.batteryEnabled);
+  syncBattery();
   companion.on('change', state => {
     syncCodex();
     syncClipboard();
@@ -402,6 +414,7 @@ async function boot(): Promise<void> {
     send(customize, 'companion', state);
     syncLevels();
     syncHud();
+    syncBattery();
     spotify.setPlayer(state.preferences.musicPlayer);
     account.configure(state.preferences.spotifyClientId);
     smart.setEnabled(!DEMO && state.preferences.spotifyEnabled && state.preferences.smartShuffle);
@@ -785,6 +798,7 @@ app.on('before-quit', () => {
   watcher?.stop();
   levels?.stop();
   hud?.stop();
+  battery?.stop();
   store?.stop();
   hooks?.stop();
   updater?.stop();
