@@ -14,6 +14,7 @@
     "test:companion": "node scripts/test-companion.mjs",
     "test:preview": "node scripts/test-preview.mjs",
     "test:displays": "node scripts/test-displays.mjs",
+    "test:battery": "node scripts/test-battery.mjs",
     "typecheck": "tsc --noEmit",
     "start": "npm run build && electron .",
     "demo": "npm run build && electron . --demo",

@@ -38,6 +38,14 @@ export interface CompanionPreferences {
   spotifyClientId: string;
   /** Mark Smart Shuffle picks in the Music face, with a + and an × to answer them. */
   smartShuffle: boolean;
+  /** Read the battery at all. Off until switched on; the menu bar already shows one. */
+  batteryEnabled: boolean;
+  /** The battery keeps a place on the resting bar. */
+  restBattery: boolean;
+  /** The level as a number beside the glyph. */
+  batteryPercentage: boolean;
+  /** A moment in the notch when the charger goes in or comes out, and when the last of it is going. */
+  batteryAlerts: boolean;
   /** Answer the volume and brightness keys in the notch instead of the macOS square. Needs Accessibility. */
   hudEnabled: boolean;
   /** Option held keeps its macOS meaning — open the matching settings pane — or moves the level like any other press. */
@@ -59,7 +67,8 @@ export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
   musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
-  hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline'
+  hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
+  batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true
 };
 export type MusicPlayer = 'spotify' | 'apple';
 export const PLAYER_NAMES: Record<MusicPlayer, string> = { spotify: 'Spotify', apple: 'Apple Music' };
@@ -158,6 +167,59 @@ export interface HudSnapshot {
 export const EMPTY_HUD: HudSnapshot = { status: 'off', reason: null, can: [], volume: null, muted: false, brightness: null };
 /** One key press, as the notch draws it. */
 export interface HudActivity { kind: HudChannel; value: number; muted: boolean; at: number }
+/**
+ * The internal battery, as IOKit reports it.
+ *
+ * A Mac without one — a mini, a Studio — is `present: false`, which is a fact
+ * about the hardware rather than a failure, and the pane says so plainly.
+ */
+export interface BatterySnapshot {
+  status: 'off' | 'starting' | 'reading' | 'unavailable';
+  reason: 'no-battery' | 'no-helper' | 'crashed' | null;
+  /** 0…1, or null before the first reading. */
+  percent: number | null;
+  charging: boolean;
+  plugged: boolean;
+  charged: boolean;
+  /** Time to full while charging, time to empty otherwise, or null while macOS is still estimating. */
+  minutes: number | null;
+}
+export const EMPTY_BATTERY: BatterySnapshot = { status: 'off', reason: null, percent: null, charging: false, plugged: false, charged: false, minutes: null };
+/** Twenty percent, the figure macOS itself warns at. */
+export const LOW_BATTERY = 0.2;
+/** Running down and nearly out. Charging at the same level is not a warning. */
+export function batteryIsLow(battery: BatterySnapshot): boolean {
+  return battery.percent !== null && battery.percent <= LOW_BATTERY && !battery.plugged;
+}
+/** Something worth a moment of the notch: the charger, or the last of the battery. */
+export type BatteryEvent = 'plugged' | 'unplugged' | 'low' | 'charged';
+export interface BatteryActivity { event: BatteryEvent; percent: number; minutes: number | null; at: number }
+/** `2:14 left`, `45m to full`, or nothing while macOS is still estimating. */
+export function batteryTime(battery: BatterySnapshot): string {
+  if (battery.charged) return 'Charged';
+  if (battery.minutes === null) return battery.charging ? 'Charging' : '';
+  const hours = Math.floor(battery.minutes / 60);
+  const span = hours ? `${hours}h ${battery.minutes % 60}m` : `${battery.minutes}m`;
+  return battery.charging ? `${span} to full` : `${span} left`;
+}
+/** What the settings pane says about the battery. */
+export function describeBattery(battery: BatterySnapshot, enabled: boolean): string {
+  if (!enabled) return 'Off. The menu bar still shows the battery in its usual place.';
+  switch (battery.status) {
+    case 'reading': {
+      const percent = battery.percent === null ? '' : `${Math.round(battery.percent * 100)}%`;
+      const time = batteryTime(battery);
+      return `${percent}${battery.plugged ? ', on the charger' : ''}${time ? ` · ${time}` : ''}.`;
+    }
+    case 'starting': return 'Reading the battery…';
+    case 'unavailable': switch (battery.reason) {
+      case 'no-battery': return 'This Mac has no internal battery, so there is nothing to show.';
+      case 'no-helper': return 'The power helper could not be built. Install the Xcode command line tools, or use a packaged build.';
+      default: return 'The power helper stopped unexpectedly. It will try again shortly.';
+    }
+    default: return 'Waiting for the first reading.';
+  }
+}
 /** What the settings pane says about the Spotify account. */
 export function describeAccount(account: SpotifyAccountSnapshot): string {
   switch (account.status) {
@@ -247,6 +309,7 @@ export interface CompanionSnapshot {
   music: SpotifySnapshot;
   capture: CaptureSnapshot;
   hud: HudSnapshot;
+  battery: BatterySnapshot;
   clipboard: ClipboardSnapshot;
   smartShuffle: SmartShuffleSnapshot;
   transfer: TransferProgress | null;
@@ -285,6 +348,8 @@ export interface CompanionBridge {
   onMusicLevels(cb: (levels: number[]) => void): () => void;
   /** One volume or brightness key press, the moment it lands. */
   onHud(cb: (activity: HudActivity) => void): () => void;
+  /** The charger going in or coming out, or the last of the battery going. */
+  onBattery(cb: (activity: BatteryActivity) => void): () => void;
   /** Show System Settings → Privacy & Security → Accessibility. */
   openAccessibility(): Promise<OperationResult>;
   /** Put a history item back on the clipboard. */

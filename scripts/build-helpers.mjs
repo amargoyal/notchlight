@@ -25,7 +25,7 @@ const outDir = path.join(native, 'prebuilt', arch);
 const manifestPath = path.join(native, 'prebuilt', 'manifest.json');
 const check = process.argv.includes('--check');
 
-export const HELPERS = ['audiotap', 'notchprobe', 'spotifywatch', 'pasteboardwatch', 'hudwatch'];
+export const HELPERS = ['audiotap', 'notchprobe', 'spotifywatch', 'pasteboardwatch', 'hudwatch', 'powerwatch'];
 export const sha256 = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
 let manifest = {};

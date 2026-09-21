@@ -34,6 +34,10 @@ export interface PreviewPreferences {
   hudPercentage: boolean;
   hudOpenNotch: boolean;
   hudClosed: 'inline' | 'wide';
+  batteryEnabled: boolean;
+  restBattery: boolean;
+  batteryPercentage: boolean;
+  batteryAlerts: boolean;
 }
 export interface PreviewClip { id: string; kind: 'text' | 'url' | 'image'; preview: string; meta: string; pinned: boolean; thumb?: string }
 export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string; /** A Smart Shuffle pick, and the playlist it is not in yet. */ pick?: string }
@@ -52,6 +56,8 @@ export interface PreviewState {
   notice: string;
   /** The key press the sample notch is answering, or nothing. */
   hud: PreviewHud | null;
+  /** What the sample battery reads, or nothing on a Mac without one. */
+  battery: PreviewBattery | null;
   codex: 'off' | Status | 'many';
   claude: 'working' | 'asking' | 'done' | 'idle' | 'many';
 }
@@ -61,8 +67,23 @@ export const DEFAULT_PREFERENCES: PreviewPreferences = {
   restClaude: true, restCodex: true, codexBuddy: true, codexPulse: true, restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
   musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
-  hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline'
+  hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
+  batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true
 };
+/** The battery, as the sample notch shows it. */
+export interface PreviewBattery { percent: number; charging: boolean; plugged: boolean; low: boolean }
+/**
+ * The readings worth looking at: a comfortable level, the charger in, the last
+ * of it going, and a level low enough to test that a nearly empty shell still
+ * reads as a battery rather than an empty box.
+ */
+export const BATTERY_SAMPLES: { id: string; label: string; battery: PreviewBattery }[] = [
+  { id: 'half', label: 'Half full', battery: { percent: 0.62, charging: false, plugged: false, low: false } },
+  { id: 'charging', label: 'On the charger', battery: { percent: 0.41, charging: true, plugged: true, low: false } },
+  { id: 'full', label: 'Fully charged', battery: { percent: 1, charging: false, plugged: true, low: false } },
+  { id: 'low', label: 'Low', battery: { percent: 0.18, charging: false, plugged: false, low: true } },
+  { id: 'critical', label: 'Nearly flat', battery: { percent: 0.04, charging: false, plugged: false, low: true } }
+];
 /** One key press, as the sample notch shows it. */
 export interface PreviewHud { kind: 'volume' | 'brightness'; value: number; muted: boolean }
 /**
@@ -99,7 +120,7 @@ export const SAMPLE_FILES: PreviewFile[] = [
 export function initialPreview(): PreviewState {
   return { view: 'music', open: true, preferences: { ...DEFAULT_PREFERENCES },
     music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false, added: [] },
-    files: SAMPLE_FILES.slice(0, 2), clips: SAMPLE_CLIPS, selected: null, received: [], drag: null, notice: '', hud: null, codex: 'off', claude: 'working' };
+    files: SAMPLE_FILES.slice(0, 2), clips: SAMPLE_CLIPS, selected: null, received: [], drag: null, notice: '', hud: null, battery: BATTERY_SAMPLES[0].battery, codex: 'off', claude: 'working' };
 }
 export type PreviewAction =
   | { type: 'view'; view: PreviewView } | { type: 'open'; value: boolean }
@@ -108,6 +129,7 @@ export type PreviewAction =
   | { type: 'music-state'; source: PreviewState['music']['source']; missingArtwork?: boolean }
   | { type: 'pick-add' } | { type: 'pick-dismiss' }
   | { type: 'hud'; hud: PreviewHud | null }
+  | { type: 'battery'; battery: PreviewBattery | null }
   | { type: 'codex'; value: PreviewState['codex'] }
   | { type: 'claude'; value: PreviewState['claude'] }
   | { type: 'add'; id: string } | { type: 'remove'; id: string } | { type: 'select'; id: string }
@@ -122,6 +144,7 @@ export function previewReducer(s: PreviewState, a: PreviewAction): PreviewState 
     case 'open': return { ...s, open: a.value };
     case 'preferences': return { ...s, preferences: { ...s.preferences, ...a.patch } };
     case 'hud': return { ...s, hud: a.hud };
+    case 'battery': return { ...s, battery: a.battery };
     case 'codex': return { ...s, codex: a.value };
     case 'claude': return { ...s, claude: a.value };
     case 'music-state': return { ...s, music: { ...s.music, source: a.source, missingArtwork: !!a.missingArtwork } };

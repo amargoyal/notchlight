@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { Island, Stubs, Wings } from './IslandView';
-import { Icon, FileThumb, HudBar, RestingWings, hudRestingPart, type HudLook, type RestingPart } from './Preview';
+import { Icon, BatteryGlyph, FileThumb, HudBar, RestingWings, batteryRestingPart, hudRestingPart, type HudLook, type RestingPart } from './Preview';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import type { AgentFilter, Snapshot } from '../shared/types';
-import { DEFAULT_COMPANION_PREFERENCES, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type CompanionView, type HudActivity, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
+import { batteryIsLow, DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type BatteryActivity, type CompanionView, type HudActivity, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
 import { useReducedMotion } from './pulse';
 import { barFrame, bassOf, type EqualizerLayout } from './equalizer';
 import './preview.css';
@@ -13,7 +13,7 @@ import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filte
 const EMPTY: Snapshot = { sessions: [], overall: 'idle', tokens: 0, elapsed: 0, dormant: true, notchW: 200, notchH: 32, hoverDelay: 550, pulse: true, now: Date.now() };
 export function useCompanion() {
   const available = !!window.notchlight?.getCompanion;
-  const [state, setState] = useState<CompanionSnapshot>({ preferences: { ...DEFAULT_COMPANION_PREFERENCES }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, hud: { ...EMPTY_HUD }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' });
+  const [state, setState] = useState<CompanionSnapshot>({ preferences: { ...DEFAULT_COMPANION_PREFERENCES }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, hud: { ...EMPTY_HUD }, battery: { ...EMPTY_BATTERY }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' });
   const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
@@ -181,6 +181,39 @@ function useHudActivity(enabled: boolean): HudActivity | null {
   }, [enabled]);
   return activity;
 }
+/**
+ * The charger going in or coming out, for as long as it is worth saying.
+ *
+ * Longer than a volume bar, because this one is telling you something you did
+ * not already know — the cable is in, or the last of the battery is going. Not
+ * so long that it sits over the notch while you work.
+ */
+const BATTERY_HOLD_MS = 3200;
+function useBatteryActivity(enabled: boolean): BatteryActivity | null {
+  const [activity, setActivity] = useState<BatteryActivity | null>(null);
+  useEffect(() => {
+    setActivity(null);
+    if (!enabled || !window.notchlight?.onBattery) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const stop = window.notchlight.onBattery(next => {
+      setActivity(next);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setActivity(null), BATTERY_HOLD_MS);
+    });
+    return () => { stop(); if (timer) clearTimeout(timer); };
+  }, [enabled]);
+  return activity;
+}
+/** What the notch says when the charger moves. */
+export function batteryHeadline(activity: BatteryActivity): string {
+  const percent = `${Math.round(activity.percent * 100)}%`;
+  switch (activity.event) {
+    case 'plugged': return `Charging · ${percent}`;
+    case 'unplugged': return `On battery · ${percent}`;
+    case 'charged': return 'Fully charged';
+    case 'low': return `Low battery · ${percent}`;
+  }
+}
 export const hudLook = (preferences: { hudStyle: 'solid' | 'gradient'; hudGlow: boolean; hudPercentage: boolean }): HudLook =>
   ({ style: preferences.hudStyle, glow: preferences.hudGlow, percentage: preferences.hudPercentage });
 
@@ -297,6 +330,9 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const preferences = live.state.preferences;
   const volume = useVolumeWheel(live);
   const hud = useHudActivity(preferences.hudEnabled);
+  const power = useBatteryActivity(preferences.batteryEnabled && preferences.batteryAlerts);
+  const { battery } = live.state;
+  const batteryLow = batteryIsLow(battery);
   const look = hudLook(preferences);
   const views = visibleViews(preferences.clipboardEnabled);
   const view: CompanionView = dragging ? 'tray' : live.state.view === 'clipboard' && !preferences.clipboardEnabled ? 'agents' : live.state.view;
@@ -319,17 +355,24 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const parts: RestingPart[] = [...agents,
     ...(preferences.restMusic && music.status === 'ready' && music.track ? [{left:<span className="mp-volume-target" onWheel={volume.onWheel}><LiveArtwork live={live} mini/></span>,right:<span className="mp-volume-target" onWheel={volume.onWheel}>{volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? music.track?.tint : undefined}/>}</span>}]:[]),
     ...(preferences.restTray && files.length || dragging ? [{left:<span className="mp-shelf-wing"><Icon name="tray" size={16}/>{files.length}</span>,right:<Icon name="file" size={16}/>}]:[]),
+    ...(preferences.batteryEnabled && preferences.restBattery && battery.status === 'reading' && battery.percent !== null
+      ? [batteryRestingPart({ percent: battery.percent, charging: battery.charging, plugged: battery.plugged, low: batteryLow }, preferences.batteryPercentage)] : []),
     ...(preferences.clipboardEnabled && preferences.restClipboard && clipboard.items.length ? [{left:<span className="mp-shelf-wing"><Icon name="clipboard" size={16}/>{clipboard.items.length}</span>,right:<span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : clipboard.items[0].kind === 'url' ? '@' : clipboard.items[0].kind === 'image' ? '▣' : 'T'}</span>}]:[])
   ];
   // A HUD takes the whole resting bar rather than joining the row. It answers a
   // key press you just made, and a bar sharing the wings with three faces is not
   // an answer — it is one more thing to find.
+  const powerResting = hud || !power ? undefined
+    : <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={[{
+      left: <span className="mp-shelf-wing"><Icon name={power.event === 'unplugged' ? 'bolt' : 'plug'} size={15}/></span>,
+      right: <span className="mp-battery-note"><BatteryGlyph percent={power.percent} charging={power.event === 'plugged'} low={power.event === 'low'}/>{batteryHeadline(power)}</span>
+    }]}/>;
   const hudResting = !hud ? undefined
     : preferences.hudClosed === 'wide' ? <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={PANEL_W} left={<div className="mp-left-wing"><Icon name={hud.kind === 'brightness' ? 'brightness' : hud.muted || hud.value === 0 ? 'mute' : 'volume'} size={17}/></div>} right={<div className="mp-right-wing"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={look} wide/></div>}/>
     : <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={[hudRestingPart(hud, look)]}/>;
-  const resting = hudResting ?? (parts.length ? <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={parts}/> : snapshot.sessions.length ? (hovering ? <Stubs snap={snapshot}/> : <div style={{width:snapshot.notchW,height:snapshot.notchH}}/>) : undefined);
+  const resting = hudResting ?? powerResting ?? (parts.length ? <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={parts}/> : snapshot.sessions.length ? (hovering ? <Stubs snap={snapshot}/> : <div style={{width:snapshot.notchW,height:snapshot.notchH}}/>) : undefined);
   const navigation = <>{hudStrip}{tabs}{view === 'agents' && <AgentFilters snapshot={snapshot} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{view === 'agents' && <AgentConnection snapshot={snapshot} filter={filter}/>}<AgentAttention sessions={snapshot.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);choose('agents');}}/>{view === 'agents' && live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</>;
-  const active = !snapshot.dormant || parts.length > 0 || keyboard || hud !== null;
+  const active = !snapshot.dormant || parts.length > 0 || keyboard || hud !== null || power !== null;
   const left = <div className="mp-left-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{view === 'music' ? <LiveArtwork live={live} mini/> : view === 'clipboard' ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/>{clipboard.items.length}</span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
   const right = <div className="mp-right-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? live.state.music.track?.tint : undefined}/> : view === 'clipboard' ? <span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : 'T'}</span> : <Icon name="file" size={16}/>}</div>;
   const wing = (full: boolean) => <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={full ? PANEL_W : undefined} left={left} right={right}/>;
