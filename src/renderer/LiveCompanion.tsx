@@ -7,6 +7,7 @@ import type { AgentFilter, Snapshot } from '../shared/types';
 import { batteryIsLow, DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type BatteryActivity, type CompanionView, type HudActivity, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
 import { useReducedMotion } from './pulse';
 import { barFrame, bassOf, type EqualizerLayout } from './equalizer';
+import { NO_SWIPE, swipeStep } from './swipe';
 import './preview.css';
 import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
 
@@ -214,6 +215,49 @@ export function batteryHeadline(activity: BatteryActivity): string {
     case 'low': return `Low battery · ${percent}`;
   }
 }
+/**
+ * A new track says what it is, for a moment, without opening the notch.
+ *
+ * Only a change of track counts — not a pause, not a seek, and not the first
+ * track after connecting, which you did not ask about. The resting bar already
+ * carries the artwork; this is the title and artist you would otherwise have to
+ * hover to read.
+ */
+const PEEK_HOLD_MS = 2600;
+function useSneakPeek(enabled: boolean, track: { id: string; title: string; artist: string } | null): { title: string; artist: string } | null {
+  const [peek, setPeek] = useState<{ title: string; artist: string } | null>(null);
+  const previous = useRef<string | null>(null);
+  useEffect(() => {
+    const id = track?.id ?? null;
+    const before = previous.current;
+    previous.current = id;
+    if (!enabled || !id || !track) { setPeek(null); return; }
+    // Nothing to compare against yet: the first track of a session is where the
+    // music already was, not something that just happened.
+    if (before === null || before === id) return;
+    setPeek({ title: track.title, artist: track.artist });
+    const timer = setTimeout(() => setPeek(null), PEEK_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [enabled, track?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  return peek;
+}
+/**
+ * Whether Music still deserves its place on the resting bar.
+ *
+ * Paused music is still music for a while — you are coming back to it. After
+ * the chosen quiet, it stands down and gives the space to whatever else is
+ * there. Playing again brings it straight back.
+ */
+function useMusicRested(setting: 'never' | '30' | '120' | '600', playing: boolean, present: boolean): boolean {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    if (setting === 'never' || !present) { setHidden(false); return; }
+    if (playing) { setHidden(false); return; }
+    const timer = setTimeout(() => setHidden(true), Number(setting) * 1000);
+    return () => clearTimeout(timer);
+  }, [setting, playing, present]);
+  return !hidden;
+}
 export const hudLook = (preferences: { hudStyle: 'solid' | 'gradient'; hudGlow: boolean; hudPercentage: boolean }): HudLook =>
   ({ style: preferences.hudStyle, glow: preferences.hudGlow, percentage: preferences.hudPercentage });
 
@@ -331,6 +375,14 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const volume = useVolumeWheel(live);
   const hud = useHudActivity(preferences.hudEnabled);
   const power = useBatteryActivity(preferences.batteryEnabled && preferences.batteryAlerts);
+  const peek = useSneakPeek(preferences.sneakPeek, live.state.music.track);
+  const swipe = useRef(NO_SWIPE);
+  const onSwipe = (e: { deltaY: number }) => {
+    if (!preferences.swipeToClose || !window.notchlight?.closeIsland) return;
+    const result = swipeStep(swipe.current, e.deltaY, Date.now());
+    swipe.current = result.state;
+    if (result.up) window.notchlight.closeIsland();
+  };
   const { battery } = live.state;
   const batteryLow = batteryIsLow(battery);
   const look = hudLook(preferences);
@@ -350,10 +402,11 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const hudStrip = hud && preferences.hudOpenNotch ? <div className="mp-hud-strip"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={look} wide/></div> : null;
   const tabs = <nav className="mp-nav" aria-label="Notch views"><div role="tablist" aria-label="Companion view">{views.map((item,index) => <button key={item} role="tab" id={`${id}-${item}`} aria-controls={`${id}-panel`} aria-selected={view === item} tabIndex={view === item ? 0 : -1} onClick={() => choose(item,true)} onKeyDown={e => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return; e.preventDefault(); choose(views[e.key === 'Home' ? 0 : e.key === 'End' ? views.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : views.length - 1)) % views.length],true); }}>{item === 'agents' ? <Buddy size={15}/> : <Icon name={item} size={14}/>} {names[item]}{item === 'agents' && snapshot.overall === 'asking' && <span className="mp-attention-dot" aria-label="Needs your attention"/>}{item === 'tray' && <span className="mp-count">{live.state.files.length}</span>}{item === 'clipboard' && <span className="mp-count">{live.state.clipboard.items.length}</span>}</button>)}</div><button className="mp-icon-button" aria-label="Open customization" onClick={onCustomize}><Icon name="settings" size={16}/></button></nav>;
   const { music, files, clipboard } = live.state;
+  const musicRested = useMusicRested(preferences.musicIdleHide, music.playing, music.status === 'ready' && !!music.track);
   const selectProvider = (provider: 'claude' | 'codex') => { setFilter(provider); choose('agents'); };
   const agents = agentRestingParts(snapshot, { ...preferences, pulse: preferences.pulse && motion, codexPulse: preferences.codexPulse && motion }, selectProvider);
   const parts: RestingPart[] = [...agents,
-    ...(preferences.restMusic && music.status === 'ready' && music.track ? [{left:<span className="mp-volume-target" onWheel={volume.onWheel}><LiveArtwork live={live} mini/></span>,right:<span className="mp-volume-target" onWheel={volume.onWheel}>{volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? music.track?.tint : undefined}/>}</span>}]:[]),
+    ...(preferences.restMusic && musicRested && music.status === 'ready' && music.track ? [{left:<span className="mp-volume-target" onWheel={volume.onWheel}><LiveArtwork live={live} mini/></span>,right:<span className="mp-volume-target" onWheel={volume.onWheel}>{volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? music.track?.tint : undefined}/>}</span>}]:[]),
     ...(preferences.restTray && files.length || dragging ? [{left:<span className="mp-shelf-wing"><Icon name="tray" size={16}/>{files.length}</span>,right:<Icon name="file" size={16}/>}]:[]),
     ...(preferences.batteryEnabled && preferences.restBattery && battery.status === 'reading' && battery.percent !== null
       ? [batteryRestingPart({ percent: battery.percent, charging: battery.charging, plugged: battery.plugged, low: batteryLow }, preferences.batteryPercentage)] : []),
@@ -367,17 +420,22 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
       left: <span className="mp-shelf-wing"><Icon name={power.event === 'unplugged' ? 'bolt' : 'plug'} size={15}/></span>,
       right: <span className="mp-battery-note"><BatteryGlyph percent={power.percent} charging={power.event === 'plugged'} low={power.event === 'low'}/>{batteryHeadline(power)}</span>
     }]}/>;
+  const peekResting = hud || power || !peek ? undefined
+    : <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={[{
+      left: <LiveArtwork live={live} mini/>,
+      right: <span className="mp-peek"><b>{peek.title}</b><span>{peek.artist}</span></span>
+    }]}/>;
   const hudResting = !hud ? undefined
     : preferences.hudClosed === 'wide' ? <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={PANEL_W} left={<div className="mp-left-wing"><Icon name={hud.kind === 'brightness' ? 'brightness' : hud.muted || hud.value === 0 ? 'mute' : 'volume'} size={17}/></div>} right={<div className="mp-right-wing"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={look} wide/></div>}/>
     : <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={[hudRestingPart(hud, look)]}/>;
-  const resting = hudResting ?? powerResting ?? (parts.length ? <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={parts}/> : snapshot.sessions.length ? (hovering ? <Stubs snap={snapshot}/> : <div style={{width:snapshot.notchW,height:snapshot.notchH}}/>) : undefined);
+  const resting = hudResting ?? powerResting ?? peekResting ?? (parts.length ? <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={parts}/> : snapshot.sessions.length ? (hovering ? <Stubs snap={snapshot}/> : <div style={{width:snapshot.notchW,height:snapshot.notchH}}/>) : undefined);
   const navigation = <>{hudStrip}{tabs}{view === 'agents' && <AgentFilters snapshot={snapshot} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{view === 'agents' && <AgentConnection snapshot={snapshot} filter={filter}/>}<AgentAttention sessions={snapshot.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);choose('agents');}}/>{view === 'agents' && live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</>;
-  const active = !snapshot.dormant || parts.length > 0 || keyboard || hud !== null || power !== null;
+  const active = !snapshot.dormant || parts.length > 0 || keyboard || hud !== null || power !== null || peek !== null;
   const left = <div className="mp-left-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{view === 'music' ? <LiveArtwork live={live} mini/> : view === 'clipboard' ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/>{clipboard.items.length}</span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
   const right = <div className="mp-right-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? live.state.music.track?.tint : undefined}/> : view === 'clipboard' ? <span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : 'T'}</span> : <Icon name="file" size={16}/>}</div>;
   const wing = (full: boolean) => <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={full ? PANEL_W : undefined} left={left} right={right}/>;
   const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
-  return <div className={`mp-surface ${preferences.density} ${preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!preferences.buddy ? 'mp-hide-buddy' : ''} ${!preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''} ${keyboard ? 'mp-keyboard' : ''}`}
+  return <div onWheel={expanded ? onSwipe : undefined} className={`mp-surface ${preferences.density} ${preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!preferences.buddy ? 'mp-hide-buddy' : ''} ${!preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''} ${keyboard ? 'mp-keyboard' : ''}`}
     onKeyDown={e => { if (e.key === 'Escape' && keyboard && window.notchlight?.keyboardDone) { e.preventDefault(); window.notchlight.keyboardDone(); } }}
     onDragOver={e => { if (isFileDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; if (leaveTimer.current) clearTimeout(leaveTimer.current); setDragging(true); } }}
     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) leaveTimer.current = setTimeout(() => setDragging(false),220); }}
