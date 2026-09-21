@@ -104,6 +104,7 @@ class NotchOverlay {
       }
     });
     win.setIgnoreMouseEvents(true, { forward: true });
+    win.setContentProtection(config().contentProtection);
     this.assertLevel();
     win.loadFile(path.join(__dirname, '../renderer/island.html'));
     win.once('ready-to-show', () => {
@@ -173,6 +174,11 @@ class NotchOverlay {
     this.applyGeometry();
   }
 
+  /** Out of screen recordings, or back into them. */
+  setContentProtection(on: boolean): void {
+    if (this.win && !this.win.isDestroyed()) this.win.setContentProtection(on);
+  }
+
   /** Re-measure this screen and tell the island what it is sitting in. */
   applyGeometry(): NotchGeometry {
     this.geometry = geometryFor(this.display);
@@ -227,6 +233,7 @@ class NotchOverlay {
     // Let the cursor poll decide whether the island stays engaged.
     this.engaged = false;
     win.setIgnoreMouseEvents(true, { forward: true });
+    win.setContentProtection(config().contentProtection);
     this.assertLevel();
     return cameForward;
   }
@@ -361,6 +368,11 @@ export class NotchWindow {
     this.overlays = keep.sort((a, b) => a.display.bounds.x - b.display.bounds.x || a.display.id - b.display.id);
     for (const overlay of this.overlays) { overlay.assertLevel(); overlay.assertTop(); }
     if (this.held) this.hold(true);
+  }
+
+  setContentProtection(on: boolean): void {
+    for (const overlay of this.overlays) overlay.setContentProtection(on);
+    logEvent('island', `screen recording ${on ? 'excluded' : 'included'}`);
   }
 
   /** Reopen the overlays against the current preferences — a Displays row changed. */

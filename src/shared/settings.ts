@@ -12,6 +12,8 @@ export interface AppSettings {
   /** Electron accelerator; empty registers nothing. */
   shortcut: string;
   allowWithoutNotch: boolean;
+  /** Keep the island out of screen recordings and screen sharing. */
+  contentProtection: boolean;
   /** Which screens carry an island. */
   displays: 'built-in' | 'all' | 'cursor' | 'chosen';
   /** The screen `displays: 'chosen'` means. 0 until one is picked. */
@@ -34,7 +36,7 @@ export interface AppSettings {
   claudeHooks: boolean;
   configDir: string;
 }
-export type AppSettingsPatch = Partial<Pick<AppSettings, 'loginItem' | 'hoverDelay' | 'shortcut' | 'allowWithoutNotch' | 'staleSec' | 'watchProcesses' | 'doneLingerSec' | 'displays' | 'displayId' | 'notchHeight' | 'notchHeightCustom' | 'plainNotchHeight'>>;
+export type AppSettingsPatch = Partial<Pick<AppSettings, 'loginItem' | 'hoverDelay' | 'shortcut' | 'allowWithoutNotch' | 'contentProtection' | 'staleSec' | 'watchProcesses' | 'doneLingerSec' | 'displays' | 'displayId' | 'notchHeight' | 'notchHeightCustom' | 'plainNotchHeight'>>;
 
 /** One attached screen, as the Displays picker shows it. */
 export interface ScreenInfo {
@@ -77,7 +79,7 @@ export function withCurrent(choices: Choice<number>[], value: number, label: (va
 
 /** What the browser preview shows in General, where nothing can be applied. */
 export const SAMPLE_APP_SETTINGS: AppSettings = {
-  version: '0.2.0', packaged: false, loginItem: false, hoverDelay: 550, shortcut: 'Alt+Shift+N', allowWithoutNotch: false,
+  version: '0.2.0', packaged: false, loginItem: false, hoverDelay: 550, shortcut: 'Alt+Shift+N', allowWithoutNotch: false, contentProtection: false,
   displays: 'built-in', displayId: 0, notchHeight: 'cutout', notchHeightCustom: 32, plainNotchHeight: 32,
   screens: [
     { id: 1, name: 'Built-in Retina Display', builtin: true, cutout: { w: 200, h: 32 }, active: true },
@@ -102,7 +104,7 @@ export function validateAppSettings(value: unknown): AppSettingsPatch {
   };
   for (const [key, item] of Object.entries(value)) {
     switch (key) {
-      case 'loginItem': case 'allowWithoutNotch': case 'watchProcesses':
+      case 'loginItem': case 'allowWithoutNotch': case 'contentProtection': case 'watchProcesses':
         if (typeof item !== 'boolean') throw new Error('Invalid setting value.');
         result[key] = item; break;
       case 'hoverDelay': result.hoverDelay = integer(item, 0, 5000, 'The hover delay'); break;

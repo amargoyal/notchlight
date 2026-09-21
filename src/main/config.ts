@@ -26,6 +26,15 @@ export interface Config {
   /** Show the island on a Mac with no cutout — it hangs off the menu bar. */
   allowWithoutNotch: boolean;
   /**
+   * Keep the island out of screen recordings and screen sharing.
+   *
+   * macOS excludes the window from capture entirely, so a shared screen shows
+   * the menu bar where the island is. Everything on the island stays visible to
+   * you and to nobody else — which is the point, since a session title or a
+   * clipboard preview is not something to leak into a meeting by accident.
+   */
+  contentProtection: boolean;
+  /**
    * Which screens carry an island.
    *
    * `built-in` is the notched panel and nothing else, which is what Notchlight
@@ -117,6 +126,7 @@ const DEFAULTS: Config = {
   notchH: 32,
   pulse: true,
   allowWithoutNotch: false,
+  contentProtection: false,
   displays: 'built-in',
   displayId: 0,
   notchHeight: 'cutout',

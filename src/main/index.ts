@@ -675,6 +675,7 @@ function appSettings(): AppSettings {
     hoverDelay: cfg.hoverDelay,
     shortcut: cfg.shortcut,
     allowWithoutNotch: cfg.allowWithoutNotch,
+    contentProtection: cfg.contentProtection,
     displays: cfg.displays,
     displayId: cfg.displayId,
     notchHeight: cfg.notchHeight,
@@ -703,6 +704,7 @@ function applyAppSettings(patch: AppSettingsPatch): void {
   writeConfig(rest);
   // A display rule is the whole arrangement of windows, so it takes effect at
   // once rather than at the next launch.
+  if (rest.contentProtection !== undefined) notch?.setContentProtection(rest.contentProtection);
   if (['displays', 'displayId', 'notchHeight', 'notchHeightCustom', 'plainNotchHeight', 'allowWithoutNotch'].some(key => key in rest)) {
     notch?.reconfigure();
     applyNotchGeometry();
