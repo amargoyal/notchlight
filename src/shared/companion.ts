@@ -1,4 +1,4 @@
-export type CompanionView = 'agents' | 'music' | 'tray' | 'clipboard';
+export type CompanionView = 'agents' | 'music' | 'tray' | 'clipboard' | 'today';
 export interface CompanionPreferences {
   theme: 'system' | 'light' | 'dark';
   density: 'compact' | 'comfortable';
@@ -54,6 +54,20 @@ export interface CompanionPreferences {
   musicIdleHide: 'never' | '30' | '120' | '600';
   /** Two fingers up over the open notch closes it. */
   swipeToClose: boolean;
+  /** Read today's events at all. Off until switched on. */
+  calendarEnabled: boolean;
+  /** Reminders due today, beside the events. A separate macOS permission. */
+  calendarReminders: boolean;
+  /** Today keeps a place on the resting bar: the next thing, and when. */
+  restToday: boolean;
+  /** Calendars whose events are left out, by identifier. */
+  calendarHidden: string[];
+  /** Leave out events that take the whole day. */
+  hideAllDay: boolean;
+  /** Leave out reminders that have been ticked off. */
+  hideDone: boolean;
+  /** The whole title, wrapped, rather than one line ending in an ellipsis. */
+  fullEventTitles: boolean;
   /** Answer the volume and brightness keys in the notch instead of the macOS square. Needs Accessibility. */
   hudEnabled: boolean;
   /** Option held keeps its macOS meaning — open the matching settings pane — or moves the level like any other press. */
@@ -77,7 +91,8 @@ export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
   hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
   batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true,
-  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true
+  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true,
+  calendarEnabled: false, calendarReminders: false, restToday: true, calendarHidden: [], hideAllDay: false, hideDone: true, fullEventTitles: false
 };
 export type MusicPlayer = 'spotify' | 'apple';
 export const PLAYER_NAMES: Record<MusicPlayer, string> = { spotify: 'Spotify', apple: 'Apple Music' };
@@ -229,6 +244,71 @@ export function describeBattery(battery: BatterySnapshot, enabled: boolean): str
     default: return 'Waiting for the first reading.';
   }
 }
+/** One calendar or reminder list, with the colour its own app gives it. */
+export interface CalendarInfo { id: string; title: string; color: string; kind: 'event' | 'reminder' }
+/** One thing happening today. A reminder has no end and can be done. */
+export interface CalendarEvent {
+  id: string;
+  calendarId: string;
+  title: string;
+  /** ISO 8601 with an offset. */
+  start: string;
+  end?: string;
+  allDay: boolean;
+  location: string;
+  kind: 'event' | 'reminder';
+  done: boolean;
+  past: boolean;
+}
+/**
+ * Today, as EventKit has it.
+ *
+ * Off until switched on, like everything else that reads something of yours.
+ * A refusal is a state rather than an error: macOS only asks once, so the pane
+ * has to say plainly where the answer can be changed.
+ */
+export interface CalendarSnapshot {
+  status: 'off' | 'starting' | 'reading' | 'unavailable';
+  reason: 'denied' | 'restricted' | 'unsupported' | 'no-helper' | 'crashed' | null;
+  /** The day these events belong to, as yyyy-mm-dd, or empty before the first read. */
+  day: string;
+  calendars: CalendarInfo[];
+  events: CalendarEvent[];
+  /** Reminders were asked for and allowed. */
+  reminders: boolean;
+}
+export const EMPTY_CALENDAR: CalendarSnapshot = { status: 'off', reason: null, day: '', calendars: [], events: [], reminders: false };
+/** The events worth showing, given what has been hidden. */
+export function visibleEvents(calendar: CalendarSnapshot, preferences: { calendarHidden: string[]; hideAllDay: boolean; hideDone: boolean }): CalendarEvent[] {
+  const hidden = new Set(preferences.calendarHidden);
+  return calendar.events.filter(event =>
+    !hidden.has(event.calendarId)
+    && !(preferences.hideAllDay && event.allDay)
+    && !(preferences.hideDone && event.done));
+}
+/** The next thing that has not happened yet, which is what the resting bar carries. */
+export function nextEvent(events: CalendarEvent[]): CalendarEvent | null {
+  return events.find(event => !event.past && !event.done) ?? null;
+}
+/** What the settings pane says about the calendar. */
+export function describeCalendar(calendar: CalendarSnapshot, enabled: boolean): string {
+  if (!enabled) return 'Off. Nothing in your calendar is read.';
+  switch (calendar.status) {
+    case 'reading': {
+      const count = calendar.events.length;
+      return `${count === 0 ? 'Nothing' : count === 1 ? 'One thing' : `${count} things`} today, across ${calendar.calendars.length} ${calendar.calendars.length === 1 ? 'calendar' : 'calendars'}.${calendar.reminders ? '' : ' Reminders are not included.'}`;
+    }
+    case 'starting': return 'Asking macOS for access to your calendar…';
+    case 'unavailable': switch (calendar.reason) {
+      case 'denied': return 'macOS did not allow access. Turn Notchlight on under System Settings → Privacy & Security → Calendars; macOS only asks once.';
+      case 'restricted': return 'Calendar access is restricted on this Mac, which is usually a profile or parental controls.';
+      case 'unsupported': return 'Reading the calendar needs macOS 14 or later. Everything else still works.';
+      case 'no-helper': return 'The calendar helper could not be built. Install the Xcode command line tools, or use a packaged build.';
+      default: return 'The calendar helper stopped unexpectedly. It will try again shortly.';
+    }
+    default: return 'Waiting for the first reading.';
+  }
+}
 /** What the settings pane says about the Spotify account. */
 export function describeAccount(account: SpotifyAccountSnapshot): string {
   switch (account.status) {
@@ -319,6 +399,7 @@ export interface CompanionSnapshot {
   capture: CaptureSnapshot;
   hud: HudSnapshot;
   battery: BatterySnapshot;
+  calendar: CalendarSnapshot;
   clipboard: ClipboardSnapshot;
   smartShuffle: SmartShuffleSnapshot;
   transfer: TransferProgress | null;
@@ -386,6 +467,10 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
     if (key === 'codexHome') {
       if (typeof item !== 'string' || item.length > 4096 || item.includes('\0') || item !== '' && !item.startsWith('/')) throw new Error('Choose an absolute Codex home directory.');
       result[key] = item; continue;
+    }
+    if (key === 'calendarHidden') {
+      if (!Array.isArray(item) || item.length > 100 || item.some(id => typeof id !== 'string' || id.length > 256)) throw new Error('Invalid calendar list.');
+      result[key] = [...new Set(item as string[])]; continue;
     }
     if (key === 'spotifyClientId') {
       if (typeof item !== 'string' || item !== '' && !/^[0-9a-f]{32}$/i.test(item.trim())) throw new Error('A Spotify Client ID is 32 hexadecimal characters.');

@@ -4,7 +4,7 @@ import { Icon, BatteryGlyph, FileThumb, HudBar, RestingWings, batteryRestingPart
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import type { AgentFilter, Snapshot } from '../shared/types';
-import { batteryIsLow, DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type BatteryActivity, type CompanionView, type HudActivity, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
+import { batteryIsLow, DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CALENDAR, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type BatteryActivity, type CompanionView, type HudActivity, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
 import { useReducedMotion } from './pulse';
 import { barFrame, bassOf, type EqualizerLayout } from './equalizer';
 import { NO_SWIPE, swipeStep } from './swipe';
@@ -14,7 +14,7 @@ import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filte
 const EMPTY: Snapshot = { sessions: [], overall: 'idle', tokens: 0, elapsed: 0, dormant: true, notchW: 200, notchH: 32, hoverDelay: 550, pulse: true, now: Date.now() };
 export function useCompanion() {
   const available = !!window.notchlight?.getCompanion;
-  const [state, setState] = useState<CompanionSnapshot>({ preferences: { ...DEFAULT_COMPANION_PREFERENCES }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, hud: { ...EMPTY_HUD }, battery: { ...EMPTY_BATTERY }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' });
+  const [state, setState] = useState<CompanionSnapshot>({ preferences: { ...DEFAULT_COMPANION_PREFERENCES }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, hud: { ...EMPTY_HUD }, battery: { ...EMPTY_BATTERY }, calendar: { ...EMPTY_CALENDAR }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' });
   const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
@@ -44,9 +44,10 @@ export function useCompanion() {
   return { available, state, snapshot: geometry ? { ...snapshot, ...geometry } : snapshot, ready, error, run };
 }
 export type LiveController = ReturnType<typeof useCompanion>;
-const names: Record<CompanionView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray', clipboard: 'Clipboard' };
+const names: Record<CompanionView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray', clipboard: 'Clipboard', today: 'Today' };
 /** Clipboard joins the row only once its history is switched on; a face with nothing behind it is noise. */
-const visibleViews = (enabled: boolean): CompanionView[] => enabled ? ['agents','music','tray','clipboard'] : ['agents','music','tray'];
+const visibleViews = (clipboard: boolean, calendar: boolean): CompanionView[] =>
+  ['agents', 'music', ...(calendar ? ['today' as const] : []), 'tray', ...(clipboard ? ['clipboard' as const] : [])];
 const ago = (at: number, now: number) => { const s = Math.max(0, Math.round((now - at) / 1000)); return s < 60 ? 'now' : s < 3600 ? `${Math.floor(s / 60)}m` : s < 86400 ? `${Math.floor(s / 3600)}h` : `${Math.floor(s / 86400)}d`; };
 const time = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2,'0')}`;
 
@@ -386,8 +387,10 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const { battery } = live.state;
   const batteryLow = batteryIsLow(battery);
   const look = hudLook(preferences);
-  const views = visibleViews(preferences.clipboardEnabled);
-  const view: CompanionView = dragging ? 'tray' : live.state.view === 'clipboard' && !preferences.clipboardEnabled ? 'agents' : live.state.view;
+  const views = visibleViews(preferences.clipboardEnabled, preferences.calendarEnabled);
+  // A face whose feature was switched off while it was selected falls back
+  // rather than leaving the panel on a tab that is no longer in the row.
+  const view: CompanionView = dragging ? 'tray' : views.includes(live.state.view) ? live.state.view : 'agents';
   const expanded = open || dragging;
   // Reduced motion stills the lights too; the pulse timer never starts for them.
   const motion = !preferences.reducedMotion;
