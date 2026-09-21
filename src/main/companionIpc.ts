@@ -82,6 +82,9 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
     if (spotify.currentPlayer() === 'apple') await promisify(execFile)('open', ['-b', 'com.apple.Music'], { timeout: 5000 });
     else await shell.openExternal('spotify:');
   });
+  // The one thing a user can do about a refused event tap. macOS has no API to
+  // ask again once it has been answered, so this only opens the right pane.
+  handle('hud:accessibility', () => shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'));
   handle('clipboard:copy', async (_e, id) => { await clips.copy(id); store.notice('Copied. Paste it wherever you like.'); });
   handle('clipboard:pin', (_e, id, pinned) => clips.pin(id, pinned));
   handle('clipboard:remove', (_e, id) => clips.remove(id));

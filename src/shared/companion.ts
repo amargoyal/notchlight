@@ -38,13 +38,28 @@ export interface CompanionPreferences {
   spotifyClientId: string;
   /** Mark Smart Shuffle picks in the Music face, with a + and an × to answer them. */
   smartShuffle: boolean;
+  /** Answer the volume and brightness keys in the notch instead of the macOS square. Needs Accessibility. */
+  hudEnabled: boolean;
+  /** Option held keeps its macOS meaning — open the matching settings pane — or moves the level like any other press. */
+  hudOptionKey: 'settings' | 'replace';
+  /** A solid bar, or one that ramps across its own length. */
+  hudStyle: 'solid' | 'gradient';
+  /** A soft light under the filled part of the bar. */
+  hudGlow: boolean;
+  /** The level as a number beside the bar. */
+  hudPercentage: boolean;
+  /** Show the bar above the tabs while the notch is open, not only while it rests. */
+  hudOpenNotch: boolean;
+  /** Resting, the bar sits in the wings beside the cutout, or takes the full panel width. */
+  hudClosed: 'inline' | 'wide';
 }
 export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   theme: 'system', density: 'comfortable', reducedMotion: false, buddy: true, pulse: true,
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true, spotifyEnabled: false,
   restClaude: true, restCodex: true, codexEnabled: false, codexApprovals: false, codexBuddy: true, codexPulse: true, codexHome: '', restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
-  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true
+  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
+  hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline'
 };
 export type MusicPlayer = 'spotify' | 'apple';
 export const PLAYER_NAMES: Record<MusicPlayer, string> = { spotify: 'Spotify', apple: 'Apple Music' };
@@ -121,6 +136,28 @@ export interface CaptureSnapshot {
   retryAt: number | null;
 }
 export const EMPTY_CAPTURE: CaptureSnapshot = { status: 'idle', reason: null, retryAt: null };
+/** The two things the volume and brightness keys move. */
+export type HudChannel = 'volume' | 'brightness';
+/**
+ * Taking over the system volume and brightness overlay.
+ *
+ * The helper installs an event tap, so this is off until it is switched on and
+ * Accessibility is granted. `can` is what this Mac can actually take over: a key
+ * outside it keeps the macOS overlay rather than doing nothing, and the settings
+ * pane says so rather than claiming more than it does.
+ */
+export interface HudSnapshot {
+  status: 'off' | 'starting' | 'listening' | 'unavailable';
+  reason: 'accessibility' | 'no-tap' | 'no-output' | 'unsupported' | 'no-helper' | 'crashed' | null;
+  can: HudChannel[];
+  /** The last levels seen, 0…1, or null before the helper has said. */
+  volume: number | null;
+  muted: boolean;
+  brightness: number | null;
+}
+export const EMPTY_HUD: HudSnapshot = { status: 'off', reason: null, can: [], volume: null, muted: false, brightness: null };
+/** One key press, as the notch draws it. */
+export interface HudActivity { kind: HudChannel; value: number; muted: boolean; at: number }
 /** What the settings pane says about the Spotify account. */
 export function describeAccount(account: SpotifyAccountSnapshot): string {
   switch (account.status) {
@@ -147,6 +184,32 @@ export function describeCapture(capture: CaptureSnapshot, music: SpotifySnapshot
       default: return 'Audio capture is unavailable right now. It will try again shortly.';
     }
     default: return music.status === 'ready' && music.playing ? 'Capture starts when the bars are on screen.' : 'Capture runs only while Spotify plays and the bars are showing.';
+  }
+}
+/** The names the settings pane and the notch use for the two channels. */
+export const HUD_NAMES: Record<HudChannel, string> = { volume: 'Volume', brightness: 'Brightness' };
+/**
+ * What the settings pane says about the system HUD. The permission is the one
+ * line a user can act on, so it names the pane and what to look for in it.
+ */
+export function describeHud(hud: HudSnapshot, enabled: boolean): string {
+  if (!enabled) return 'Off. macOS shows its own square in the middle of the screen for volume and brightness.';
+  switch (hud.status) {
+    case 'listening': {
+      const missing = (['volume', 'brightness'] as HudChannel[]).filter(channel => !hud.can.includes(channel));
+      const taken = hud.can.map(channel => HUD_NAMES[channel].toLowerCase()).join(' and ') || 'nothing';
+      return `Replacing the system overlay for ${taken}.${missing.length ? ` macOS still handles ${missing.map(channel => HUD_NAMES[channel].toLowerCase()).join(' and ')} on this Mac.` : ''}`;
+    }
+    case 'starting': return 'Starting the key listener…';
+    case 'unavailable': switch (hud.reason) {
+      case 'accessibility': return 'macOS has not allowed Notchlight to see the keys. Allow it under System Settings → Privacy & Security → Accessibility; this tries again on its own. An app update can need the box ticked again.';
+      case 'no-tap': return 'macOS refused the key listener. Allowing Notchlight under Accessibility again usually settles it.';
+      case 'no-output': return 'No output device is selected, so there is no volume to change.';
+      case 'unsupported': return 'Neither the volume nor the brightness can be changed on this Mac. macOS keeps its own overlay.';
+      case 'no-helper': return 'The key helper could not be built. Install the Xcode command line tools, or use a packaged build.';
+      default: return 'The key helper stopped unexpectedly. It will try again shortly.';
+    }
+    default: return 'Waiting for the key listener to start.';
   }
 }
 /** One thing that was copied: text, a URL, or an image. */
@@ -183,6 +246,7 @@ export interface CompanionSnapshot {
   files: ShelfFile[];
   music: SpotifySnapshot;
   capture: CaptureSnapshot;
+  hud: HudSnapshot;
   clipboard: ClipboardSnapshot;
   smartShuffle: SmartShuffleSnapshot;
   transfer: TransferProgress | null;
@@ -219,6 +283,10 @@ export interface CompanionBridge {
   answerPick(answer: SmartShuffleAnswer): Promise<OperationResult>;
   /** Five band levels, bass first, each 0…1, while Spotify plays and the bars are on screen. */
   onMusicLevels(cb: (levels: number[]) => void): () => void;
+  /** One volume or brightness key press, the moment it lands. */
+  onHud(cb: (activity: HudActivity) => void): () => void;
+  /** Show System Settings → Privacy & Security → Accessibility. */
+  openAccessibility(): Promise<OperationResult>;
   /** Put a history item back on the clipboard. */
   copyClipboardItem(id: string): Promise<OperationResult>;
   pinClipboardItem(id: string, pinned: boolean): Promise<OperationResult>;
@@ -233,7 +301,8 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid preferences.');
   const result: Record<string, unknown> = {};
   const choices: Record<string, readonly string[]> = {
-    theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100'], equalizerLayout: ['rising', 'mirrored'], musicPlayer: ['spotify', 'apple', 'auto']
+    theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100'], equalizerLayout: ['rising', 'mirrored'], musicPlayer: ['spotify', 'apple', 'auto'],
+    hudOptionKey: ['settings', 'replace'], hudStyle: ['solid', 'gradient'], hudClosed: ['inline', 'wide']
   };
   for (const [key, item] of Object.entries(value)) {
     if (!Object.hasOwn(DEFAULT_COMPANION_PREFERENCES, key)) throw new Error('Unknown preference.');

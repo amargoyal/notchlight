@@ -96,6 +96,20 @@ export class LineHelper<T> extends EventEmitter {
 
 export interface PasteboardChange { change: number; types: string[]; concealed: boolean }
 
+/** What a key press did: the level it landed on, 0…1, and mute for the volume. */
+export interface HudEvent { kind: 'volume' | 'brightness'; value: number; muted: boolean }
+
+/** One hudwatch line into a change, or null. */
+export function parseHudEvent(line: string): HudEvent | null {
+  try {
+    const raw = JSON.parse(line);
+    if (!raw || typeof raw !== 'object') return null;
+    if (raw.kind !== 'volume' && raw.kind !== 'brightness') return null;
+    if (typeof raw.value !== 'number' || !Number.isFinite(raw.value)) return null;
+    return { kind: raw.kind, value: Math.max(0, Math.min(1, raw.value)), muted: raw.muted === true };
+  } catch { return null; }
+}
+
 /** One pasteboardwatch line into a change, or null. */
 export function parsePasteboardChange(line: string): PasteboardChange | null {
   try {

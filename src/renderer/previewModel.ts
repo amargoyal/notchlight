@@ -27,6 +27,13 @@ export interface PreviewPreferences {
   sparkline: boolean;
   spotifyClientId: string;
   smartShuffle: boolean;
+  hudEnabled: boolean;
+  hudOptionKey: 'settings' | 'replace';
+  hudStyle: 'solid' | 'gradient';
+  hudGlow: boolean;
+  hudPercentage: boolean;
+  hudOpenNotch: boolean;
+  hudClosed: 'inline' | 'wide';
 }
 export interface PreviewClip { id: string; kind: 'text' | 'url' | 'image'; preview: string; meta: string; pinned: boolean; thumb?: string }
 export interface PreviewTrack { id: string; title: string; artist: string; album: string; duration: number; artwork?: string; /** A Smart Shuffle pick, and the playlist it is not in yet. */ pick?: string }
@@ -43,6 +50,8 @@ export interface PreviewState {
   received: PreviewFile[];
   drag: { origin: 'finder' | 'tray'; id: string; previousView: PreviewView; previousOpen: boolean } | null;
   notice: string;
+  /** The key press the sample notch is answering, or nothing. */
+  hud: PreviewHud | null;
   codex: 'off' | Status | 'many';
   claude: 'working' | 'asking' | 'done' | 'idle' | 'many';
 }
@@ -51,8 +60,22 @@ export const DEFAULT_PREFERENCES: PreviewPreferences = {
   artwork: true, visualizer: true, thumbnails: 'large', removeAfterTransfer: true,
   restClaude: true, restCodex: true, codexBuddy: true, codexPulse: true, restMusic: true, restTray: true,
   clipboardEnabled: false, clipboardHistorySize: '50', restClipboard: true,
-  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true
+  musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
+  hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline'
 };
+/** One key press, as the sample notch shows it. */
+export interface PreviewHud { kind: 'volume' | 'brightness'; value: number; muted: boolean }
+/**
+ * The HUD states worth looking at: the ordinary one, both ends of the bar, mute,
+ * and a level low enough to test that a nearly empty bar still reads.
+ */
+export const HUD_SAMPLES: { id: string; label: string; hud: PreviewHud }[] = [
+  { id: 'volume', label: 'Volume, half way', hud: { kind: 'volume', value: 0.44, muted: false } },
+  { id: 'volume-full', label: 'Volume, all the way up', hud: { kind: 'volume', value: 1, muted: false } },
+  { id: 'volume-muted', label: 'Volume, muted', hud: { kind: 'volume', value: 0, muted: true } },
+  { id: 'brightness', label: 'Brightness', hud: { kind: 'brightness', value: 0.71, muted: false } },
+  { id: 'brightness-low', label: 'Brightness, nearly off', hud: { kind: 'brightness', value: 0.05, muted: false } }
+];
 export const SAMPLE_CLIPS: PreviewClip[] = [
   { id: 'clip-url', kind: 'url', preview: 'https://developer.apple.com/documentation/coreaudio', meta: 'developer.apple.com · 2m', pinned: false },
   { id: 'clip-cmd', kind: 'text', preview: 'npm run service:restart', meta: '23 chars · 9m', pinned: true },
@@ -76,7 +99,7 @@ export const SAMPLE_FILES: PreviewFile[] = [
 export function initialPreview(): PreviewState {
   return { view: 'music', open: true, preferences: { ...DEFAULT_PREFERENCES },
     music: { index: 0, position: 72, playing: true, source: 'ready', missingArtwork: false, added: [] },
-    files: SAMPLE_FILES.slice(0, 2), clips: SAMPLE_CLIPS, selected: null, received: [], drag: null, notice: '', codex: 'off', claude: 'working' };
+    files: SAMPLE_FILES.slice(0, 2), clips: SAMPLE_CLIPS, selected: null, received: [], drag: null, notice: '', hud: null, codex: 'off', claude: 'working' };
 }
 export type PreviewAction =
   | { type: 'view'; view: PreviewView } | { type: 'open'; value: boolean }
@@ -84,6 +107,7 @@ export type PreviewAction =
   | { type: 'start-playlist' } | { type: 'play' } | { type: 'skip'; delta: number } | { type: 'seek'; position: number } | { type: 'tick' }
   | { type: 'music-state'; source: PreviewState['music']['source']; missingArtwork?: boolean }
   | { type: 'pick-add' } | { type: 'pick-dismiss' }
+  | { type: 'hud'; hud: PreviewHud | null }
   | { type: 'codex'; value: PreviewState['codex'] }
   | { type: 'claude'; value: PreviewState['claude'] }
   | { type: 'add'; id: string } | { type: 'remove'; id: string } | { type: 'select'; id: string }
@@ -97,6 +121,7 @@ export function previewReducer(s: PreviewState, a: PreviewAction): PreviewState 
     case 'view': return { ...s, view: a.view, open: true };
     case 'open': return { ...s, open: a.value };
     case 'preferences': return { ...s, preferences: { ...s.preferences, ...a.patch } };
+    case 'hud': return { ...s, hud: a.hud };
     case 'codex': return { ...s, codex: a.value };
     case 'claude': return { ...s, claude: a.value };
     case 'music-state': return { ...s, music: { ...s.music, source: a.source, missingArtwork: !!a.missingArtwork } };

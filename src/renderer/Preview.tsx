@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type D
 import { Island, Stubs, Wings } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
-import { initialPreview, previewReducer, previewAgents, SAMPLE_FILES, TRACKS,
+import { initialPreview, previewReducer, previewAgents, HUD_SAMPLES, SAMPLE_FILES, TRACKS,
   type PreviewAction, type PreviewFile, type PreviewState, type PreviewView } from './previewModel';
 import './preview.css';
 import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
@@ -34,7 +34,10 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     face: <><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="10.5" r="1.3" fill="currentColor" stroke="none"/><path d="M9 15c1.6 1.3 4.4 1.3 6 0"/></>,
     info: <><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.8h.01"/></>,
     updown: <path d="m8 9.5 4-4 4 4M8 14.5l4 4 4-4"/>,
-    copy: <><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></>
+    copy: <><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></>,
+    volume: <><path d="M4 9h3l5-4v14l-5-4H4Z"/><path d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10"/></>,
+    mute: <><path d="M4 9h3l5-4v14l-5-4H4Z"/><path d="m16 9.5 5 5m0-5-5 5"/></>,
+    brightness: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></>
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.file}</svg>;
 }
@@ -92,6 +95,36 @@ function Artwork({ state, mini = false }: { state: PreviewState; mini?: boolean 
       ? <img src={track.artwork} alt={mini ? '' : `${track.album} — sample artwork`} draggable={false}/>
       : <Icon name="music" size={mini ? 14 : 34}/>}
   </div>;
+}
+/** How a HUD bar is dressed, which is four preferences and nothing else. */
+export interface HudLook { style: 'solid' | 'gradient'; glow: boolean; percentage: boolean }
+/**
+ * One level, as a bar.
+ *
+ * It stands in for the grey square macOS puts in the middle of the screen, so it
+ * says the same two things and no more: which key was pressed, and where the
+ * level landed. The width is written inline rather than animated — the value is
+ * already the end of the movement, and the overlay is a transparent window whose
+ * every frame costs the compositor.
+ */
+export function HudBar({ kind, value, muted, look, wide = false }: { kind: 'volume' | 'brightness'; value: number; muted?: boolean; look: HudLook; wide?: boolean }) {
+  const percent = Math.round(Math.max(0, Math.min(1, value)) * 100);
+  const icon = kind === 'brightness' ? 'brightness' : muted || percent === 0 ? 'mute' : 'volume';
+  const name = kind === 'brightness' ? 'Brightness' : muted ? 'Volume, muted' : 'Volume';
+  return <span className={`mp-hud ${wide ? 'is-wide' : ''} ${look.style === 'gradient' ? 'is-gradient' : ''} ${look.glow ? 'is-glowing' : ''} ${muted ? 'is-muted' : ''}`} role="status" aria-label={`${name} ${percent}%`}>
+    <Icon name={icon} size={14}/>
+    <span className="mp-hud-track"><i style={{ width: `${percent}%` }}/></span>
+    {look.percentage && <b>{percent}</b>}
+  </span>;
+}
+/** The HUD on the resting bar: the key on the left, the level on the right. */
+export function hudRestingPart(activity: { kind: 'volume' | 'brightness'; value: number; muted: boolean }, look: HudLook): RestingPart {
+  const percent = Math.round(Math.max(0, Math.min(1, activity.value)) * 100);
+  const icon = activity.kind === 'brightness' ? 'brightness' : activity.muted || percent === 0 ? 'mute' : 'volume';
+  return {
+    left: <span className="mp-shelf-wing"><Icon name={icon} size={16}/></span>,
+    right: <HudBar kind={activity.kind} value={activity.value} muted={activity.muted} look={look}/>
+  };
 }
 export interface RestingPart { left: ReactNode; right: ReactNode; provider?: boolean }
 /**
@@ -214,7 +247,10 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
     {music ? <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow && state.music.source === 'ready' ? SAMPLE_TINT : undefined}/> : clips ? <span className="mp-clip-kind" aria-hidden="true">T</span> : <Icon name="file" size={16}/>}
   </div>;
   const wing = (expanded: boolean) => <Wings notchW={notchW} height={notchH} width={expanded ? PANEL_W : undefined} left={<div className="mp-left-wing">{headLeft}</div>} right={headRight}/>;
-  const nav = <>{tabs}{state.view === 'agents' && <AgentFilters snapshot={snap} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{state.view === 'agents' && <AgentConnection snapshot={snap} filter={filter}/>}<AgentAttention sessions={snap.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);dispatch({type:'view',view:'agents'});}}/></>;
+  const hudLook: HudLook = { style: prefs.hudStyle, glow: prefs.hudGlow, percentage: prefs.hudPercentage };
+  const hud = prefs.hudEnabled ? state.hud : null;
+  const hudStrip = hud && prefs.hudOpenNotch ? <div className="mp-hud-strip"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={hudLook} wide/></div> : null;
+  const nav = <>{hudStrip}{tabs}{state.view === 'agents' && <AgentFilters snapshot={snap} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{state.view === 'agents' && <AgentConnection snapshot={snap} filter={filter}/>}<AgentAttention sessions={snap.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);dispatch({type:'view',view:'agents'});}}/></>;
   const agentParts = agentRestingParts(snap,prefs,p => {setFilter(p);dispatch({type:'view',view:'agents'});});
   const parts: RestingPart[] = [
     ...agentParts,
@@ -223,8 +259,12 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
     ...(prefs.clipboardEnabled && prefs.restClipboard && state.clips.length > 0 ? [{ left: <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span>, right: <span className="mp-clip-kind" aria-hidden="true">{state.clips[0].kind === 'url' ? '@' : state.clips[0].kind === 'image' ? '▣' : 'T'}</span> }] : [])
   ];
   const attention = undefined;
-  const resting = parts.length || attention ? <RestingWings notchW={notchW} height={notchH} parts={parts} attention={attention}/>
-    : !prefs.restClaude && snap.sessions.length ? <Stubs snap={snap}/> : undefined;
+  // The HUD answers a key press, so it takes the resting bar rather than joining it.
+  const hudResting = !hud ? undefined
+    : prefs.hudClosed === 'wide' ? <Wings notchW={notchW} height={notchH} width={PANEL_W} left={<div className="mp-left-wing"><Icon name={hud.kind === 'brightness' ? 'brightness' : hud.muted || hud.value === 0 ? 'mute' : 'volume'} size={17}/></div>} right={<div className="mp-right-wing"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={hudLook} wide/></div>}/>
+    : <RestingWings notchW={notchW} height={notchH} parts={[hudRestingPart(hud, hudLook)]}/>;
+  const resting = hudResting ?? (parts.length || attention ? <RestingWings notchW={notchW} height={notchH} parts={parts} attention={attention}/>
+    : !prefs.restClaude && snap.sessions.length ? <Stubs snap={snap}/> : undefined);
   return <div className={`mp-surface ${state.preferences.density} ${state.preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!state.preferences.buddy ? 'mp-hide-buddy' : ''} ${!state.preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''}`}
     onDragOver={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; dispatch({ type: 'drag-enter' }); } }}
     onDrop={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); dispatch({ type: 'add', id: state.drag.id }); } }}>
@@ -298,6 +338,14 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'Resting · music only', note: 'Album on the left. Playback on the right.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
   { name: 'Resting · Claude and music', note: 'Two faces share the bar without crowding it.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restTray: false } }) },
   { name: 'Resting · Claude hidden, needs you', note: 'A hidden face still gets a word in when it must.', patch: s => ({ ...s, open: false, claude: 'asking', preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
+  { name: 'HUD · volume', note: 'The key press takes the resting bar; nothing else shares it.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[0].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'HUD · all the way up', note: 'A full bar still reads as a bar, not as a block.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[1].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'HUD · muted', note: 'The slashed speaker, and a track with nothing in it.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[2].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'HUD · brightness with the number', note: 'A/B: the level spelled out beside the bar.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[3].hud, preferences: { ...s.preferences, hudEnabled: true, hudPercentage: true } }) },
+  { name: 'HUD · gradient, no glow', note: 'A/B: the bar ramps across itself and sits flat.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[3].hud, preferences: { ...s.preferences, hudEnabled: true, hudStyle: 'gradient', hudGlow: false } }) },
+  { name: 'HUD · nearly off', note: 'Five percent has to be visible, or the key feels dead.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[4].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'HUD · wide bar', note: 'A/B: one press takes the full panel width instead of the wings.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[0].hud, preferences: { ...s.preferences, hudEnabled: true, hudClosed: 'wide' } }) },
+  { name: 'HUD · open notch', note: 'Above the tabs, whichever face you were on.', patch: s => ({ ...s, open: true, hud: HUD_SAMPLES[3].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
   { name: 'Tray · empty', note: 'A clear target for the next thing you pick up.', patch: s => ({ ...s, view: 'tray', files: [] }) },
   { name: 'Tray · populated', note: 'Recognizable thumbnails, readable names.', patch: s => ({ ...s, view: 'tray' }) },
   { name: 'Tray · selected', note: 'Select a file, then take it out with the keyboard.', patch: s => ({ ...s, view: 'tray', selected: 'brief' }) },

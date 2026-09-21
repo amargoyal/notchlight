@@ -15,6 +15,32 @@ Original vector record sleeves and a landscape illustration, bundled locally. Th
 ## Boundaries
 Use the same Island shell and Claude components in previews. Sample controls must remain isolated from production state. Native appearance preferences persist separately from Claude gate configuration. Every preview has empty/error/overflow examples. Gallery remains the exhaustive visual regression surface.
 
+## System HUD
+
+The volume and brightness keys are answered by one bar, which stands in for the
+grey square macOS draws in the middle of the screen. It says two things: which
+key was pressed, and where the level landed. Nothing else.
+
+A HUD **takes** the resting bar rather than joining it. Faces share the bar
+because each is a standing state; a HUD answers something you did a moment ago,
+and a bar competing with three faces is not an answer. It holds for 1.5 s and
+each further press restarts that hold, so a key held down reads as one bar
+moving. Closed, it sits in the wings beside the cutout, or takes the panel width
+when *Wide bar* is chosen. Open, it is a strip above the tabs, on every face, and
+the face underneath is never replaced.
+
+The bar is solid or a left-to-right ramp, optionally with a soft light under the
+filled part and the level spelled out beside it. It uses the existing ink and
+text tokens; when the accent colour preference lands it follows that instead. The
+fill width is written directly, never animated — the value is already the end of
+the movement, and every frame of the overlay costs the compositor. Nothing here
+moves under reduced motion; the level still changes.
+
+Replacement is off until switched on, because it needs Accessibility. The pane
+says what is actually being replaced: a Mac whose brightness cannot be read keeps
+the macOS overlay for that key, and the HUD pane says so rather than claiming
+both. The permission row is the only actionable line and names the exact pane.
+
 ## Agents extension — implementation pending validation
 
 The current navigation uses **Agents, Music, Tray**, with **All / Claude / Codex**
