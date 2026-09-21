@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('notchlight', {
   revealFile: (id: string) => ipcRenderer.invoke('shelf:reveal', id),
   locateFile: (id: string) => ipcRenderer.invoke('shelf:locate', id),
   saveFileCopy: (ids: string[]) => ipcRenderer.invoke('shelf:copy', ids),
+  shareFiles: (ids: string[]) => ipcRenderer.invoke('shelf:share', ids),
   startFileDrag: (ids: string[]) => ipcRenderer.send('shelf:drag', ids),
   connectSpotify: () => ipcRenderer.invoke('spotify:connect'),
   openSpotify: () => ipcRenderer.invoke('spotify:open'),

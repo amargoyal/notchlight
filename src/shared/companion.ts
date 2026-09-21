@@ -428,6 +428,8 @@ export interface CompanionBridge {
   /** Ask where a missing file lives now. */
   locateFile(id: string): Promise<OperationResult>;
   saveFileCopy(ids: string[]): Promise<OperationResult>;
+  /** macOS's own share sheet, AirDrop included. The items stay in Tray. */
+  shareFiles(ids: string[]): Promise<OperationResult>;
   startFileDrag(ids: string[]): void;
   connectSpotify(): Promise<OperationResult>;
   openSpotify(): Promise<OperationResult>;

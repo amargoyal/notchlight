@@ -494,7 +494,13 @@ async function boot(): Promise<void> {
   });
   pickFiles = installCompanionIpc(companion, spotify, clips,
     win => !!win && (win === customize || win === welcome || !!notch?.owns(win)),
-    () => { openCustomize(); return customize!; }, account, smart);
+    () => { openCustomize(); return customize!; }, account, smart,
+    // Under the notch on the screen the island is on, which is where the files
+    // being shared appear to be coming from.
+    () => {
+      const bounds = notch?.win?.getBounds();
+      return bounds ? { x: Math.round(bounds.x + bounds.width / 2), y: bounds.y + 36 } : { x: 0, y: 40 };
+    });
   if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
   smart.setEnabled(!DEMO && spotifyEnabled && companion.current().preferences.smartShuffle);
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);

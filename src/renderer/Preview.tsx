@@ -42,6 +42,7 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     bolt: <path d="M13 2 4 14h6l-1 8 9-12h-6Z" fill="currentColor" stroke="none"/>,
     plug: <><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0Z"/><path d="M12 17v4"/></>,
     today: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></>,
+    share: <><path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"/></>,
     pin2: <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>,
     brightness: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></>
   };
