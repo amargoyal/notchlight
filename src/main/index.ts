@@ -44,6 +44,8 @@ import { validateAppSettings, type AppSettings, type AppSettingsPatch, type Scre
 const DEMO = process.argv.includes('--demo');
 const GALLERY_ONLY = process.argv.includes('--gallery');
 const CUSTOMIZE = process.argv.includes('--customize');
+/** Open the welcome on its own, to look at it. */
+const WELCOME_PREVIEW = process.argv.includes('--welcome');
 /** Open the update card with a sample release, to look at it. */
 const UPDATE_PREVIEW = process.argv.includes('--update-preview');
 app.setName('Notchlight');
@@ -476,8 +478,8 @@ async function boot(): Promise<void> {
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);
   // After the island exists, not before: the welcome points at a notch, and
   // pointing at one that has not been drawn yet is a poor introduction.
-  if (!DEMO && !GALLERY_ONLY && !CUSTOMIZE && config().onboardedVersion !== app.getVersion()) {
-    setTimeout(() => openWelcome(), 900);
+  if (WELCOME_PREVIEW || (!DEMO && !GALLERY_ONLY && !CUSTOMIZE && config().onboardedVersion !== app.getVersion())) {
+    setTimeout(() => openWelcome(), WELCOME_PREVIEW ? 0 : 900);
   }
 
   // Hover intent and the open state belong to each overlay: the cursor is only
