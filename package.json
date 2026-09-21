@@ -18,6 +18,7 @@
     "test:swipe": "node scripts/test-swipe.mjs",
     "test:today": "node scripts/test-today.mjs",
     "typecheck": "tsc --noEmit",
+    "check": "node scripts/test-all.mjs",
     "start": "npm run build && electron .",
     "demo": "npm run build && electron . --demo",
     "customize": "npm run build && electron . --customize",
