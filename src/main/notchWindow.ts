@@ -533,6 +533,42 @@ export function createCustomizeWindow(): BrowserWindow {
 }
 
 /**
+ * The welcome: one card, shown once, on the display you are looking at.
+ *
+ * Deliberately not a panel over the notch. It is asking questions, so it has to
+ * take focus and hold it, which is the one thing the island itself never does.
+ */
+export function createWelcomeWindow(): BrowserWindow {
+  const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const width = 640;
+  const height = 620;
+  const win = new BrowserWindow({
+    width,
+    height,
+    x: Math.round(d.workArea.x + (d.workArea.width - width) / 2),
+    y: Math.round(d.workArea.y + Math.max(40, (d.workArea.height - height) / 3)),
+    show: false,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    title: 'Notchlight — Welcome',
+    backgroundColor: '#f5f2ed',
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 14, y: 14 },
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  win.webContents.on('console-message', e => {
+    if (e.level === 'error' || e.level === 'warning') logEvent('notchlight', `[welcome] ${e.message}`);
+  });
+  win.loadFile(path.join(__dirname, '../renderer/welcome.html'));
+  return win;
+}
+
+/**
  * The update window: a small card, centred on the display with the cutout,
  * above other windows but not the island. Frameless, so the card can be the
  * whole thing — macOS still gives it rounded corners and a shadow.
