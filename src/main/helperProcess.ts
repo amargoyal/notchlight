@@ -19,6 +19,15 @@ export class LineHelper<T> extends EventEmitter {
   private retryTimer: NodeJS.Timeout | null = null;
   private failures = 0;
   private generation = 0;
+  /**
+   * The last start ended in a refusal rather than a crash.
+   *
+   * A refusal is macOS answering a question it will not be asked again — a
+   * permission that was denied, hardware that is not there. It is still worth
+   * looking at now and then, because the answer can be changed in System
+   * Settings, but nowhere near as often as a crash is worth retrying.
+   */
+  private refused = false;
   listening = false;
   starts = 0;
 
@@ -61,7 +70,13 @@ export class LineHelper<T> extends EventEmitter {
     let first = true;
     readline.createInterface({ input: child.stdout! }).on('line', line => {
       if (this.child !== child) return;
-      if (first) { first = false; this.failures = 0; this.setListening(true); this.emit('ready', line); return; }
+      if (first) { first = false; this.setListening(true); this.emit('ready', line); return; }
+      // A second line is the only proof the helper is actually working, so it
+      // is what clears the backoff. Clearing it on the first line cleared it on
+      // the refusal too, and a refused helper then respawned every five seconds
+      // for as long as the app was open.
+      this.failures = 0;
+      this.refused = false;
       const event = this.parse(line);
       if (event !== null) this.emit('event', event);
     });
@@ -74,10 +89,32 @@ export class LineHelper<T> extends EventEmitter {
     });
   }
 
-  /** 5 s, 10 s, 20 s, 40 s, then a minute between attempts. */
+  /**
+   * The owner read the first line and it was a refusal, not a working helper.
+   *
+   * Only the owner can tell: the line is the helper's own protocol and this
+   * knows nothing about it.
+   */
+  markRefused(): void { this.refused = true; }
+
+  /** Try again now rather than waiting out the backoff — a permission was just granted. */
+  retryNow(): void {
+    if (!this.wanted) return;
+    if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = null; }
+    this.failures = 0;
+    this.refused = false;
+    if (!this.child) void this.start();
+  }
+
+  /**
+   * 5 s, 10 s, 20 s, 40 s, then a minute between attempts — and once the helper
+   * has been refused rather than having crashed, up to ten minutes, because
+   * nothing changes a refusal except someone visiting System Settings.
+   */
   private retryLater() {
     if (this.retryTimer) return;
-    const delay = Math.min(60_000, 5_000 * 2 ** Math.min(4, this.failures++));
+    const ceiling = this.refused ? 600_000 : 60_000;
+    const delay = Math.min(ceiling, 5_000 * 2 ** Math.min(7, this.failures++));
     this.retryTimer = setTimeout(() => { this.retryTimer = null; if (this.wanted) void this.start(); }, delay);
   }
 
