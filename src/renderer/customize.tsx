@@ -4,25 +4,26 @@ import './island.css';
 import './customize.css';
 import { Buddy } from './Buddy';
 import { CompanionSurface, useCompanion, type LiveController } from './LiveCompanion';
-import { BATTERY_SAMPLES, DEFAULT_PREFERENCES, HUD_SAMPLES, SAMPLE_FILES } from './previewModel';
+import { BATTERY_SAMPLES, DEFAULT_PREFERENCES, HUD_SAMPLES, SAMPLE_CALENDARS, sampleDay, SAMPLE_FILES } from './previewModel';
 import { Icon, PreviewSurface, usePreview } from './Preview';
 import type { PreviewAction, PreviewPreferences, PreviewState } from './previewModel';
-import { batteryIsLow, batteryTime, describeAccount, describeBattery, describeCapture, describeHud, HUD_NAMES, PLAYER_NAMES, SPOTIFY_REDIRECT_URI, type HudChannel } from '../shared/companion';
+import { batteryIsLow, batteryTime, describeAccount, describeBattery, describeCalendar, describeCapture, describeHud, HUD_NAMES, PLAYER_NAMES, SPOTIFY_REDIRECT_URI, type HudChannel } from '../shared/companion';
 import { DISPLAY_CHOICES, HOVER_DELAYS, LINGER_CHOICES, NOTCH_HEIGHT_CHOICES, SAMPLE_APP_SETTINGS, STALE_CHOICES, describeScreen, shortcutLabel, withCurrent, type AppSettings, type AppSettingsPatch } from '../shared/settings';
 
 /* ---- sections ---- */
-type Section = 'general' | 'appearance' | 'hud' | 'agents' | 'music' | 'tray' | 'clipboard' | 'about';
+type Section = 'general' | 'appearance' | 'hud' | 'agents' | 'music' | 'today' | 'tray' | 'clipboard' | 'about';
 const SECTIONS: { id: Section; label: string; description: string; icon: string; tile: string; keywords: string }[] = [
   { id: 'general', label: 'General', description: 'Startup, how the notch opens, which displays carry it, and how long sessions stay on the bar.', icon: 'settings', tile: '#8d8a84', keywords: 'login startup updates hover delay shortcut keyboard sessions forget stale terminal finished displays monitor screen external height cutout size' },
   { id: 'appearance', label: 'Appearance', description: 'How this window and the notch look, and what rests on the collapsed bar. The notch stays black, like the hardware.', icon: 'appearance', tile: '#5f83a8', keywords: 'theme light dark system spacing compact comfortable motion resting bar collapsed battery charge charger power percentage' },
   { id: 'hud', label: 'HUD', description: 'The volume and brightness keys, answered in the notch instead of the middle of the screen.', icon: 'volume', tile: '#6f7f8c', keywords: 'volume brightness hud overlay osd keys media accessibility mute percentage' },
   { id: 'agents', label: 'Agents', description: 'Claude Code and Codex sessions on this Mac, and how each one shows up.', icon: 'face', tile: '#c97c5c', keywords: 'claude codex buddy robot pulse tokens hooks approvals home' },
   { id: 'music', label: 'Music', description: 'Which player the notch follows, and what the Music face shows.', icon: 'music', tile: '#c2606c', keywords: 'spotify apple player artwork glow bars visualizer capture smart shuffle client id' },
+  { id: 'today', label: 'Today', description: 'Your day in the notch: what is next, and everything else in the order it happens.', icon: 'today', tile: '#8a6ea8', keywords: 'calendar events reminders eventkit day agenda meeting all day completed titles permission privacy' },
   { id: 'tray', label: 'Tray', description: 'A temporary shelf for files on their way somewhere.', icon: 'tray', tile: '#7f9a6b', keywords: 'shelf files thumbnails drag drop copy' },
   { id: 'clipboard', label: 'Clipboard', description: 'What you copied, still within reach. Off until you say so.', icon: 'clipboard', tile: '#b48b3e', keywords: 'history copy paste pins pause clear' },
   { id: 'about', label: 'About', description: 'Version, updates, and the things that live on this Mac.', icon: 'info', tile: '#8d8a84', keywords: 'version update release config folder gallery reset' }
 ];
-type View = 'agents' | 'music' | 'tray' | 'clipboard';
+type View = 'agents' | 'music' | 'today' | 'tray' | 'clipboard';
 
 /* ---- search ---- */
 const SearchContext = createContext('');
@@ -339,6 +340,42 @@ function MusicPane({ live, state, dispatch, prefs, pref }: PaneProps) {
   </>;
 }
 
+function TodayPane({ live, state, dispatch, prefs, pref, showView }: PaneProps) {
+  const calendar = live.state.calendar;
+  const calendars = live.available ? calendar.calendars : SAMPLE_CALENDARS;
+  const hidden = new Set(prefs.calendarHidden);
+  const toggle = (id: string, on: boolean) => pref('calendarHidden', on ? prefs.calendarHidden.filter(x => x !== id) : [...prefs.calendarHidden, id]);
+  return <>
+    <Group title="Your day" footer={live.available ? 'Read through EventKit, the same way Calendar itself reads it. Notchlight never writes to your calendar; a reminder ticked off in the notch is the one exception, and it goes back through Reminders.' : 'Sample events. This Mac’s real calendar is not read in the preview.'}>
+      <Toggle title="Show today" description="Off until you say so. macOS asks for access the first time, and only asks once." value={prefs.calendarEnabled} onChange={v => { pref('calendarEnabled', v); if (v) showView('today'); }}/>
+      <Toggle title="Include reminders" description="Reminders due today, beside the events. A separate macOS permission, asked for the same way." value={prefs.calendarReminders} onChange={v => pref('calendarReminders', v)}/>
+      {live.available && prefs.calendarEnabled && <Row title="Access" description={describeCalendar(calendar, prefs.calendarEnabled)}>
+        <Status tone={calendar.status === 'reading' ? 'good' : calendar.status === 'unavailable' ? 'bad' : 'wait'}>
+          {calendar.status === 'reading' ? 'Reading' : calendar.status === 'starting' ? 'Asking' : calendar.reason === 'denied' ? 'Not allowed' : 'Unavailable'}
+        </Status>
+        {calendar.reason === 'denied' && <Button onClick={() => void live.run(() => window.notchlight.openCalendarPrivacy())}>Open Privacy…</Button>}
+      </Row>}
+    </Group>
+    <Group title="What to show" footer="Hiding a calendar here changes nothing in Calendar itself; it only leaves those events out of the notch.">
+      <Toggle title="Hide all-day events" description="Birthdays and away days take a row each and rarely need one." value={prefs.hideAllDay} onChange={v => pref('hideAllDay', v)}/>
+      <Toggle title="Hide finished reminders" description="A reminder you have ticked off stays out of the day." value={prefs.hideDone} onChange={v => pref('hideDone', v)}/>
+      <Toggle title="Full titles" description="Long titles wrap to two lines instead of ending in an ellipsis." value={prefs.fullEventTitles} onChange={v => pref('fullEventTitles', v)}/>
+      <Toggle title="Show on the resting bar" description="The next thing, and how long until it, on the collapsed notch." value={prefs.restToday} onChange={v => pref('restToday', v)}/>
+    </Group>
+    <Group title="Calendars" footer={calendars.length ? undefined : 'No calendars yet. They appear here once access is allowed.'}>
+      {calendars.map(item => <Toggle key={item.id} title={item.title} description={item.kind === 'reminder' ? 'Reminders list' : 'Calendar'}
+        icon={<i style={{ width: 10, height: 10, borderRadius: 3, background: item.color, display: 'inline-block', flex: 'none' }}/>}
+        value={!hidden.has(item.id)} onChange={v => toggle(item.id, v)}/>)}
+    </Group>
+    {!live.available && <Group title="Try it out">
+      <Row title="Sample day" description="The sample events are written against the clock, so there is always something behind you and something coming.">
+        <Button onClick={() => dispatch({ type: 'today', today: sampleDay() })}>Reset the Day</Button>
+        <Button kind="quiet" disabled={!state.today.length} onClick={() => dispatch({ type: 'today', today: [] })}>Clear</Button>
+      </Row>
+    </Group>}
+  </>;
+}
+
 function TrayPane({ live, state, dispatch, prefs, pref }: PaneProps) {
   const nextSample = SAMPLE_FILES.find(file => !state.files.some(f => f.id === file.id));
   return <>
@@ -411,9 +448,9 @@ function App() {
   const showView = (view: View) => { if (live.available) void live.run(() => window.notchlight.setView(view)); else dispatch({ type: 'view', view }); };
   const navigate = (id: Section) => {
     setSection(id);
-    if (id === 'agents' || id === 'music' || id === 'tray' || (id === 'clipboard' && prefs.clipboardEnabled)) showView(id);
+    if (id === 'agents' || id === 'music' || id === 'tray' || (id === 'clipboard' && prefs.clipboardEnabled) || (id === 'today' && prefs.calendarEnabled)) showView(id);
   };
-  const panes: Record<Section, (props: PaneProps) => ReactNode> = { general: GeneralPane, appearance: AppearancePane, hud: HudPane, agents: AgentsPane, music: MusicPane, tray: TrayPane, clipboard: ClipboardPane, about: AboutPane };
+  const panes: Record<Section, (props: PaneProps) => ReactNode> = { general: GeneralPane, appearance: AppearancePane, hud: HudPane, agents: AgentsPane, music: MusicPane, today: TodayPane, tray: TrayPane, clipboard: ClipboardPane, about: AboutPane };
   const Pane = panes[section];
   return <div className={`customize-app theme-${prefs.theme}`}>
     <SearchContext.Provider value={query}>
