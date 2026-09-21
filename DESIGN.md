@@ -15,6 +15,29 @@ Original vector record sleeves and a landscape illustration, bundled locally. Th
 ## Boundaries
 Use the same Island shell and Claude components in previews. Sample controls must remain isolated from production state. Native appearance preferences persist separately from Claude gate configuration. Every preview has empty/error/overflow examples. Gallery remains the exhaustive visual regression surface.
 
+## Sharing, peeking, and standing aside
+
+**Share.** The Tray footer hands the selection to macOS's own share sheet,
+AirDrop included. NSSharingService needs an app context Electron cannot give it,
+so a small accessory helper puts the picker up, waits for one answer and exits.
+It is anchored under the notch, where the files appear to be coming from. The
+items stay in Tray afterwards: sharing a file is not the same as being finished
+with it.
+
+**Peek.** A second shortcut that is a look rather than a visit — the island
+unfolds for a couple of seconds and folds away again, and never takes the
+keyboard. It answers "what is it doing" when your hands are on the keys and the
+notch is on another screen. Pressing it again puts it away early. Empty by
+default; the one that opens the notch is the one most people want.
+
+**Fullscreen.** A film or a presentation has asked for the whole screen, and the
+island is on top of everything by design. macOS announces nothing about this, but
+it does hide the menu bar, so a screen whose work area has swallowed its own top
+inset has something fullscreen over it. *Hide media* drops the music and the
+track peek and keeps the agents, which is the part worth seeing over a film;
+*Hide all* takes the island off that screen entirely. Staying is the default,
+because an island that disappears without being asked is a bug report.
+
 ## Today
 
 A fourth face, between Music and Tray. It reads your calendar and never writes
