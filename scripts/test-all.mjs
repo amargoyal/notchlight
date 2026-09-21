@@ -8,7 +8,7 @@
  */
 import { spawnSync } from 'node:child_process';
 
-const CHECKS = ['typecheck', 'helpers:check', 'test:today', 'test:swipe', 'test:battery', 'test:displays', 'test:companion', 'test:preview'];
+const CHECKS = ['typecheck', 'helpers:check', 'test:today', 'test:swipe', 'test:battery', 'test:displays', 'test:companion', 'test:preview', 'test:render'];
 const results = CHECKS.map(name => {
   const run = spawnSync('npm', ['run', '--silent', name], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const failed = run.status !== 0;

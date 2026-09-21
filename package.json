@@ -13,6 +13,7 @@
     "watch": "node scripts/build.mjs --watch",
     "test:companion": "node scripts/test-companion.mjs",
     "test:preview": "node scripts/test-preview.mjs",
+    "test:render": "node scripts/test-render.mjs",
     "test:displays": "node scripts/test-displays.mjs",
     "test:battery": "node scripts/test-battery.mjs",
     "test:swipe": "node scripts/test-swipe.mjs",
