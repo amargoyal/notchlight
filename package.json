@@ -16,6 +16,7 @@
     "test:displays": "node scripts/test-displays.mjs",
     "test:battery": "node scripts/test-battery.mjs",
     "test:swipe": "node scripts/test-swipe.mjs",
+    "test:today": "node scripts/test-today.mjs",
     "typecheck": "tsc --noEmit",
     "start": "npm run build && electron .",
     "demo": "npm run build && electron . --demo",
