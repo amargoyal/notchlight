@@ -4,13 +4,20 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, validatePreferences, type CaptureSnapshot, type ClipboardSnapshot, type CompanionSnapshot, type BatterySnapshot, type CompanionView, type HudSnapshot, type ShelfFile, type SmartShuffleSnapshot, type SpotifySnapshot, type TransferProgress } from '../shared/companion';
+import { DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CALENDAR, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, validatePreferences, type CaptureSnapshot, type ClipboardSnapshot, type CompanionSnapshot, type BatterySnapshot, type CalendarSnapshot, type CompanionView, type HudSnapshot, type ShelfFile, type SmartShuffleSnapshot, type SpotifySnapshot, type TransferProgress } from '../shared/companion';
 
 type Entry = { id: string; path: string };
 /** What Remove took away, so Undo can put it back where it was. */
 type Removed = { entries: { entry: Entry; index: number }[]; at: number };
 
-const isView = (value: unknown): value is CompanionView => value === 'agents' || value === 'music' || value === 'tray' || value === 'clipboard';
+const isView = (value: unknown): value is CompanionView => value === 'agents' || value === 'music' || value === 'tray' || value === 'clipboard' || value === 'today';
+
+/** A face only counts as somewhere to return to while its feature is switched on. */
+function faceIsOn(view: CompanionView, preferences: { clipboardEnabled: boolean; calendarEnabled: boolean }): boolean {
+  if (view === 'clipboard') return preferences.clipboardEnabled;
+  if (view === 'today') return preferences.calendarEnabled;
+  return true;
+}
 
 /** Every id in the argument, in order, or a clear complaint. */
 function idList(value: unknown): string[] {
@@ -31,7 +38,7 @@ export class CompanionStore extends EventEmitter {
   private removed: Removed | null = null;
   constructor(private file: string, private icon: (file: string) => Promise<string>, pulse = true) {
     super();
-    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, hud: { ...EMPTY_HUD }, battery: { ...EMPTY_BATTERY }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' };
+    this.state = { preferences: { ...DEFAULT_COMPANION_PREFERENCES, pulse }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, hud: { ...EMPTY_HUD }, battery: { ...EMPTY_BATTERY }, calendar: { ...EMPTY_CALENDAR }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' };
   }
   current(): CompanionSnapshot { return this.state; }
   private emitState() { this.emit('change', this.state); }
@@ -47,7 +54,7 @@ export class CompanionStore extends EventEmitter {
       // The face you were last on, when you asked to come back to it. A face
       // whose feature has since been switched off falls back to Agents rather
       // than opening on a tab that is no longer there.
-      if (this.state.preferences.rememberTab && isView(raw.view) && (raw.view !== 'clipboard' || this.state.preferences.clipboardEnabled)) {
+      if (this.state.preferences.rememberTab && isView(raw.view) && faceIsOn(raw.view, this.state.preferences)) {
         this.state.view = raw.view;
       }
       if (Array.isArray(raw.entries)) {
@@ -110,6 +117,7 @@ export class CompanionStore extends EventEmitter {
       && current.charged === battery.charged && current.minutes === battery.minutes) return;
     this.state = { ...this.state, battery }; this.emitState();
   }
+  setCalendar(calendar: CalendarSnapshot): void { this.state = { ...this.state, calendar }; this.emitState(); }
   setClipboard(clipboard: ClipboardSnapshot): void { this.state = { ...this.state, clipboard }; this.emitState(); }
   setSmartShuffle(smartShuffle: SmartShuffleSnapshot): void { this.state = { ...this.state, smartShuffle }; this.emitState(); }
   notice(notice: string): void { this.state = { ...this.state, notice }; this.emitState(); }

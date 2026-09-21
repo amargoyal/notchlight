@@ -46,5 +46,13 @@
       "host": "Darwin 27.0.0",
       "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)"
     }
+  },
+  "calendarwatch": {
+    "arm64": {
+      "sha256": "2d2f7dbd00787d303516047a059a710a99b379c20855b92d6ca10bc5e16c748d",
+      "builtAt": "2026-09-21T02:33:24.716Z",
+      "host": "Darwin 27.0.0",
+      "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)"
+    }
   }
 }

@@ -1,8 +1,10 @@
 import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type Dispatch, type DragEvent, type ReactNode } from 'react';
+import { nextIndex, span, until } from './today';
+import { nextEvent, visibleEvents } from '../shared/companion';
 import { Island, Stubs, Wings } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
-import { initialPreview, previewReducer, previewAgents, BATTERY_SAMPLES, HUD_SAMPLES, SAMPLE_FILES, TRACKS,
+import { initialPreview, previewReducer, previewAgents, BATTERY_SAMPLES, HUD_SAMPLES, SAMPLE_CALENDARS, SAMPLE_FILES, TRACKS,
   type PreviewAction, type PreviewFile, type PreviewState, type PreviewView } from './previewModel';
 import './preview.css';
 import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filteredSnapshot, providerOf } from './Agents';
@@ -39,6 +41,8 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     mute: <><path d="M4 9h3l5-4v14l-5-4H4Z"/><path d="m16 9.5 5 5m0-5-5 5"/></>,
     bolt: <path d="M13 2 4 14h6l-1 8 9-12h-6Z" fill="currentColor" stroke="none"/>,
     plug: <><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0Z"/><path d="M12 17v4"/></>,
+    today: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></>,
+    pin2: <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>,
     brightness: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></>
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.file}</svg>;
@@ -61,12 +65,13 @@ export function usePreview(seed?: PreviewState, clock = true) {
 }
 
 type Controls = { state: PreviewState; dispatch: Dispatch<PreviewAction> };
-const viewNames: Record<PreviewView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray', clipboard: 'Clipboard' };
-const allViews: PreviewView[] = ['agents', 'music', 'tray', 'clipboard'];
+const viewNames: Record<PreviewView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray', clipboard: 'Clipboard', today: 'Today' };
+const allViews: PreviewView[] = ['agents', 'music', 'today', 'tray', 'clipboard'];
 const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
 function Navigation({ state, onNavigate, onCustomize, id, attention }: { state: PreviewState; onNavigate: (view: PreviewView) => void; onCustomize: () => void; id: string; attention: boolean }) {
-  const views = state.preferences.clipboardEnabled ? allViews : allViews.filter(v => v !== 'clipboard');
+  const views = allViews.filter(view =>
+    (view !== 'clipboard' || state.preferences.clipboardEnabled) && (view !== 'today' || state.preferences.calendarEnabled));
   return <nav className="mp-nav" aria-label="Notch views">
     <div role="tablist" aria-label="Preview view">
       {views.map((view, index) => <button key={view} role="tab" id={`${id}-${view}`} aria-controls={`${id}-panel`}
@@ -143,6 +148,49 @@ export function BatteryGlyph({ percent, charging, plugged, low, showPercent = fa
     <span className="mp-battery-shell"><i style={{ width: `${Math.max(shown ? 6 : 0, shown)}%` }}/>{charging && <Icon name="bolt" size={9}/>}</span>
     {showPercent && <b>{shown}</b>}
   </span>;
+}
+/**
+ * One thing happening today.
+ *
+ * The calendar's own colour is the only ornament: it is what makes a row
+ * belong to Work or Home at a glance, and it is already a decision someone
+ * made in the app they keep their calendar in. Something already behind you is
+ * dimmed rather than removed — the day reads better with its shape intact.
+ */
+export function EventRow({ event, color, full, onToggle }: { event: import('../shared/companion').CalendarEvent; color: string; full: boolean; onToggle?: () => void }) {
+  const Tag = onToggle ? 'button' : 'div';
+  return <Tag className={`mp-event ${event.past ? 'is-past' : ''} ${event.done ? 'is-done' : ''} ${event.kind === 'reminder' ? 'is-reminder' : ''}`}
+    {...(onToggle ? { onClick: onToggle, type: 'button' as const, 'aria-pressed': event.done, 'aria-label': `${event.done ? 'Not done' : 'Done'}: ${event.title}` } : {})}>
+    <i className="mp-event-mark" style={{ background: color }} aria-hidden="true"/>
+    <span className="mp-event-text">
+      <b className={full ? 'is-full' : ''} title={event.title}>{event.title}</b>
+      <small>{span(event)}{event.location ? ` · ${event.location}` : ''}</small>
+    </span>
+  </Tag>;
+}
+/** The whole day, in the order it happens, scrolled to the next thing. */
+export function DayList({ events, colorOf, full, empty, onToggle }: { events: import('../shared/companion').CalendarEvent[]; colorOf: (id: string) => string; full: boolean; empty: ReactNode; onToggle?: (event: import('../shared/companion').CalendarEvent) => void }) {
+  const list = useRef<HTMLDivElement>(null);
+  const index = nextIndex(events);
+  useLayoutEffect(() => {
+    if (index < 0) return;
+    const row = list.current?.children[index] as HTMLElement | undefined;
+    // `nearest` rather than `center`: the things after it are the rest of your
+    // day, and shoving them below the fold to centre one row helps nobody.
+    row?.scrollIntoView({ block: 'nearest' });
+  }, [index, events.length]);
+  if (!events.length) return <>{empty}</>;
+  return <div className="mp-day" ref={list} role="list" aria-label="Today">
+    {events.map(event => <EventRow key={event.id} event={event} color={colorOf(event.calendarId)} full={full} onToggle={onToggle && event.kind === 'reminder' ? () => onToggle(event) : undefined}/>)}
+  </div>;
+}
+/** Today on the resting bar: the next thing, and how long until it. */
+export function todayRestingPart(event: import('../shared/companion').CalendarEvent | null, color: string, now: number): RestingPart {
+  if (!event) return { left: <span className="mp-shelf-wing"><Icon name="today" size={15}/></span>, right: <span className="mp-today-wing"><span>Clear</span></span> };
+  return {
+    left: <span className="mp-shelf-wing"><i className="mp-event-mark" style={{ background: color }} aria-hidden="true"/></span>,
+    right: <span className="mp-today-wing"><b title={event.title}>{event.title}</b><span>{event.allDay ? 'All day' : until(event, now)}</span></span>
+  };
 }
 /** The battery on the resting bar: the glyph on the right, where the hardware one sits. */
 export function batteryRestingPart(battery: { percent: number; charging: boolean; plugged: boolean; low: boolean }, showPercent: boolean): RestingPart {
@@ -249,6 +297,22 @@ function ClipboardFace({ state, dispatch }: Controls) {
     <div className="mp-tray-footer"><span>Click an item to copy it again.</span>{ordered.length > 0 && <button className="mp-text-button" onClick={() => dispatch({ type: 'clip-clear' })}>Clear{pins ? ' unpinned' : ''}</button>}</div></div>;
 }
 
+/** Today, with the sample day. Reminders can be ticked; events cannot. */
+function TodayFace({ state, dispatch }: Controls) {
+  const events = visibleEvents(state.today, state.preferences);
+  const colorOf = (id: string) => SAMPLE_CALENDARS.find(c => c.id === id)?.color ?? '#8d8a84';
+  const hidden = state.today.length - events.length;
+  return <div className="mp-today">
+    <div className="mp-tray-heading">
+      <span>{events.length ? `${events.length} today` : 'Nothing today'}{hidden ? ` · ${hidden} hidden` : ''}</span>
+      <button className="mp-text-button" onClick={() => dispatch({ type: 'today', today: [] })}>Clear the day</button>
+    </div>
+    <DayList events={events} colorOf={colorOf} full={state.preferences.fullEventTitles}
+      onToggle={event => dispatch({ type: 'today', today: state.today.map(e => e.id === event.id ? { ...e, done: !e.done } : e) })}
+      empty={<div className="mp-empty mp-empty-tray"><Icon name="today" size={32}/><p>{state.today.length ? 'Everything today is hidden.' : 'Nothing in the diary.'}</p><span>{state.today.length ? 'Some calendars are switched off, or all-day events are hidden.' : 'A clear day. Sample events return with Reset.'}</span></div>}/>
+  </div>;
+}
+
 export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, notchH = 34 }: Controls & { onCustomize: () => void; notchW?: number; notchH?: number }) {
   const id = useId();
   const [filter,setFilter] = useState<AgentFilter>(state.codexConnection ? 'codex' : 'all');
@@ -266,10 +330,13 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
   const prefs = state.preferences;
   const music = state.view === 'music';
   const clips = state.view === 'clipboard';
-  const headLeft = music ? <Artwork state={state} mini/> : clips ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>;
+  const today = state.view === 'today';
+  const shownToday = prefs.calendarEnabled ? visibleEvents(state.today, prefs) : [];
+  const upNext = nextEvent(shownToday);
+  const headLeft = music ? <Artwork state={state} mini/> : today ? <span className="mp-shelf-wing"><Icon name="today" size={17}/><span>{shownToday.length}</span></span> : clips ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>;
   const headRight = <div className="mp-right-wing">
     {snap.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" title="Agents need attention" onClick={() => dispatch({ type: 'view', view: 'agents' })}><span className="mp-attention-dot"/></button>}
-    {music ? <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow && state.music.source === 'ready' ? SAMPLE_TINT : undefined}/> : clips ? <span className="mp-clip-kind" aria-hidden="true">T</span> : <Icon name="file" size={16}/>}
+    {music ? <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow && state.music.source === 'ready' ? SAMPLE_TINT : undefined}/> : today ? <Icon name="today" size={16}/> : clips ? <span className="mp-clip-kind" aria-hidden="true">T</span> : <Icon name="file" size={16}/>}
   </div>;
   const wing = (expanded: boolean) => <Wings notchW={notchW} height={notchH} width={expanded ? PANEL_W : undefined} left={<div className="mp-left-wing">{headLeft}</div>} right={headRight}/>;
   const hudLook: HudLook = { style: prefs.hudStyle, glow: prefs.hudGlow, percentage: prefs.hudPercentage };
@@ -281,6 +348,7 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
     ...agentParts,
     ...(prefs.restMusic && state.music.source === 'ready' ? [{ left: <Artwork state={state} mini/>, right: <Equalizer active={playing} layout={prefs.equalizerLayout} tint={prefs.artworkGlow ? SAMPLE_TINT : undefined}/> }] : []),
     ...(prefs.restTray && state.files.length > 0 || state.drag?.origin === 'finder' ? [{ left: <span className="mp-shelf-wing"><Icon name="tray" size={17}/><span>{state.files.length}</span></span>, right: <Icon name="file" size={16}/> }] : []),
+    ...(prefs.calendarEnabled && prefs.restToday && upNext ? [todayRestingPart(upNext, SAMPLE_CALENDARS.find(c => c.id === upNext.calendarId)?.color ?? '#8d8a84', Date.now())] : []),
     ...(prefs.batteryEnabled && prefs.restBattery && state.battery ? [batteryRestingPart(state.battery, prefs.batteryPercentage)] : []),
     ...(prefs.clipboardEnabled && prefs.restClipboard && state.clips.length > 0 ? [{ left: <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/><span>{state.clips.length}</span></span>, right: <span className="mp-clip-kind" aria-hidden="true">{state.clips[0].kind === 'url' ? '@' : state.clips[0].kind === 'image' ? '▣' : 'T'}</span> }] : [])
   ];
@@ -298,7 +366,7 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
       onDismiss={id => dispatch(id.startsWith('codex:') ? {type:'codex',value:'off'} : {type:'claude',value:'idle'})}
       onDecide={id => dispatch(id.startsWith('codex:') ? {type:'codex',value:'done'} : {type:'claude',value:'done'})}
       surface={{ selectedSession:target,navigation: nav, active: true, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${state.view}` },
-        expanded: state.view === 'agents' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{nav}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${state.view}`}>{music ? <MusicFace state={state} dispatch={dispatch}/> : clips ? <ClipboardFace state={state} dispatch={dispatch}/> : <TrayFace state={state} dispatch={dispatch}/>}</div></div>,
+        expanded: state.view === 'agents' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{nav}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${state.view}`}>{music ? <MusicFace state={state} dispatch={dispatch}/> : today ? <TodayFace state={state} dispatch={dispatch}/> : clips ? <ClipboardFace state={state} dispatch={dispatch}/> : <TrayFace state={state} dispatch={dispatch}/>}</div></div>,
         collapsed: resting }}/>
   </div>;
 }
@@ -372,6 +440,13 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'HUD · nearly off', note: 'Five percent has to be visible, or the key feels dead.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[4].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
   { name: 'HUD · wide bar', note: 'A/B: one press takes the full panel width instead of the wings.', patch: s => ({ ...s, open: false, hud: HUD_SAMPLES[0].hud, preferences: { ...s.preferences, hudEnabled: true, hudClosed: 'wide' } }) },
   { name: 'HUD · open notch', note: 'Above the tabs, whichever face you were on.', patch: s => ({ ...s, open: true, hud: HUD_SAMPLES[3].hud, preferences: { ...s.preferences, hudEnabled: true } }) },
+  { name: 'Today · the day', note: 'The whole day in order, scrolled to the next thing. What is behind you is dimmed, not removed.', patch: s => ({ ...s, view: 'today', open: true, preferences: { ...s.preferences, calendarEnabled: true } }) },
+  { name: 'Today · full titles', note: 'A/B: long titles wrap to two lines instead of ending in an ellipsis.', patch: s => ({ ...s, view: 'today', open: true, preferences: { ...s.preferences, calendarEnabled: true, fullEventTitles: true } }) },
+  { name: 'Today · all-day hidden', note: 'A/B: the birthday goes, the count says how many are hidden.', patch: s => ({ ...s, view: 'today', open: true, preferences: { ...s.preferences, calendarEnabled: true, hideAllDay: true } }) },
+  { name: 'Today · one calendar off', note: 'Home is switched off; Work and Reminders stay.', patch: s => ({ ...s, view: 'today', open: true, preferences: { ...s.preferences, calendarEnabled: true, calendarHidden: ['home'] } }) },
+  { name: 'Today · a clear day', note: 'An empty diary is an answer, not an error state.', patch: s => ({ ...s, view: 'today', open: true, today: [], preferences: { ...s.preferences, calendarEnabled: true } }) },
+  { name: 'Today · everything hidden', note: 'A day with things in it and nothing showing says which rule did it.', patch: s => ({ ...s, view: 'today', open: true, preferences: { ...s.preferences, calendarEnabled: true, calendarHidden: ['work', 'home', 'later'] } }) },
+  { name: 'Today · on the resting bar', note: 'The next thing, and how long until it.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, calendarEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
   { name: 'Battery · on the resting bar', note: 'A level is a length; the number beside it is optional.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[0].battery, preferences: { ...s.preferences, batteryEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
   { name: 'Battery · charging', note: 'A bolt through the level, and green rather than ivory.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[1].battery, preferences: { ...s.preferences, batteryEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },
   { name: 'Battery · low', note: 'Amber is the one state meant to catch the corner of your eye.', patch: s => ({ ...s, open: false, battery: BATTERY_SAMPLES[3].battery, preferences: { ...s.preferences, batteryEnabled: true, restClaude: false, restMusic: false, restTray: false } }) },

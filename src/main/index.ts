@@ -23,6 +23,7 @@ import { installCompanionIpc } from './companionIpc';
 import { AudioLevels, helperArguments, wantsLevels } from './audioLevels';
 import { Hud } from './hud';
 import { Battery } from './battery';
+import { Calendar } from './calendar';
 import { fetchAppleArtwork } from './appleArtwork';
 import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
@@ -38,7 +39,7 @@ import { Updater, type Release } from './updates';
 import type { UpdateResponse } from '../shared/updates';
 import { jumpToProcess } from './terminal';
 import type { HitRect, Snapshot } from '../shared/types';
-import type { BatteryActivity, BatterySnapshot, HudActivity, HudSnapshot } from '../shared/companion';
+import type { BatteryActivity, BatterySnapshot, CalendarSnapshot, HudActivity, HudSnapshot } from '../shared/companion';
 import { validateAppSettings, type AppSettings, type AppSettingsPatch, type ScreenInfo } from '../shared/settings';
 
 const DEMO = process.argv.includes('--demo');
@@ -84,6 +85,7 @@ let smart: SmartShuffle;
 let levels: AudioLevels;
 let hud: Hud;
 let battery: Battery;
+let calendar: Calendar;
 let shelfTimer: NodeJS.Timeout | null = null;
 let pickFiles: (() => Promise<void>) | null = null;
 let claudeStore: Store | null = null;
@@ -386,6 +388,8 @@ async function boot(): Promise<void> {
     send(customize, 'battery:event', activity);
   });
   battery.on('change', (state: BatterySnapshot) => companion.setBattery(state));
+  calendar = new Calendar();
+  calendar.on('change', (state: CalendarSnapshot) => companion.setCalendar(state));
   await companion.load();
   // Electron's clipboard is asynchronous and W3C-shaped; the raw macOS markers
   // that mean "do not remember this" are asked for by name through its
@@ -457,6 +461,13 @@ async function boot(): Promise<void> {
   // level where it was an hour ago is worse than one quiet helper.
   const syncBattery = () => battery.setActive(!DEMO && companion.current().preferences.batteryEnabled);
   syncBattery();
+  // Reminders are a second macOS permission, so asking for them starts a fresh
+  // helper: a process that has already asked for less cannot ask for more.
+  const syncCalendar = () => {
+    const { calendarEnabled, calendarReminders } = companion.current().preferences;
+    calendar.configure(!DEMO && calendarEnabled, calendarReminders);
+  };
+  syncCalendar();
   companion.on('change', state => {
     syncCodex();
     syncClipboard();
@@ -466,6 +477,7 @@ async function boot(): Promise<void> {
     syncLevels();
     syncHud();
     syncBattery();
+    syncCalendar();
     spotify.setPlayer(state.preferences.musicPlayer);
     account.configure(state.preferences.spotifyClientId);
     smart.setEnabled(!DEMO && state.preferences.spotifyEnabled && state.preferences.smartShuffle);
@@ -869,6 +881,7 @@ app.on('before-quit', () => {
   levels?.stop();
   hud?.stop();
   battery?.stop();
+  calendar?.stop();
   store?.stop();
   hooks?.stop();
   updater?.stop();

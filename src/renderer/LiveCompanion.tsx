@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { Island, Stubs, Wings } from './IslandView';
-import { Icon, BatteryGlyph, FileThumb, HudBar, RestingWings, batteryRestingPart, hudRestingPart, type HudLook, type RestingPart } from './Preview';
+import { Icon, BatteryGlyph, DayList, FileThumb, HudBar, RestingWings, batteryRestingPart, hudRestingPart, todayRestingPart, type HudLook, type RestingPart } from './Preview';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import type { AgentFilter, Snapshot } from '../shared/types';
-import { batteryIsLow, DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type BatteryActivity, type CompanionView, type HudActivity, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
+import { batteryIsLow, describeCalendar, nextEvent, visibleEvents, DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CALENDAR, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type BatteryActivity, type CompanionView, type HudActivity, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
 import { useReducedMotion } from './pulse';
 import { barFrame, bassOf, type EqualizerLayout } from './equalizer';
 import { NO_SWIPE, swipeStep } from './swipe';
@@ -14,7 +14,7 @@ import { AgentFilters, AgentConnection, AgentAttention, agentRestingParts, filte
 const EMPTY: Snapshot = { sessions: [], overall: 'idle', tokens: 0, elapsed: 0, dormant: true, notchW: 200, notchH: 32, hoverDelay: 550, pulse: true, now: Date.now() };
 export function useCompanion() {
   const available = !!window.notchlight?.getCompanion;
-  const [state, setState] = useState<CompanionSnapshot>({ preferences: { ...DEFAULT_COMPANION_PREFERENCES }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, hud: { ...EMPTY_HUD }, battery: { ...EMPTY_BATTERY }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' });
+  const [state, setState] = useState<CompanionSnapshot>({ preferences: { ...DEFAULT_COMPANION_PREFERENCES }, view: 'agents', files: [], music: { ...EMPTY_SPOTIFY }, capture: { ...EMPTY_CAPTURE }, hud: { ...EMPTY_HUD }, battery: { ...EMPTY_BATTERY }, calendar: { ...EMPTY_CALENDAR }, clipboard: { ...EMPTY_CLIPBOARD }, smartShuffle: { ...EMPTY_SMART_SHUFFLE }, transfer: null, undoable: 0, notice: '' });
   const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
@@ -44,9 +44,10 @@ export function useCompanion() {
   return { available, state, snapshot: geometry ? { ...snapshot, ...geometry } : snapshot, ready, error, run };
 }
 export type LiveController = ReturnType<typeof useCompanion>;
-const names: Record<CompanionView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray', clipboard: 'Clipboard' };
+const names: Record<CompanionView, string> = { agents: 'Agents', music: 'Music', tray: 'Tray', clipboard: 'Clipboard', today: 'Today' };
 /** Clipboard joins the row only once its history is switched on; a face with nothing behind it is noise. */
-const visibleViews = (enabled: boolean): CompanionView[] => enabled ? ['agents','music','tray','clipboard'] : ['agents','music','tray'];
+const visibleViews = (clipboard: boolean, calendar: boolean): CompanionView[] =>
+  ['agents', 'music', ...(calendar ? ['today' as const] : []), 'tray', ...(clipboard ? ['clipboard' as const] : [])];
 const ago = (at: number, now: number) => { const s = Math.max(0, Math.round((now - at) / 1000)); return s < 60 ? 'now' : s < 3600 ? `${Math.floor(s / 60)}m` : s < 86400 ? `${Math.floor(s / 3600)}h` : `${Math.floor(s / 86400)}d`; };
 const time = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2,'0')}`;
 
@@ -364,6 +365,38 @@ function LiveClipboard({ live }: { live: LiveController }) {
     <div className="mp-tray-footer"><span>Click an item to copy it again.</span>{clipboard.items.length > 0 && <button className="mp-text-button" onClick={() => void live.run(() => window.notchlight.clearClipboard(false))}>Clear{pins ? ' unpinned' : ''}</button>}</div></div>;
 }
 
+/**
+ * Today, the day the calendar has it.
+ *
+ * The list is the whole day in the order it happens, scrolled to the next
+ * thing, with what is behind you dimmed rather than removed. A reminder can be
+ * ticked off here; an event cannot, because this reads your calendar and does
+ * not write to it.
+ */
+function LiveToday({ live }: { live: LiveController }) {
+  const { calendar, preferences } = live.state;
+  const events = visibleEvents(calendar.events, preferences);
+  const colorOf = (id: string) => calendar.calendars.find(c => c.id === id)?.color ?? '#8d8a84';
+  if (calendar.status !== 'reading') {
+    const asking = calendar.status === 'starting';
+    return <div className="mp-empty">
+      <Icon name={calendar.status === 'unavailable' ? 'warning' : 'today'} size={30}/>
+      <p>{asking ? 'Asking macOS…' : calendar.reason === 'denied' ? 'Notchlight cannot see your calendar.' : 'Your day, when you want it.'}</p>
+      <span>{describeCalendar(calendar, preferences.calendarEnabled)}</span>
+      {calendar.reason === 'denied' && <button className="mp-soft-button" onClick={() => void live.run(() => window.notchlight.openCalendarPrivacy())}>Open Privacy Settings</button>}
+    </div>;
+  }
+  const hidden = calendar.events.length - events.length;
+  return <div className="mp-today">
+    <div className="mp-tray-heading">
+      <span>{events.length ? `${events.length} today` : 'Nothing today'}{hidden ? ` · ${hidden} hidden` : ''}</span>
+      <button className="mp-text-button" onClick={() => void live.run(() => window.notchlight.openCalendarApp())}>Open Calendar</button>
+    </div>
+    <DayList events={events} colorOf={colorOf} full={preferences.fullEventTitles}
+      empty={<div className="mp-empty mp-empty-tray"><Icon name="today" size={32}/><p>{calendar.events.length ? 'Everything today is hidden.' : 'Nothing in the diary.'}</p><span>{calendar.events.length ? 'Some calendars are switched off, or all-day events are hidden. Both are in Customize → Today.' : 'A clear day. Events and reminders appear here as they are added.'}</span></div>}/>
+  </div>;
+}
+
 export function CompanionSurface({ live, open, hovering, keyboard = false, onBox, onCustomize }: { live: LiveController; open: boolean; hovering: boolean; keyboard?: boolean; onBox?: (r: {x:number;y:number;w:number;h:number}) => void; onCustomize: () => void }) {
   const id = useId();
   const [filter,setFilter] = useState<AgentFilter>('all');
@@ -386,8 +419,10 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const { battery } = live.state;
   const batteryLow = batteryIsLow(battery);
   const look = hudLook(preferences);
-  const views = visibleViews(preferences.clipboardEnabled);
-  const view: CompanionView = dragging ? 'tray' : live.state.view === 'clipboard' && !preferences.clipboardEnabled ? 'agents' : live.state.view;
+  const views = visibleViews(preferences.clipboardEnabled, preferences.calendarEnabled);
+  // A face whose feature was switched off while it was selected falls back
+  // rather than leaving the panel on a tab that is no longer in the row.
+  const view: CompanionView = dragging ? 'tray' : views.includes(live.state.view) ? live.state.view : 'agents';
   const expanded = open || dragging;
   // Reduced motion stills the lights too; the pulse timer never starts for them.
   const motion = !preferences.reducedMotion;
@@ -400,14 +435,18 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   // Open, the bar sits above the tabs: the same answer, in the space the panel
   // already has, without taking the face you were looking at away from you.
   const hudStrip = hud && preferences.hudOpenNotch ? <div className="mp-hud-strip"><HudBar kind={hud.kind} value={hud.value} muted={hud.muted} look={look} wide/></div> : null;
-  const tabs = <nav className="mp-nav" aria-label="Notch views"><div role="tablist" aria-label="Companion view">{views.map((item,index) => <button key={item} role="tab" id={`${id}-${item}`} aria-controls={`${id}-panel`} aria-selected={view === item} tabIndex={view === item ? 0 : -1} onClick={() => choose(item,true)} onKeyDown={e => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return; e.preventDefault(); choose(views[e.key === 'Home' ? 0 : e.key === 'End' ? views.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : views.length - 1)) % views.length],true); }}>{item === 'agents' ? <Buddy size={15}/> : <Icon name={item} size={14}/>} {names[item]}{item === 'agents' && snapshot.overall === 'asking' && <span className="mp-attention-dot" aria-label="Needs your attention"/>}{item === 'tray' && <span className="mp-count">{live.state.files.length}</span>}{item === 'clipboard' && <span className="mp-count">{live.state.clipboard.items.length}</span>}</button>)}</div><button className="mp-icon-button" aria-label="Open customization" onClick={onCustomize}><Icon name="settings" size={16}/></button></nav>;
-  const { music, files, clipboard } = live.state;
+  const tabs = <nav className="mp-nav" aria-label="Notch views"><div role="tablist" aria-label="Companion view">{views.map((item,index) => <button key={item} role="tab" id={`${id}-${item}`} aria-controls={`${id}-panel`} aria-selected={view === item} tabIndex={view === item ? 0 : -1} onClick={() => choose(item,true)} onKeyDown={e => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return; e.preventDefault(); choose(views[e.key === 'Home' ? 0 : e.key === 'End' ? views.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : views.length - 1)) % views.length],true); }}>{item === 'agents' ? <Buddy size={15}/> : <Icon name={item} size={14}/>} {names[item]}{item === 'today' && upNext && <span className="mp-count">{today.length}</span>}{item === 'agents' && snapshot.overall === 'asking' && <span className="mp-attention-dot" aria-label="Needs your attention"/>}{item === 'tray' && <span className="mp-count">{live.state.files.length}</span>}{item === 'clipboard' && <span className="mp-count">{live.state.clipboard.items.length}</span>}</button>)}</div><button className="mp-icon-button" aria-label="Open customization" onClick={onCustomize}><Icon name="settings" size={16}/></button></nav>;
+  const { music, files, clipboard, calendar } = live.state;
+  const today = preferences.calendarEnabled ? visibleEvents(calendar.events, preferences) : [];
+  const upNext = nextEvent(today);
   const musicRested = useMusicRested(preferences.musicIdleHide, music.playing, music.status === 'ready' && !!music.track);
   const selectProvider = (provider: 'claude' | 'codex') => { setFilter(provider); choose('agents'); };
   const agents = agentRestingParts(snapshot, { ...preferences, pulse: preferences.pulse && motion, codexPulse: preferences.codexPulse && motion }, selectProvider);
   const parts: RestingPart[] = [...agents,
     ...(preferences.restMusic && musicRested && music.status === 'ready' && music.track ? [{left:<span className="mp-volume-target" onWheel={volume.onWheel}><LiveArtwork live={live} mini/></span>,right:<span className="mp-volume-target" onWheel={volume.onWheel}>{volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? music.track?.tint : undefined}/>}</span>}]:[]),
     ...(preferences.restTray && files.length || dragging ? [{left:<span className="mp-shelf-wing"><Icon name="tray" size={16}/>{files.length}</span>,right:<Icon name="file" size={16}/>}]:[]),
+    ...(preferences.calendarEnabled && preferences.restToday && calendar.status === 'reading' && upNext
+      ? [todayRestingPart(upNext, calendar.calendars.find(c => c.id === upNext.calendarId)?.color ?? '#8d8a84', Date.now())] : []),
     ...(preferences.batteryEnabled && preferences.restBattery && battery.status === 'reading' && battery.percent !== null
       ? [batteryRestingPart({ percent: battery.percent, charging: battery.charging, plugged: battery.plugged, low: batteryLow }, preferences.batteryPercentage)] : []),
     ...(preferences.clipboardEnabled && preferences.restClipboard && clipboard.items.length ? [{left:<span className="mp-shelf-wing"><Icon name="clipboard" size={16}/>{clipboard.items.length}</span>,right:<span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : clipboard.items[0].kind === 'url' ? '@' : clipboard.items[0].kind === 'image' ? '▣' : 'T'}</span>}]:[])
@@ -431,8 +470,8 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const resting = hudResting ?? powerResting ?? peekResting ?? (parts.length ? <RestingWings notchW={snapshot.notchW} height={snapshot.notchH} parts={parts}/> : snapshot.sessions.length ? (hovering ? <Stubs snap={snapshot}/> : <div style={{width:snapshot.notchW,height:snapshot.notchH}}/>) : undefined);
   const navigation = <>{hudStrip}{tabs}{view === 'agents' && <AgentFilters snapshot={snapshot} value={filter} onChange={f => {setFilter(f);setTarget(undefined);}}/>}{view === 'agents' && <AgentConnection snapshot={snapshot} filter={filter}/>}<AgentAttention sessions={snapshot.sessions} onSelect={s => {setFilter(providerOf(s));setTarget(s.id);choose('agents');}}/>{view === 'agents' && live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</>;
   const active = !snapshot.dormant || parts.length > 0 || keyboard || hud !== null || power !== null || peek !== null;
-  const left = <div className="mp-left-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{view === 'music' ? <LiveArtwork live={live} mini/> : view === 'clipboard' ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/>{clipboard.items.length}</span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
-  const right = <div className="mp-right-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? live.state.music.track?.tint : undefined}/> : view === 'clipboard' ? <span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : 'T'}</span> : <Icon name="file" size={16}/>}</div>;
+  const left = <div className="mp-left-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{view === 'music' ? <LiveArtwork live={live} mini/> : view === 'today' ? <span className="mp-shelf-wing"><Icon name="today" size={17}/>{today.length}</span> : view === 'clipboard' ? <span className="mp-shelf-wing"><Icon name="clipboard" size={17}/>{clipboard.items.length}</span> : <span className="mp-shelf-wing"><Icon name="tray" size={17}/>{live.state.files.length}</span>}</div>;
+  const right = <div className="mp-right-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? live.state.music.track?.tint : undefined}/> : view === 'today' ? <Icon name="today" size={16}/> : view === 'clipboard' ? <span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : 'T'}</span> : <Icon name="file" size={16}/>}</div>;
   const wing = (full: boolean) => <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={full ? PANEL_W : undefined} left={left} right={right}/>;
   const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
   return <div onWheel={expanded ? onSwipe : undefined} className={`mp-surface ${preferences.density} ${preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!preferences.buddy ? 'mp-hide-buddy' : ''} ${!preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''} ${keyboard ? 'mp-keyboard' : ''}`}
@@ -440,7 +479,7 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
     onDragOver={e => { if (isFileDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; if (leaveTimer.current) clearTimeout(leaveTimer.current); setDragging(true); } }}
     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) leaveTimer.current = setTimeout(() => setDragging(false),220); }}
     onDrop={e => { if (!isFileDrag(e)) return; e.preventDefault(); if (leaveTimer.current) clearTimeout(leaveTimer.current); const files = Array.from(e.dataTransfer.files); void live.run(() => window.notchlight.addFiles(files)).finally(() => setDragging(false)); }}>
-    <Island snap={filteredSnapshot(snapshot,filter)} open={expanded} hovering={hovering} onBox={onBox} onDismiss={sessionId => window.notchlight.dismiss(sessionId)} onJump={sessionId => void live.run(() => window.notchlight.focusSession(sessionId))} onDecide={(sessionId,askId,decision) => live.run(() => window.notchlight.decide(sessionId,askId,decision))} surface={{ active, navigation, selectedSession: target, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${view}` }, expanded: view === 'agents' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{navigation}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${view}`}>{view === 'music' ? <LiveMusic live={live}/> : view === 'clipboard' ? <LiveClipboard live={live}/> : <LiveTray live={live} dragging={dragging}/>}</div>{live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</div>, collapsed: resting }}/>
+    <Island snap={filteredSnapshot(snapshot,filter)} open={expanded} hovering={hovering} onBox={onBox} onDismiss={sessionId => window.notchlight.dismiss(sessionId)} onJump={sessionId => void live.run(() => window.notchlight.focusSession(sessionId))} onDecide={(sessionId,askId,decision) => live.run(() => window.notchlight.decide(sessionId,askId,decision))} surface={{ active, navigation, selectedSession: target, panel: { id: `${id}-panel`, 'aria-labelledby': `${id}-${view}` }, expanded: view === 'agents' ? undefined : <div style={{ width: PANEL_W }}>{wing(true)}{navigation}<div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${view}`}>{view === 'music' ? <LiveMusic live={live}/> : view === 'today' ? <LiveToday live={live}/> : view === 'clipboard' ? <LiveClipboard live={live}/> : <LiveTray live={live} dragging={dragging}/>}</div>{live.error && <p role="alert" className="mp-live-error">{live.error}</p>}</div>, collapsed: resting }}/>
   </div>;
 }
 
