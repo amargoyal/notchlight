@@ -36,6 +36,7 @@ try {
   const { renderToString, CompanionSurface, PreviewSurface, initialPreview, model } = await import(pathToFileURL(outfile).href).then(m => m.default ?? m);
   const React = await import('react');
 
+  const css = readFileSync('src/renderer/preview.css', 'utf8');
   const snapshot = { sessions: [], overall: 'idle', tokens: 0, elapsed: 0, dormant: true, notchW: 200, notchH: 32, hoverDelay: 550, pulse: true, now: Date.now() };
   const liveFor = (preferences, over = {}) => ({
     available: true, ready: true, error: '', fullscreen: false, run: () => {}, snapshot,
@@ -90,6 +91,12 @@ try {
   // crowded row has to tighten.
   const crowded = renderToString(React.createElement(CompanionSurface, { live: everything, open: true, hovering: true, onCustomize() {} }));
   assert.ok(crowded.includes('is-tight'), 'five faces must tighten the tab row or the gear falls off the end');
+  // A class the stylesheet says nothing about tightens nothing. This shipped
+  // once: the markup carried is-tight, the rules had been lost, and every check
+  // passed while the gear sat half off the panel.
+  assert.ok(/^\.mp-nav\.is-tight \{/m.test(css), '.mp-nav.is-tight has no rules, so the class does nothing');
+  assert.ok(/^\.mp-nav\.is-tight \.mp-count \{[^}]*display:\s*none/m.test(css), 'a tightened row must drop the counts; they are what pushes it over the edge');
+  assert.ok(/^\.mp-nav > \.mp-icon-button \{[^}]*flex:\s*none/m.test(css), 'the gear must not shrink or be pushed off when the tabs get greedy');
   const roomy = liveFor({});
   const spacious = renderToString(React.createElement(CompanionSurface, { live: roomy, open: true, hovering: true, onCustomize() {} }));
   assert.ok(!spacious.includes('is-tight'), 'three faces have room and must not be squeezed for nothing');
@@ -98,7 +105,6 @@ try {
   // heading sits flush against the edge of the notch. Today shipped without
   // one, and no amount of rendering catches that — the class is in the markup
   // either way. So the stylesheet itself is what gets asked.
-  const css = readFileSync('src/renderer/preview.css', 'utf8');
   const playing = { ...model.EMPTY_SPOTIFY, status: 'ready', playing: true, at: Date.now(), track: { id: 't', title: 'Late Light', artist: 'The Quiet Hours', album: 'Somewhere, Slowly', duration: 234 } };
   const loaded = [
     ['music', {}, 'mp-music', { music: playing }],
