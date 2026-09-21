@@ -7,7 +7,7 @@ import { CompanionSurface, useCompanion, type LiveController } from './LiveCompa
 import { BATTERY_SAMPLES, DEFAULT_PREFERENCES, HUD_SAMPLES, SAMPLE_CALENDARS, sampleDay, SAMPLE_FILES } from './previewModel';
 import { Icon, PreviewSurface, usePreview } from './Preview';
 import type { PreviewAction, PreviewPreferences, PreviewState } from './previewModel';
-import { batteryIsLow, batteryTime, describeAccount, describeBattery, describeCalendar, describeCapture, describeHud, HUD_NAMES, PLAYER_NAMES, SPOTIFY_REDIRECT_URI, type HudChannel } from '../shared/companion';
+import { batteryIsLow, batteryTime, describeAccount, describeBattery, describeCalendar, describeCapture, describeHud, HUD_NAMES, MUSIC_CONTROLS, MUSIC_CONTROL_NAMES, type MusicControl, PLAYER_NAMES, SPOTIFY_REDIRECT_URI, type HudChannel } from '../shared/companion';
 import { DISPLAY_CHOICES, HOVER_DELAYS, LINGER_CHOICES, NOTCH_HEIGHT_CHOICES, SAMPLE_APP_SETTINGS, STALE_CHOICES, describeScreen, shortcutLabel, withCurrent, type AppSettings, type AppSettingsPatch } from '../shared/settings';
 
 /* ---- sections ---- */
@@ -70,6 +70,48 @@ function AppIcon({ size }: { size: number }) {
   return <svg className="settings-app-icon" width={size} height={size} viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22.37" fill="#f2ede7"/><path d="M16 0H84V20A16 16 0 0 1 68 36H32A16 16 0 0 1 16 20Z" fill="#000"/><circle cx="34" cy="20" r="6.5" fill="#5fbe86"/></svg>;
 }
 const Robot = () => <span style={{ width: 16, height: 16, borderRadius: 5, background: '#dce7ea', border: '1.5px solid #89aab5', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><i style={{ width: 8, height: 3, borderRadius: 2, background: '#15252d', display: 'block' }}/></span>;
+
+/**
+ * The transport row, in the order it will appear.
+ *
+ * Drag to reorder, because that is the direct way to say "this one goes there".
+ * Every drag also has a keyboard equivalent on the row itself — a list you can
+ * only rearrange with a mouse is one some people simply cannot rearrange — and
+ * the two do exactly the same thing.
+ */
+function SlotEditor({ value, onChange }: { value: MusicControl[]; onChange: (slots: MusicControl[]) => void }) {
+  const [dragging, setDragging] = useState<MusicControl | null>(null);
+  const [over, setOver] = useState<MusicControl | null>(null);
+  const move = (control: MusicControl, to: number) => {
+    const rest = value.filter(c => c !== control);
+    const at = Math.max(0, Math.min(rest.length, to));
+    onChange([...rest.slice(0, at), control, ...rest.slice(at)]);
+  };
+  const spare = MUSIC_CONTROLS.filter(control => !value.includes(control));
+  return <div className="settings-slots">
+    <ol className="settings-slot-list" aria-label="Transport controls, in order">
+      {value.map((control, index) => <li key={control}
+        className={`${dragging === control ? 'is-dragging' : ''} ${over === control && dragging && dragging !== control ? 'is-over' : ''}`}
+        draggable onDragStart={e => { setDragging(control); e.dataTransfer.effectAllowed = 'move'; }}
+        onDragEnd={() => { setDragging(null); setOver(null); }}
+        onDragOver={e => { if (dragging) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOver(control); } }}
+        onDrop={e => { if (!dragging) return; e.preventDefault(); move(dragging, index); setDragging(null); setOver(null); }}>
+        <span className="settings-slot-grip" aria-hidden="true">⠿</span>
+        <span className="settings-slot-name">{MUSIC_CONTROL_NAMES[control]}</span>
+        <span className="settings-slot-actions">
+          <button type="button" className="settings-slot-step" aria-label={`Move ${MUSIC_CONTROL_NAMES[control]} earlier`} disabled={index === 0} onClick={() => move(control, index - 1)}>↑</button>
+          <button type="button" className="settings-slot-step" aria-label={`Move ${MUSIC_CONTROL_NAMES[control]} later`} disabled={index === value.length - 1} onClick={() => move(control, index + 1)}>↓</button>
+          <button type="button" className="settings-slot-step" aria-label={`Remove ${MUSIC_CONTROL_NAMES[control]}`} onClick={() => onChange(value.filter(c => c !== control))}>×</button>
+        </span>
+      </li>)}
+      {!value.length && <li className="is-empty">Play on its own.</li>}
+    </ol>
+    {spare.length > 0 && <div className="settings-slot-spare">
+      <span>Add</span>
+      {spare.map(control => <Button key={control} kind="quiet" disabled={value.length >= 4} onClick={() => onChange([...value, control])}>{MUSIC_CONTROL_NAMES[control]}</Button>)}
+    </div>}
+  </div>;
+}
 
 /** The Client ID, saved when it is whole: on blur or Enter, never mid-typing. */
 function ClientIdField({ value, onSave }: { value: string; onSave: (id: string) => void }) {
@@ -324,6 +366,12 @@ function MusicPane({ live, state, dispatch, prefs, pref }: PaneProps) {
       <Toggle title="Album artwork" description="Give each track a familiar face." value={prefs.artwork} onChange={v => pref('artwork', v)}/>
       <Toggle title="Glow in the artwork’s colour" description="A soft light behind the artwork and the bars, taken from the record sleeve." value={prefs.artworkGlow} onChange={v => pref('artworkGlow', v)}/>
       <Toggle title="Breathe with the bass" description="The small artwork moves with the low end while the bars are live. Still under Reduce motion." value={prefs.artworkPulse} onChange={v => pref('artworkPulse', v)}/>
+    </Group>
+    <Group title="Transport" footer="Play always keeps the middle; the rest fill out from it, left first. Up to four, and none at all is allowed — the seek bar and the scroll wheel still work.">
+      <Row title="Controls" description="Drag to reorder, or use the arrows on each row."><SlotEditor value={prefs.musicSlots} onChange={slots => pref('musicSlots', slots)}/></Row>
+      {live.available && <Row title="Shuffle and repeat" description={live.state.music.shuffling === null && live.state.music.repeating === null ? `${PLAYER_NAMES[live.state.music.player]} has not said whether these are on. The buttons still work.` : 'Read from the player, and switched there too.'}>
+        <Status tone={live.state.music.shuffling === null ? 'off' : 'good'}>{live.state.music.shuffling === null ? 'Not reported' : `Shuffle ${live.state.music.shuffling ? 'on' : 'off'}`}</Status>
+      </Row>}
     </Group>
     <Group title="Visualizer" footer={live.available && live.state.preferences.spotifyEnabled ? 'Capture is separate from the connection: track details and playback keep working when the bars cannot. Nothing is recorded; the output is reduced to five numbers and dropped.' : undefined}>
       <Toggle title="Move with the music" description={live.available ? 'Bars in the collapsed wing follow what is actually playing.' : 'A quiet rhythm in the collapsed wing.'} value={prefs.visualizer} onChange={v => pref('visualizer', v)}/>

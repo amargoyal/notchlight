@@ -24,7 +24,11 @@ export function normalizeSpotify(value: unknown, player: MusicPlayer = 'spotify'
   const track = raw.track as Record<string, unknown>;
   const duration = number(track.durationMs) / 1000;
   const volume = typeof raw.volume === 'number' && Number.isFinite(raw.volume) && raw.volume >= 0 ? Math.min(100, Math.round(raw.volume)) : -1;
+  // A player that did not say is null rather than false: an unlit shuffle
+  // button and one that cannot be read are not the same thing.
+  const flag = (value: unknown): boolean | null => typeof value === 'boolean' ? value : null;
   return { ...base, status: 'ready', playing: raw.playing === true, position: Math.min(number(raw.position), duration), at: Date.now(), volume,
+    shuffling: flag(raw.shuffling), repeating: flag(raw.repeating),
     track: { id: str(track.id), title: str(track.title) || 'Untitled track', artist: str(track.artist), album: str(track.album), duration, artwork: validArtwork(str(track.artwork)) } };
 }
 export function validArtwork(value: string): string | undefined {
@@ -210,7 +214,7 @@ export class SpotifyPlayer extends EventEmitter {
   }
   command(command: unknown, position?: unknown): Promise<void> {
     if (!this.enabled) return Promise.reject(new Error('Connect Spotify first.'));
-    if (typeof command !== 'string' || !['toggle','next','previous','seek','volume'].includes(command)) return Promise.reject(new Error('Unknown music control.'));
+    if (typeof command !== 'string' || !['toggle','next','previous','seek','volume','shuffle','repeat'].includes(command)) return Promise.reject(new Error('Unknown music control.'));
     if (command === 'seek' && (typeof position !== 'number' || !Number.isFinite(position) || !this.state.track)) return Promise.reject(new Error('No track is ready to seek.'));
     if (command === 'volume' && (typeof position !== 'number' || !Number.isFinite(position))) return Promise.reject(new Error('Choose a volume between 0 and 100.'));
     if (this.state.busy) return Promise.reject(new Error('Spotify is still responding.'));

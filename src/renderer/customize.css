@@ -76,6 +76,20 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-segmented label:focus-within { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 
 /* ---- pop-up button ---- */
+.settings-slots { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.settings-slot-list { list-style: none; display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; min-width: 236px; }
+.settings-slot-list li { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border: 1px solid var(--ui-line); border-radius: 7px; background: var(--ui-field); font-size: 12px; }
+.settings-slot-list li.is-dragging { opacity: .4; }
+/* The row the drop would land on, marked on its top edge so the order is legible mid-drag. */
+.settings-slot-list li.is-over { box-shadow: inset 0 2px 0 -1px var(--ui-accent); border-top-color: var(--ui-accent); }
+.settings-slot-list li.is-empty { justify-content: center; color: var(--ui-muted); border-style: dashed; background: transparent; }
+.settings-slot-grip { color: var(--ui-muted); cursor: grab; letter-spacing: -1px; }
+.settings-slot-name { flex: 1; min-width: 0; }
+.settings-slot-actions { display: flex; gap: 2px; }
+.settings-slot-step { width: 22px; height: 22px; border: 0; border-radius: 5px; background: transparent; color: var(--ui-muted); font-size: 12px; cursor: default; }
+.settings-slot-step:hover:not(:disabled) { background: var(--ui-control); color: var(--ui-text); }
+.settings-slot-step:disabled { opacity: .35; }
+.settings-slot-spare { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; font-size: 11px; color: var(--ui-muted); }
 .settings-slider { display: inline-flex; align-items: center; gap: 10px; }
 .settings-slider input { width: 148px; accent-color: var(--ui-accent, #8d8a84); cursor: pointer; }
 .settings-slider b { min-width: 42px; text-align: right; font: 500 12px/1 ui-monospace, monospace; color: var(--ui-text); }

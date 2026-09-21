@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type Dispatch, type DragEvent, type ReactNode } from 'react';
 import { nextIndex, span, until } from './today';
-import { nextEvent, visibleEvents } from '../shared/companion';
+import { nextEvent, visibleEvents, MUSIC_CONTROL_NAMES, type MusicControl } from '../shared/companion';
 import { Island, Stubs, Wings } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
@@ -43,6 +43,9 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     plug: <><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0Z"/><path d="M12 17v4"/></>,
     today: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></>,
     share: <><path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"/></>,
+    shuffle: <><path d="M3 6h3l4 12h4M3 18h3l1.5-4.5"/><path d="M14 6h4M18 6l-2.5-2.5M18 6l-2.5 2.5M14 18h4M18 18l-2.5-2.5M18 18l-2.5 2.5"/></>,
+    repeat: <><path d="M5 9a3 3 0 0 1 3-3h11M19 6l-2.5-2.5M19 6l-2.5 2.5"/><path d="M19 15a3 3 0 0 1-3 3H5M5 18l2.5-2.5M5 18l2.5 2.5"/></>,
+    launch: <><path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></>,
     pin2: <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>,
     brightness: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></>
   };
@@ -237,6 +240,11 @@ function MusicFace({ state, dispatch }: Controls) {
     <span>{state.music.source === 'empty' ? 'Start the sample playlist to see this face in motion.' : 'The sample player is unavailable. Try reconnecting.'}</span>
     <button className="mp-soft-button" onClick={() => dispatch(state.music.source === 'empty' ? { type: 'start-playlist' } : { type: 'music-state', source: 'ready' })}>{state.music.source === 'empty' ? 'Start sample playlist' : 'Reconnect sample player'}</button>
   </div>;
+  // Play keeps the middle; the chosen controls fill out from it, left first.
+  const slots = state.preferences.musicSlots;
+  const half = Math.ceil(slots.length / 2);
+  const leftSlots = slots.slice(0, half);
+  const rightSlots = slots.slice(half);
   return <div className="mp-music">
     <div className="mp-track-row">
       <Artwork state={state}/>
@@ -245,9 +253,9 @@ function MusicFace({ state, dispatch }: Controls) {
         <p title={track.artist}>{pick && <span className="mp-pick" role="img" aria-label="Smart Shuffle pick" title={`A Smart Shuffle pick — not in ${pick} yet`}><Icon name="sparkle" size={11}/></span>}{track.artist}</p>
         <div className="mp-seek"><span>{time(state.music.position)}</span><input aria-label="Track position" aria-valuetext={`${time(state.music.position)} of ${time(track.duration)}`} type="range" min="0" max={track.duration} value={state.music.position} onChange={e => dispatch({ type: 'seek', position: Number(e.target.value) })}/><span>−{time(track.duration - state.music.position)}</span></div>
         <div className="mp-transport">
-          <button className="mp-icon-button" aria-label="Previous track" onClick={() => dispatch({ type: 'skip', delta: -1 })}><Icon name="back" size={18}/></button>
+          {leftSlots.map(control => <SampleSlot key={control} control={control} state={state} dispatch={dispatch}/>)}
           <button className="mp-icon-button mp-play" aria-label={state.music.playing ? 'Pause sample music' : 'Play sample music'} onClick={() => dispatch({ type: 'play' })}><Icon name={state.music.playing ? 'pause' : 'play'} size={18}/></button>
-          <button className="mp-icon-button" aria-label="Next track" onClick={() => dispatch({ type: 'skip', delta: 1 })}><Icon name="next" size={18}/></button>
+          {rightSlots.map(control => <SampleSlot key={control} control={control} state={state} dispatch={dispatch}/>)}
         </div>
       </div>
       {pick && <div className="mp-track-actions">
@@ -299,6 +307,18 @@ function ClipboardFace({ state, dispatch }: Controls) {
 }
 
 /** Today, with the sample day. Reminders can be ticked; events cannot. */
+/** One sample transport slot. Shuffle and repeat flip a sample flag and nothing else. */
+function SampleSlot({ control, state, dispatch }: Controls & { control: MusicControl }) {
+  const name = MUSIC_CONTROL_NAMES[control];
+  if (control === 'previous' || control === 'next') {
+    return <button className="mp-icon-button" aria-label={`${name} track`} onClick={() => dispatch({ type: 'skip', delta: control === 'next' ? 1 : -1 })}><Icon name={control === 'next' ? 'next' : 'back'} size={18}/></button>;
+  }
+  if (control === 'open') return <button className="mp-icon-button" aria-label="Open the sample player" title="Sample only" onClick={() => dispatch({ type: 'music-state', source: 'ready' })}><Icon name="launch" size={17}/></button>;
+  const on = control === 'shuffle' ? state.music.shuffling : state.music.repeating;
+  return <button className={`mp-icon-button mp-toggle ${on ? 'is-on' : ''}`} aria-pressed={on} aria-label={name} title={`${name} ${on ? 'on' : 'off'}`}
+    onClick={() => dispatch({ type: 'music-toggle', control })}><Icon name={control} size={17}/></button>;
+}
+
 function TodayFace({ state, dispatch }: Controls) {
   const events = visibleEvents(state.today, state.preferences);
   const colorOf = (id: string) => SAMPLE_CALENDARS.find(c => c.id === id)?.color ?? '#8d8a84';
@@ -428,6 +448,9 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'Music · missing artwork', note: 'The music symbol holds the composition together.', patch: s => ({ ...s, music: { ...s.music, missingArtwork: true } }) },
   { name: 'Music · unavailable', note: 'Explain what happened and offer a way back.', patch: s => ({ ...s, music: { ...s.music, source: 'unavailable' } }) },
   { name: 'Music · long title, wider notch', note: 'A two-line title and a 240 × 38pt camera exclusion.', notchW: 240, notchH: 38, patch: s => ({ ...s, music: { ...s.music, index: 2 } }) },
+  { name: 'Music · four controls', note: 'Play keeps the middle; shuffle and repeat fill out from it.', patch: s => ({ ...s, preferences: { ...s.preferences, musicSlots: ['shuffle', 'previous', 'next', 'repeat'] } }) },
+  { name: 'Music · shuffle and repeat on', note: 'A lit toggle carries a dot, so the state survives a small icon.', patch: s => ({ ...s, music: { ...s.music, shuffling: true, repeating: true }, preferences: { ...s.preferences, musicSlots: ['shuffle', 'previous', 'next', 'repeat'] } }) },
+  { name: 'Music · play alone', note: 'No slots at all. The seek bar and the scroll wheel still work.', patch: s => ({ ...s, preferences: { ...s.preferences, musicSlots: [] } }) },
   { name: 'Music · Smart Shuffle pick', note: 'A track Spotify slipped in: the mark by the artist, + keeps it, × moves on.', patch: s => ({ ...s, music: { ...s.music, index: 3 } }) },
   { name: 'Resting · everything on', note: 'Agent identities nearest the lens; Music and Tray use the outer space.', patch: s => ({ ...s, open: false }) },
   { name: 'Resting · music only', note: 'Album on the left. Playback on the right.', patch: s => ({ ...s, open: false, preferences: { ...s.preferences, restClaude: false, restTray: false } }) },
