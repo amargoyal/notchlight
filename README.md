@@ -3,13 +3,13 @@
 A macOS notch companion for Claude Code, Spotify, and files. Three focused
 faces, a customizable resting bar, and nothing behind the lens.
 
-![Clones per day](docs/traffic.svg)
+![Clone history](docs/traffic.svg)
 
-<sub>GitHub keeps clone counts for fourteen days and then discards them, so
-they are written down daily by [`scripts/traffic.mjs`](scripts/traffic.mjs) into
-[`docs/traffic.json`](docs/traffic.json) and redrawn here. The lighter bar is
-clones, the darker one is how many were unique that day — those are not summed,
-because the same person cloning on two days is unique on both.</sub>
+<sub>A running total. GitHub keeps clone counts for fourteen days and then
+discards them, so they are written down daily by
+[`scripts/traffic.mjs`](scripts/traffic.mjs) into
+[`docs/traffic.json`](docs/traffic.json) and the curve is redrawn from
+everything kept so far.</sub>
 
 ### Codex integration
 
