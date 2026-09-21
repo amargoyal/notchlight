@@ -565,6 +565,13 @@ export function createCustomizeWindow(): BrowserWindow {
       nodeIntegration: false
     }
   });
+  // The settings window has devtools you could open, and nobody does. A render
+  // that throws leaves a white window and no explanation anywhere — which is
+  // exactly how a blank notch took a while to place.
+  win.webContents.on('console-message', e => {
+    if (e.level === 'error' || e.level === 'warning') logEvent('notchlight', `[customize] ${e.message}`);
+  });
+  win.webContents.on('render-process-gone', (_e, det) => logEvent('notchlight', `[customize] renderer gone: ${det.reason}`));
   win.loadFile(path.join(__dirname, '../renderer/customize.html'));
   return win;
 }
