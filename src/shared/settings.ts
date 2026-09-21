@@ -81,7 +81,7 @@ export function withCurrent(choices: Choice<number>[], value: number, label: (va
 
 /** What the browser preview shows in General, where nothing can be applied. */
 export const SAMPLE_APP_SETTINGS: AppSettings = {
-  version: '0.2.0', packaged: false, loginItem: false, hoverDelay: 550, shortcut: 'Alt+Shift+N', peekShortcut: '', allowWithoutNotch: false, contentProtection: false,
+  version: '0.3.0', packaged: false, loginItem: false, hoverDelay: 550, shortcut: 'Alt+Shift+N', peekShortcut: '', allowWithoutNotch: false, contentProtection: false,
   displays: 'built-in', displayId: 0, notchHeight: 'cutout', notchHeightCustom: 32, plainNotchHeight: 32,
   screens: [
     { id: 1, name: 'Built-in Retina Display', builtin: true, cutout: { w: 200, h: 32 }, active: true },
