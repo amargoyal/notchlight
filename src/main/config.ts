@@ -111,6 +111,12 @@ export interface Config {
    */
   shortcut: string;
   /**
+   * A second global shortcut, which peeks rather than opens: the notch shows
+   * what is on the resting bar for a moment and folds away again, without ever
+   * taking the keyboard. Empty registers nothing.
+   */
+  peekShortcut: string;
+  /**
    * Milliseconds added to the output device's reported latency before the
    * equalizer bars are shown. Zero trusts Core Audio's figure. AirPods report
    * an estimate; if the bars run early, try 80; if late, try -80.
@@ -160,6 +166,7 @@ const DEFAULTS: Config = {
   watchProcesses: true,
   processGraceSec: 8,
   shortcut: 'Alt+Shift+N',
+  peekShortcut: '',
   levelsOffsetMs: 0,
   levelsFps: 60
 };
@@ -183,6 +190,7 @@ export function config(): Config {
   // become a blocking hook by accident.
   if (!Array.isArray(cached.gateTools)) cached.gateTools = [];
   if (typeof cached.shortcut !== 'string') cached.shortcut = DEFAULTS.shortcut;
+  if (typeof cached.peekShortcut !== 'string') cached.peekShortcut = '';
   if (typeof cached.onboardedVersion !== 'string') cached.onboardedVersion = '';
   if (typeof cached.levelsOffsetMs !== 'number' || !Number.isFinite(cached.levelsOffsetMs)) cached.levelsOffsetMs = 0;
   cached.levelsOffsetMs = Math.max(-2000, Math.min(2000, Math.round(cached.levelsOffsetMs)));
