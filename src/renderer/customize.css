@@ -76,6 +76,15 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-segmented label:focus-within { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 
 /* ---- pop-up button ---- */
+.settings-accents { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 300px; }
+.settings-accents label { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px 3px 5px; border: 1px solid transparent; border-radius: 7px; font-size: 11px; color: var(--ui-muted); cursor: default; }
+.settings-accents label.is-selected { border-color: var(--ui-line); background: var(--ui-control); color: var(--ui-text); }
+.settings-accents input { position: absolute; opacity: 0; width: 0; height: 0; }
+.settings-accents input:focus-visible + .settings-accent-dot { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.settings-accent-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px #00000018; }
+/* System has no colour of its own to show, so it shows that it has none. */
+.settings-accent-dot.is-system { background: conic-gradient(#c97c5c, #d9a441, #7f9a6b, #5f9a9e, #5f83a8, #8a6ea8, #c2606c, #c97c5c); }
+.settings-accent-name { white-space: nowrap; }
 .settings-slots { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
 .settings-slot-list { list-style: none; display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; min-width: 236px; }
 .settings-slot-list li { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border: 1px solid var(--ui-line); border-radius: 7px; background: var(--ui-field); font-size: 12px; }
