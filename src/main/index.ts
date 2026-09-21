@@ -169,16 +169,26 @@ function openWelcome(): void {
   });
   welcome.on('closed', () => {
     welcome = null;
+    markWelcomeSeen();
     syncDock();
   });
 }
 
-/** The welcome is over, however it ended: never show this version's again. */
+/**
+ * The welcome is over, however it ended.
+ *
+ * Closing the window counts. Someone who shuts it on the second step has
+ * answered the question — they do not want to be walked through it — and being
+ * asked again at every launch would be the app arguing with them.
+ */
+function markWelcomeSeen(): void {
+  if (config().onboardedVersion === app.getVersion()) return;
+  writeConfig({ onboardedVersion: app.getVersion() });
+  logEvent('notchlight', `welcome seen for ${app.getVersion()}`);
+}
+
 function finishWelcome(): void {
-  if (config().onboardedVersion !== app.getVersion()) {
-    writeConfig({ onboardedVersion: app.getVersion() });
-    logEvent('notchlight', `welcome finished for ${app.getVersion()}`);
-  }
+  markWelcomeSeen();
   if (welcome && !welcome.isDestroyed()) welcome.close();
 }
 
