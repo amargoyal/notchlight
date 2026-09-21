@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type Dispatch, type DragEvent, type ReactNode } from 'react';
 import { nextIndex, span, until } from './today';
-import { nextEvent, visibleEvents, MUSIC_CONTROL_NAMES, type MusicControl } from '../shared/companion';
+import { accentColor, nextEvent, visibleEvents, MUSIC_CONTROL_NAMES, type MusicControl } from '../shared/companion';
 import { Island, Stubs, Wings } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
@@ -380,7 +380,8 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
     : <RestingWings notchW={notchW} height={notchH} parts={[hudRestingPart(hud, hudLook)]}/>;
   const resting = hudResting ?? (parts.length || attention ? <RestingWings notchW={notchW} height={notchH} parts={parts} attention={attention}/>
     : !prefs.restClaude && snap.sessions.length ? <Stubs snap={snap}/> : undefined);
-  return <div className={`mp-surface ${state.preferences.density} ${state.preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!state.preferences.buddy ? 'mp-hide-buddy' : ''} ${!state.preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''}`}
+  const skin = accentColor(prefs.accent) ? { '--mp-accent': accentColor(prefs.accent) } as React.CSSProperties : {};
+  return <div style={skin} className={`mp-surface radius-${prefs.cornerRadius} ${prefs.windowShadow ? '' : 'no-shadow'} ${state.preferences.density} ${state.preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!state.preferences.buddy ? 'mp-hide-buddy' : ''} ${!state.preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''}`}
     onDragOver={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; dispatch({ type: 'drag-enter' }); } }}
     onDrop={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); dispatch({ type: 'add', id: state.drag.id }); } }}>
     <Island snap={{ ...filteredSnapshot(snap,filter), sparkline: prefs.sparkline }} open={state.open} hovering

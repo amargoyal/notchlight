@@ -58,6 +58,14 @@ export interface CompanionPreferences {
   fullscreenHide: 'never' | 'media' | 'all';
   /** The transport row, in order. Play always sits in the middle of them. */
   musicSlots: MusicControl[];
+  /** The one colour that is a choice: bars, sliders, the selected thing. */
+  accent: AccentName;
+  /** A shadow under the open notch, so it reads as lifted off the screen. */
+  windowShadow: boolean;
+  /** How round the island's bottom corners are. */
+  cornerRadius: 'small' | 'medium' | 'large';
+  /** Points of slack around the island's own box, so a near miss still counts as a hover. */
+  hoverPadding: '0' | '6' | '14' | '24';
   /** Read today's events at all. Off until switched on. */
   calendarEnabled: boolean;
   /** Reminders due today, beside the events. A separate macOS permission. */
@@ -96,7 +104,7 @@ export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
   batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true,
   rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true, fullscreenHide: 'never',
-  musicSlots: ['previous', 'next'],
+  musicSlots: ['previous', 'next'], accent: 'terracotta', windowShadow: true, cornerRadius: 'medium', hoverPadding: '6',
   calendarEnabled: false, calendarReminders: false, restToday: true, calendarHidden: [], hideAllDay: false, hideDone: true, fullEventTitles: false
 };
 export type MusicPlayer = 'spotify' | 'apple';
@@ -251,6 +259,31 @@ export function describeBattery(battery: BatterySnapshot, enabled: boolean): str
     }
     default: return 'Waiting for the first reading.';
   }
+}
+/**
+ * The one colour that is a choice.
+ *
+ * Everything else on the island is fixed: black because the notch is black,
+ * warm off-white because that is what reads on it, and the status lights, which
+ * mean something and cannot be redecorated. The accent is the small amount of
+ * colour left over — the filled part of a bar, a slider, the selected thing —
+ * and `system` follows the accent colour set in System Settings.
+ */
+export type AccentName = 'system' | 'terracotta' | 'amber' | 'sage' | 'teal' | 'slate' | 'plum' | 'rose' | 'ivory';
+export const ACCENTS: { value: AccentName; label: string; color: string }[] = [
+  { value: 'system', label: 'System', color: '' },
+  { value: 'terracotta', label: 'Terracotta', color: '#c97c5c' },
+  { value: 'amber', label: 'Amber', color: '#d9a441' },
+  { value: 'sage', label: 'Sage', color: '#7f9a6b' },
+  { value: 'teal', label: 'Teal', color: '#5f9a9e' },
+  { value: 'slate', label: 'Slate', color: '#5f83a8' },
+  { value: 'plum', label: 'Plum', color: '#8a6ea8' },
+  { value: 'rose', label: 'Rose', color: '#c2606c' },
+  { value: 'ivory', label: 'Ivory', color: '#e6dccd' }
+];
+/** The colour to paint with, or undefined for the one macOS is using. */
+export function accentColor(name: AccentName): string | undefined {
+  return ACCENTS.find(accent => accent.value === name)?.color || undefined;
 }
 /** One calendar or reminder list, with the colour its own app gives it. */
 export interface CalendarInfo { id: string; title: string; color: string; kind: 'event' | 'reminder' }
@@ -498,7 +531,8 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
   const choices: Record<string, readonly string[]> = {
     theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100'], equalizerLayout: ['rising', 'mirrored'], musicPlayer: ['spotify', 'apple', 'auto'],
     hudOptionKey: ['settings', 'replace'], hudStyle: ['solid', 'gradient'], hudClosed: ['inline', 'wide'],
-    musicIdleHide: ['never', '30', '120', '600'], fullscreenHide: ['never', 'media', 'all']
+    musicIdleHide: ['never', '30', '120', '600'], fullscreenHide: ['never', 'media', 'all'],
+    accent: ACCENTS.map(a => a.value), cornerRadius: ['small', 'medium', 'large'], hoverPadding: ['0', '6', '14', '24']
   };
   for (const [key, item] of Object.entries(value)) {
     if (!Object.hasOwn(DEFAULT_COMPANION_PREFERENCES, key)) throw new Error('Unknown preference.');
