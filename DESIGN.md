@@ -15,6 +15,30 @@ Original vector record sleeves and a landscape illustration, bundled locally. Th
 ## Boundaries
 Use the same Island shell and Claude components in previews. Sample controls must remain isolated from production state. Native appearance preferences persist separately from Claude gate configuration. Every preview has empty/error/overflow examples. Gallery remains the exhaustive visual regression surface.
 
+## Displays
+
+One island on the built-in panel is the default and the only thing a
+single-screen Mac ever sees. Plugged into a monitor, the island can appear on
+every eligible screen, on one you pick, or follow the pointer across screen
+edges. Following the pointer moves the existing overlay rather than building a
+new one, so crossing an edge is instant instead of a reload.
+
+Each screen carries its own hover intent and its own measurements. The cursor is
+only on one screen at a time, so islands never fight — but one unfolding on the
+display you are not looking at would be worse than useless, so the dwell belongs
+to the overlay the pointer is actually on.
+
+A screen with a cutout matches the hole, the menu bar it sits in, or a figure
+between 15 and 45 points. The cutout can measure a point shorter than its own
+menu bar, and a bar that misses by a pixel leaves a sliver of menu bar above it,
+so matching the cutout means the taller of the two. A screen with no cutout has
+no hole to fill: it takes a plain height between 0 and 40, and 0 means leave that
+screen alone. Those screens need the same opt-in as a Mac without a notch — a bar
+hanging off a menu bar is not something to arrive by surprise on a second monitor.
+
+A chosen screen that is unplugged falls back to the built-in panel rather than
+leaving the island on nothing.
+
 ## System HUD
 
 The volume and brightness keys are answered by one bar, which stands in for the
