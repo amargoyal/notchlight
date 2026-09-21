@@ -444,6 +444,10 @@ export interface CompanionBridge {
   closeIsland(): void;
   /** Show System Settings → Privacy & Security → Accessibility. */
   openAccessibility(): Promise<OperationResult>;
+  /** Show System Settings → Privacy & Security → Calendars, where a refusal can be undone. */
+  openCalendarPrivacy(): Promise<OperationResult>;
+  /** Open Calendar, for the things the notch cannot do. */
+  openCalendarApp(): Promise<OperationResult>;
   /** Put a history item back on the clipboard. */
   copyClipboardItem(id: string): Promise<OperationResult>;
   pinClipboardItem(id: string, pinned: boolean): Promise<OperationResult>;

@@ -49,6 +49,8 @@ contextBridge.exposeInMainWorld('notchlight', {
   onMusicLevels: (cb: (levels: number[]) => void) => subscribe('music:levels', cb),
   onHud: (cb: (activity: HudActivity) => void) => subscribe('hud:event', cb),
   openAccessibility: () => ipcRenderer.invoke('hud:accessibility'),
+  openCalendarPrivacy: () => ipcRenderer.invoke('calendar:privacy'),
+  openCalendarApp: () => ipcRenderer.invoke('calendar:open'),
   onBattery: (cb: (activity: BatteryActivity) => void) => subscribe('battery:event', cb),
   copyClipboardItem: (id: string) => ipcRenderer.invoke('clipboard:copy', id),
   pinClipboardItem: (id: string, pinned: boolean) => ipcRenderer.invoke('clipboard:pin', id, pinned),

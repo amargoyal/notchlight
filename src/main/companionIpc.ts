@@ -84,6 +84,10 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
   });
   // The one thing a user can do about a refused event tap. macOS has no API to
   // ask again once it has been answered, so this only opens the right pane.
+  // macOS asks for the calendar once and remembers the answer, so the only way
+  // back from a refusal is the pane it was recorded in.
+  handle('calendar:privacy', () => shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars'));
+  handle('calendar:open', () => promisify(execFile)('open', ['-b', 'com.apple.iCal'], { timeout: 5000 }).then(() => undefined));
   handle('hud:accessibility', () => shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'));
   handle('clipboard:copy', async (_e, id) => { await clips.copy(id); store.notice('Copied. Paste it wherever you like.'); });
   handle('clipboard:pin', (_e, id, pinned) => clips.pin(id, pinned));
