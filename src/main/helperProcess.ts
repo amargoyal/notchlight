@@ -110,6 +110,20 @@ export function parseHudEvent(line: string): HudEvent | null {
   } catch { return null; }
 }
 
+/** What the battery is doing, as powerwatch reports it. */
+export interface PowerEvent { percent: number; charging: boolean; plugged: boolean; charged: boolean; minutes: number | null }
+
+/** One powerwatch line into a reading, or null. */
+export function parsePowerEvent(line: string): PowerEvent | null {
+  try {
+    const raw = JSON.parse(line);
+    if (!raw || typeof raw !== 'object') return null;
+    if (typeof raw.percent !== 'number' || !Number.isFinite(raw.percent)) return null;
+    const minutes = typeof raw.minutes === 'number' && Number.isFinite(raw.minutes) && raw.minutes > 0 ? Math.round(raw.minutes) : null;
+    return { percent: Math.max(0, Math.min(1, raw.percent)), charging: raw.charging === true, plugged: raw.plugged === true, charged: raw.charged === true, minutes };
+  } catch { return null; }
+}
+
 /** One pasteboardwatch line into a change, or null. */
 export function parsePasteboardChange(line: string): PasteboardChange | null {
   try {
