@@ -1,4 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type Dispatch, type DragEvent, type ReactNode } from 'react';
+import { nextIndex, span, until } from './today';
 import { Island, Stubs, Wings } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
@@ -39,6 +40,8 @@ export function Icon({ name, size = 18 }: { name: string; size?: number }) {
     mute: <><path d="M4 9h3l5-4v14l-5-4H4Z"/><path d="m16 9.5 5 5m0-5-5 5"/></>,
     bolt: <path d="M13 2 4 14h6l-1 8 9-12h-6Z" fill="currentColor" stroke="none"/>,
     plug: <><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0Z"/><path d="M12 17v4"/></>,
+    today: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></>,
+    pin2: <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>,
     brightness: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></>
   };
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.file}</svg>;
@@ -143,6 +146,49 @@ export function BatteryGlyph({ percent, charging, plugged, low, showPercent = fa
     <span className="mp-battery-shell"><i style={{ width: `${Math.max(shown ? 6 : 0, shown)}%` }}/>{charging && <Icon name="bolt" size={9}/>}</span>
     {showPercent && <b>{shown}</b>}
   </span>;
+}
+/**
+ * One thing happening today.
+ *
+ * The calendar's own colour is the only ornament: it is what makes a row
+ * belong to Work or Home at a glance, and it is already a decision someone
+ * made in the app they keep their calendar in. Something already behind you is
+ * dimmed rather than removed — the day reads better with its shape intact.
+ */
+export function EventRow({ event, color, full, onToggle }: { event: import('../shared/companion').CalendarEvent; color: string; full: boolean; onToggle?: () => void }) {
+  const Tag = onToggle ? 'button' : 'div';
+  return <Tag className={`mp-event ${event.past ? 'is-past' : ''} ${event.done ? 'is-done' : ''} ${event.kind === 'reminder' ? 'is-reminder' : ''}`}
+    {...(onToggle ? { onClick: onToggle, type: 'button' as const, 'aria-pressed': event.done, 'aria-label': `${event.done ? 'Not done' : 'Done'}: ${event.title}` } : {})}>
+    <i className="mp-event-mark" style={{ background: color }} aria-hidden="true"/>
+    <span className="mp-event-text">
+      <b className={full ? 'is-full' : ''} title={event.title}>{event.title}</b>
+      <small>{span(event)}{event.location ? ` · ${event.location}` : ''}</small>
+    </span>
+  </Tag>;
+}
+/** The whole day, in the order it happens, scrolled to the next thing. */
+export function DayList({ events, colorOf, full, empty, onToggle }: { events: import('../shared/companion').CalendarEvent[]; colorOf: (id: string) => string; full: boolean; empty: ReactNode; onToggle?: (event: import('../shared/companion').CalendarEvent) => void }) {
+  const list = useRef<HTMLDivElement>(null);
+  const index = nextIndex(events);
+  useLayoutEffect(() => {
+    if (index < 0) return;
+    const row = list.current?.children[index] as HTMLElement | undefined;
+    // `nearest` rather than `center`: the things after it are the rest of your
+    // day, and shoving them below the fold to centre one row helps nobody.
+    row?.scrollIntoView({ block: 'nearest' });
+  }, [index, events.length]);
+  if (!events.length) return <>{empty}</>;
+  return <div className="mp-day" ref={list} role="list" aria-label="Today">
+    {events.map(event => <EventRow key={event.id} event={event} color={colorOf(event.calendarId)} full={full} onToggle={onToggle && event.kind === 'reminder' ? () => onToggle(event) : undefined}/>)}
+  </div>;
+}
+/** Today on the resting bar: the next thing, and how long until it. */
+export function todayRestingPart(event: import('../shared/companion').CalendarEvent | null, color: string, now: number): RestingPart {
+  if (!event) return { left: <span className="mp-shelf-wing"><Icon name="today" size={15}/></span>, right: <span className="mp-today-wing"><span>Clear</span></span> };
+  return {
+    left: <span className="mp-shelf-wing"><i className="mp-event-mark" style={{ background: color }} aria-hidden="true"/></span>,
+    right: <span className="mp-today-wing"><b title={event.title}>{event.title}</b><span>{event.allDay ? 'All day' : until(event, now)}</span></span>
+  };
 }
 /** The battery on the resting bar: the glyph on the right, where the hardware one sits. */
 export function batteryRestingPart(battery: { percent: number; charging: boolean; plugged: boolean; low: boolean }, showPercent: boolean): RestingPart {
