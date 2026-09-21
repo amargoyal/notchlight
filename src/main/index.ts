@@ -494,7 +494,13 @@ async function boot(): Promise<void> {
   });
   pickFiles = installCompanionIpc(companion, spotify, clips,
     win => !!win && (win === customize || win === welcome || !!notch?.owns(win)),
-    () => { openCustomize(); return customize!; }, account, smart);
+    () => { openCustomize(); return customize!; }, account, smart,
+    // Under the notch on the screen the island is on, which is where the files
+    // being shared appear to be coming from.
+    () => {
+      const bounds = notch?.win?.getBounds();
+      return bounds ? { x: Math.round(bounds.x + bounds.width / 2), y: bounds.y + 36 } : { x: 0, y: 40 };
+    });
   if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
   smart.setEnabled(!DEMO && spotifyEnabled && companion.current().preferences.smartShuffle);
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);
@@ -632,17 +638,42 @@ function releaseKeyboard(why: string): void {
   }
 }
 
-function registerShortcut(): boolean {
-  const accelerator = config().shortcut;
+/**
+ * A look, rather than a visit.
+ *
+ * The island unfolds where the pointer is and folds itself away again, without
+ * ever taking the keyboard. It is for the answer to "what is it doing" when
+ * your hands are on the keyboard and the notch is on another screen — and
+ * pressing it again puts it away early.
+ */
+const PEEK_MS = 2600;
+let peekTimer: NodeJS.Timeout | null = null;
+function peek(): void {
+  if (peekTimer) { clearTimeout(peekTimer); peekTimer = null; notch?.hold(false); return; }
+  notch?.hold(true);
+  logEvent('island', 'peeked');
+  peekTimer = setTimeout(() => { peekTimer = null; notch?.hold(false); }, PEEK_MS);
+}
+
+function register(accelerator: string, what: string, action: () => void): boolean {
   if (!accelerator) return true;
   try {
-    const ok = globalShortcut.register(accelerator, () => keyboard ? releaseKeyboard('shortcut') : openForKeyboard());
-    logEvent('island', ok ? `shortcut ${accelerator} registered` : `shortcut ${accelerator} is taken by another app`);
+    const ok = globalShortcut.register(accelerator, action);
+    logEvent('island', ok ? `${what} ${accelerator} registered` : `${what} ${accelerator} is taken by another app`);
     return ok;
   } catch (error) {
-    logEvent('island', `shortcut ${accelerator} rejected: ${(error as Error).message}`);
+    logEvent('island', `${what} ${accelerator} rejected: ${(error as Error).message}`);
     return false;
   }
+}
+
+function registerShortcut(): boolean {
+  const cfg = config();
+  const opens = register(cfg.shortcut, 'shortcut', () => keyboard ? releaseKeyboard('shortcut') : openForKeyboard());
+  // The two are registered together and reported together, but a peek shortcut
+  // that clashes must not cost the one that opens the notch.
+  const peeks = register(cfg.peekShortcut, 'peek shortcut', () => peek());
+  return opens && peeks;
 }
 
 /**
@@ -754,6 +785,7 @@ function appSettings(): AppSettings {
     loginItem: app.isPackaged && app.getLoginItemSettings().openAtLogin,
     hoverDelay: cfg.hoverDelay,
     shortcut: cfg.shortcut,
+    peekShortcut: cfg.peekShortcut,
     allowWithoutNotch: cfg.allowWithoutNotch,
     contentProtection: cfg.contentProtection,
     displays: cfg.displays,
@@ -780,7 +812,7 @@ function applyAppSettings(patch: AppSettingsPatch): void {
     logEvent('notchlight', `start at login ${loginItem ? 'on' : 'off'}`);
   }
   if (!Object.keys(rest).length) return;
-  const before = config().shortcut;
+  const before = { shortcut: config().shortcut, peekShortcut: config().peekShortcut };
   writeConfig(rest);
   // A display rule is the whole arrangement of windows, so it takes effect at
   // once rather than at the next launch.
@@ -789,10 +821,11 @@ function applyAppSettings(patch: AppSettingsPatch): void {
     notch?.reconfigure();
     applyNotchGeometry();
   }
-  if (rest.shortcut !== undefined && rest.shortcut !== before) {
+  if (rest.shortcut !== undefined && rest.shortcut !== before.shortcut || rest.peekShortcut !== undefined && rest.peekShortcut !== before.peekShortcut) {
     globalShortcut.unregisterAll();
     if (!registerShortcut()) {
-      writeConfig({ shortcut: before });
+      globalShortcut.unregisterAll();
+      writeConfig(before);
       registerShortcut();
       throw new Error('That shortcut is taken by another app. The old one still works.');
     }

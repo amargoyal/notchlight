@@ -10,10 +10,12 @@ import type { SpotifyAccount } from './spotifyAccount';
 import type { SmartShuffle } from './smartShuffle';
 import { ClipboardStore } from './clipboardStore';
 import { trayIcon } from './png';
+import { ensureHelper } from './helpers';
+import { logEvent } from './lifecycle';
 import type { OperationResult } from '../shared/companion';
 
 type Event = IpcMainInvokeEvent | IpcMainEvent;
-export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlayer, clips: ClipboardStore, trusted: (win: BrowserWindow | null) => boolean, dialogWindow: () => BrowserWindow, account: SpotifyAccount, smart: SmartShuffle) {
+export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlayer, clips: ClipboardStore, trusted: (win: BrowserWindow | null) => boolean, dialogWindow: () => BrowserWindow, account: SpotifyAccount, smart: SmartShuffle, shareAnchor: () => { x: number; y: number }) {
   function check(event: Event) {
     if (event.senderFrame !== event.sender.mainFrame || !trusted(BrowserWindow.fromWebContents(event.sender))) throw new Error('This window cannot change the companion.');
   }
@@ -61,6 +63,26 @@ export function installCompanionIpc(store: CompanionStore, spotify: SpotifyPlaye
       event.sender.startDrag({ file: files[0], files, icon });
       store.notice(`Drag to another app. ${files.length === 1 ? 'The item stays' : `The ${files.length} items stay`} in Tray until you remove ${files.length === 1 ? 'it' : 'them'}.${list.length > files.length ? ` ${list.length - files.length} missing ${list.length - files.length === 1 ? 'file was' : 'files were'} left out.` : ''}`);
     } catch (error) { store.notice((error as Error).message || 'Could not start the file drag.'); }
+  });
+  /**
+   * The share sheet, AirDrop included.
+   *
+   * NSSharingService needs an app context Electron cannot give it, so a small
+   * accessory helper puts the picker up, waits for an answer and exits. It is
+   * anchored under the notch, where the files being shared are.
+   */
+  handle('shelf:share', async (_e, ids) => {
+    const { present } = await store.existingPaths(ids);
+    if (!present.length) throw new Error('Those files were moved or removed. Use Locate to find them, or add them again.');
+    const bin = await ensureHelper('share');
+    if (!bin) throw new Error('The share helper could not be built. Install the Xcode command line tools, or use a packaged build.');
+    const anchor = shareAnchor();
+    const { stdout } = await promisify(execFile)(bin, ['--at', String(anchor.x), String(anchor.y), ...present], { timeout: 130_000 });
+    let result: { ok?: boolean; service?: string | null; reason?: string } = {};
+    try { result = JSON.parse(stdout.trim().split('\n').pop() ?? '{}'); } catch { /* a helper that said nothing is a dismissal */ }
+    if (result.ok === false) throw new Error(result.reason === 'missing' ? 'Those files were moved or removed.' : 'The share sheet could not be opened.');
+    logEvent('notchlight', `share ${result.service ?? 'dismissed'} for ${present.length} file${present.length === 1 ? '' : 's'}`);
+    if (result.service) store.notice(`Shared ${present.length === 1 ? 'one item' : `${present.length} items`} with ${result.service}. ${present.length === 1 ? 'It stays' : 'They stay'} in Tray.`);
   });
   handle('codex:home', async () => {
     const result = await dialog.showOpenDialog(dialogWindow(), {title:'Choose Codex home', properties:['openDirectory','showHiddenFiles']});

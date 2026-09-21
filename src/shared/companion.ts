@@ -54,6 +54,8 @@ export interface CompanionPreferences {
   musicIdleHide: 'never' | '30' | '120' | '600';
   /** Two fingers up over the open notch closes it. */
   swipeToClose: boolean;
+  /** What the island does while something is fullscreen over it. */
+  fullscreenHide: 'never' | 'media' | 'all';
   /** Read today's events at all. Off until switched on. */
   calendarEnabled: boolean;
   /** Reminders due today, beside the events. A separate macOS permission. */
@@ -91,7 +93,7 @@ export const DEFAULT_COMPANION_PREFERENCES: CompanionPreferences = {
   musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
   hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
   batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true,
-  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true,
+  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true, fullscreenHide: 'never',
   calendarEnabled: false, calendarReminders: false, restToday: true, calendarHidden: [], hideAllDay: false, hideDone: true, fullEventTitles: false
 };
 export type MusicPlayer = 'spotify' | 'apple';
@@ -428,6 +430,8 @@ export interface CompanionBridge {
   /** Ask where a missing file lives now. */
   locateFile(id: string): Promise<OperationResult>;
   saveFileCopy(ids: string[]): Promise<OperationResult>;
+  /** macOS's own share sheet, AirDrop included. The items stay in Tray. */
+  shareFiles(ids: string[]): Promise<OperationResult>;
   startFileDrag(ids: string[]): void;
   connectSpotify(): Promise<OperationResult>;
   openSpotify(): Promise<OperationResult>;
@@ -467,7 +471,7 @@ export function validatePreferences(value: unknown): Partial<CompanionPreference
   const choices: Record<string, readonly string[]> = {
     theme: ['system', 'light', 'dark'], density: ['compact', 'comfortable'], thumbnails: ['small', 'large'], clipboardHistorySize: ['20', '50', '100'], equalizerLayout: ['rising', 'mirrored'], musicPlayer: ['spotify', 'apple', 'auto'],
     hudOptionKey: ['settings', 'replace'], hudStyle: ['solid', 'gradient'], hudClosed: ['inline', 'wide'],
-    musicIdleHide: ['never', '30', '120', '600']
+    musicIdleHide: ['never', '30', '120', '600'], fullscreenHide: ['never', 'media', 'all']
   };
   for (const [key, item] of Object.entries(value)) {
     if (!Object.hasOwn(DEFAULT_COMPANION_PREFERENCES, key)) throw new Error('Unknown preference.');

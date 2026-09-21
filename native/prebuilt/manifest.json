@@ -54,5 +54,13 @@
       "host": "Darwin 27.0.0",
       "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)"
     }
+  },
+  "share": {
+    "arm64": {
+      "sha256": "a9dc25bd12496e2f65048bc6443543bb2bd686d1a268bb848dda10b011355939",
+      "builtAt": "2026-09-21T02:37:13.304Z",
+      "host": "Darwin 27.0.0",
+      "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)"
+    }
   }
 }

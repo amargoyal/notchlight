@@ -11,6 +11,8 @@ export interface AppSettings {
   hoverDelay: number;
   /** Electron accelerator; empty registers nothing. */
   shortcut: string;
+  /** A second accelerator that peeks rather than opens. Empty registers nothing. */
+  peekShortcut: string;
   allowWithoutNotch: boolean;
   /** Keep the island out of screen recordings and screen sharing. */
   contentProtection: boolean;
@@ -36,7 +38,7 @@ export interface AppSettings {
   claudeHooks: boolean;
   configDir: string;
 }
-export type AppSettingsPatch = Partial<Pick<AppSettings, 'loginItem' | 'hoverDelay' | 'shortcut' | 'allowWithoutNotch' | 'contentProtection' | 'staleSec' | 'watchProcesses' | 'doneLingerSec' | 'displays' | 'displayId' | 'notchHeight' | 'notchHeightCustom' | 'plainNotchHeight'>>;
+export type AppSettingsPatch = Partial<Pick<AppSettings, 'loginItem' | 'hoverDelay' | 'shortcut' | 'peekShortcut' | 'allowWithoutNotch' | 'contentProtection' | 'staleSec' | 'watchProcesses' | 'doneLingerSec' | 'displays' | 'displayId' | 'notchHeight' | 'notchHeightCustom' | 'plainNotchHeight'>>;
 
 /** One attached screen, as the Displays picker shows it. */
 export interface ScreenInfo {
@@ -79,7 +81,7 @@ export function withCurrent(choices: Choice<number>[], value: number, label: (va
 
 /** What the browser preview shows in General, where nothing can be applied. */
 export const SAMPLE_APP_SETTINGS: AppSettings = {
-  version: '0.2.0', packaged: false, loginItem: false, hoverDelay: 550, shortcut: 'Alt+Shift+N', allowWithoutNotch: false, contentProtection: false,
+  version: '0.2.0', packaged: false, loginItem: false, hoverDelay: 550, shortcut: 'Alt+Shift+N', peekShortcut: '', allowWithoutNotch: false, contentProtection: false,
   displays: 'built-in', displayId: 0, notchHeight: 'cutout', notchHeightCustom: 32, plainNotchHeight: 32,
   screens: [
     { id: 1, name: 'Built-in Retina Display', builtin: true, cutout: { w: 200, h: 32 }, active: true },
@@ -119,9 +121,9 @@ export function validateAppSettings(value: unknown): AppSettingsPatch {
         result.notchHeight = item as AppSettings['notchHeight']; break;
       case 'staleSec': result.staleSec = integer(item, 60, 7 * 24 * 60 * 60, 'The session timeout'); break;
       case 'doneLingerSec': result.doneLingerSec = integer(item, 0, 24 * 60 * 60, 'The finished-light delay'); break;
-      case 'shortcut':
+      case 'shortcut': case 'peekShortcut':
         if (typeof item !== 'string' || item.length > 64 || !/^([A-Za-z0-9]+\+)*[A-Za-z0-9]*$/.test(item)) throw new Error('That is not a shortcut Notchlight can register.');
-        result.shortcut = item; break;
+        result[key] = item; break;
       default: throw new Error('Unknown setting.');
     }
   }
