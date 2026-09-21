@@ -76,6 +76,9 @@ html, body, #root { height: 100%; margin: 0; overflow: hidden; }
 .settings-segmented label:focus-within { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
 
 /* ---- pop-up button ---- */
+.settings-slider { display: inline-flex; align-items: center; gap: 10px; }
+.settings-slider input { width: 148px; accent-color: var(--ui-accent, #8d8a84); cursor: pointer; }
+.settings-slider b { min-width: 42px; text-align: right; font: 500 12px/1 ui-monospace, monospace; color: var(--ui-text); }
 .settings-popup { position: relative; display: inline-flex; align-items: center; color: var(--ui-muted); }
 .settings-popup select { appearance: none; -webkit-appearance: none; height: 24px; padding: 0 24px 0 9px; border-radius: 6px; border: 1px solid var(--ui-line); background: var(--ui-field); color: var(--ui-text); font-size: 12px; box-shadow: 0 1px 1px #00000010; }
 .settings-popup svg { position: absolute; right: 6px; pointer-events: none; }

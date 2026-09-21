@@ -8,12 +8,12 @@ import { DEFAULT_PREFERENCES, HUD_SAMPLES, SAMPLE_FILES } from './previewModel';
 import { Icon, PreviewSurface, usePreview } from './Preview';
 import type { PreviewAction, PreviewPreferences, PreviewState } from './previewModel';
 import { describeAccount, describeCapture, describeHud, HUD_NAMES, PLAYER_NAMES, SPOTIFY_REDIRECT_URI, type HudChannel } from '../shared/companion';
-import { HOVER_DELAYS, LINGER_CHOICES, SAMPLE_APP_SETTINGS, STALE_CHOICES, shortcutLabel, withCurrent, type AppSettings, type AppSettingsPatch } from '../shared/settings';
+import { DISPLAY_CHOICES, HOVER_DELAYS, LINGER_CHOICES, NOTCH_HEIGHT_CHOICES, SAMPLE_APP_SETTINGS, STALE_CHOICES, describeScreen, shortcutLabel, withCurrent, type AppSettings, type AppSettingsPatch } from '../shared/settings';
 
 /* ---- sections ---- */
 type Section = 'general' | 'appearance' | 'hud' | 'agents' | 'music' | 'tray' | 'clipboard' | 'about';
 const SECTIONS: { id: Section; label: string; description: string; icon: string; tile: string; keywords: string }[] = [
-  { id: 'general', label: 'General', description: 'Startup, how the notch opens, and how long sessions stay on the bar.', icon: 'settings', tile: '#8d8a84', keywords: 'login startup updates hover delay shortcut keyboard sessions forget stale terminal finished' },
+  { id: 'general', label: 'General', description: 'Startup, how the notch opens, which displays carry it, and how long sessions stay on the bar.', icon: 'settings', tile: '#8d8a84', keywords: 'login startup updates hover delay shortcut keyboard sessions forget stale terminal finished displays monitor screen external height cutout size' },
   { id: 'appearance', label: 'Appearance', description: 'How this window and the notch look. The notch stays black, like the hardware.', icon: 'appearance', tile: '#5f83a8', keywords: 'theme light dark system spacing compact comfortable motion resting bar collapsed' },
   { id: 'hud', label: 'HUD', description: 'The volume and brightness keys, answered in the notch instead of the middle of the screen.', icon: 'volume', tile: '#6f7f8c', keywords: 'volume brightness hud overlay osd keys media accessibility mute percentage' },
   { id: 'agents', label: 'Agents', description: 'Claude Code and Codex sessions on this Mac, and how each one shows up.', icon: 'face', tile: '#c97c5c', keywords: 'claude codex buddy robot pulse tokens hooks approvals home' },
@@ -53,6 +53,10 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
 }
 function Popup<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void }) {
   return <span className="settings-popup"><select aria-label={label} value={String(value)} onChange={e => { const next = options.find(option => String(option.value) === e.target.value); if (next) onChange(next.value); }}>{options.map(option => <option key={String(option.value)} value={String(option.value)}>{option.label}</option>)}</select><Icon name="updown" size={12}/></span>;
+}
+/** A points figure with a live readout; the value is applied as it moves. */
+function Slider({ label, value, min, max, unit, onChange }: { label: string; value: number; min: number; max: number; unit: string; onChange: (value: number) => void }) {
+  return <span className="settings-slider"><input type="range" aria-label={label} min={min} max={max} step={1} value={value} onChange={e => onChange(Number(e.target.value))}/><b>{value === 0 ? 'Off' : `${value} ${unit}`}</b></span>;
 }
 function Status({ tone = 'good', children }: { tone?: 'good' | 'wait' | 'off' | 'bad'; children: ReactNode }) {
   return <span className={`settings-status tone-${tone}`} role="status"><i/><span>{children}</span></span>;
@@ -168,6 +172,26 @@ function GeneralPane({ live, app }: PaneProps) {
       <Row title="Hover delay" description="How long the pointer rests on the notch before it opens."><Popup label="Hover delay" value={s.hoverDelay} options={withCurrent(HOVER_DELAYS, s.hoverDelay, v => `${(v / 1000).toFixed(2)} seconds`)} onChange={v => app.update({ hoverDelay: v })}/></Row>
       <Row title="Keyboard shortcut" description="Opens the notch for the keyboard. Escape hands focus back to the app you were in."><ShortcutRecorder value={s.shortcut} onSave={v => app.update({ shortcut: v })}/></Row>
       <Toggle title="Show on a Mac without a notch" description="The island hangs off the menu bar instead of a cutout. Takes effect the next time Notchlight starts." value={s.allowWithoutNotch} onChange={v => app.update({ allowWithoutNotch: v })}/>
+    </Group>
+    <Group title="Displays" footer={live.available ? 'A display with no cutout needs “Show on a Mac without a notch” above; the island hangs off its menu bar instead of filling a hole.' : 'These apply in the desktop app. Here they only change the preview.'}>
+      <Row title="Show the notch on" description="One island on the built-in display is the default. Every display gives each screen its own; following the pointer keeps one and moves it across screen edges.">
+        <Popup label="Show the notch on" value={s.displays} options={DISPLAY_CHOICES} onChange={v => app.update({ displays: v })}/>
+      </Row>
+      {s.displays === 'chosen' && <Row title="Display" description={s.screens.length > 1 ? 'Unplug it and the island falls back to the built-in display rather than disappearing.' : 'Only one display is attached right now.'}>
+        <Popup label="Display" value={s.displayId || (s.screens[0]?.id ?? 0)} options={s.screens.map(screen => ({ value: screen.id, label: screen.name }))} onChange={v => app.update({ displayId: v })}/>
+      </Row>}
+      <Row title="Height on a display with a cutout" description="Match the hole, match the menu bar it sits in, or set your own.">
+        <Segmented label="Height on a display with a cutout" value={s.notchHeight} options={NOTCH_HEIGHT_CHOICES} onChange={v => app.update({ notchHeight: v })}/>
+      </Row>
+      {s.notchHeight === 'custom' && <Row title="Custom height" description="15 to 45 points. Below the menu bar's own height a sliver of it shows above the bar.">
+        <Slider label="Custom height" value={s.notchHeightCustom} min={15} max={45} unit="pt" onChange={v => app.update({ notchHeightCustom: v })}/>
+      </Row>}
+      <Row title="Height on a display without a cutout" description="0 to 40 points. Zero leaves those displays alone.">
+        <Slider label="Height on a display without a cutout" value={s.plainNotchHeight} min={0} max={40} unit="pt" onChange={v => app.update({ plainNotchHeight: v })}/>
+      </Row>
+      {s.screens.map(screen => <Row key={screen.id} title={screen.name} description={describeScreen(screen)}>
+        <Status tone={screen.active ? 'good' : 'off'}>{screen.active ? 'Showing' : 'Not showing'}</Status>
+      </Row>)}
     </Group>
     <Group title="Sessions" footer="With the Claude Code hooks installed, a session leaves the moment it really ends.">
       <Row title="Forget a quiet session after" description="A session that has said nothing for this long leaves the bar."><Popup label="Forget a quiet session after" value={s.staleSec} options={withCurrent(STALE_CHOICES, s.staleSec, v => `${Math.round(v / 60)} minutes`)} onChange={v => app.update({ staleSec: v })}/></Row>
