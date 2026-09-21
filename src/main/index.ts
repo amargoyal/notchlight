@@ -26,7 +26,7 @@ import { Battery } from './battery';
 import { fetchAppleArtwork } from './appleArtwork';
 import { DemoStore } from './demo';
 import { HookServer, type HookEvent } from './hookServer';
-import { createGalleryWindow, createCustomizeWindow, createUpdateWindow, NotchWindow } from './notchWindow';
+import { createGalleryWindow, createCustomizeWindow, createUpdateWindow, createWelcomeWindow, NotchWindow } from './notchWindow';
 import { notchState, probeDisplays, probeNotch } from './notchProbe';
 import { menubarIcon } from './png';
 import { Store } from './store';
@@ -44,6 +44,8 @@ import { validateAppSettings, type AppSettings, type AppSettingsPatch, type Scre
 const DEMO = process.argv.includes('--demo');
 const GALLERY_ONLY = process.argv.includes('--gallery');
 const CUSTOMIZE = process.argv.includes('--customize');
+/** Open the welcome on its own, to look at it. */
+const WELCOME_PREVIEW = process.argv.includes('--welcome');
 /** Open the update card with a sample release, to look at it. */
 const UPDATE_PREVIEW = process.argv.includes('--update-preview');
 app.setName('Notchlight');
@@ -68,6 +70,7 @@ let tray: Tray | null = null;
 let gallery: BrowserWindow | null = null;
 let customize: BrowserWindow | null = null;
 let updateWin: BrowserWindow | null = null;
+let welcome: BrowserWindow | null = null;
 let updater: Updater;
 /** The release the open update window is about, so its answer knows the version. */
 let offered: Release | null = null;
@@ -139,8 +142,54 @@ function showDock(): void {
 
 /** Keep the Dock available while either ordinary desktop window is open. */
 function syncDock(): void {
-  if (gallery || customize) showDock();
+  if (gallery || customize || welcome) showDock();
   else app.dock?.hide();
+}
+
+/**
+ * The welcome, shown once per version that asks for one.
+ *
+ * It takes focus, which the island never does, so it needs the Dock icon for as
+ * long as it is open — an accessory process cannot come to the front, and a
+ * window asking questions from behind the terminal is worse than no window.
+ */
+function openWelcome(): void {
+  if (welcome && !welcome.isDestroyed()) {
+    app.focus({ steal: true });
+    welcome.show();
+    return void welcome.focus();
+  }
+  showDock();
+  welcome = createWelcomeWindow();
+  welcome.webContents.on('did-finish-load', () => send(welcome, 'companion', companion.current()));
+  welcome.once('ready-to-show', () => {
+    app.focus({ steal: true });
+    welcome?.show();
+    welcome?.focus();
+  });
+  welcome.on('closed', () => {
+    welcome = null;
+    markWelcomeSeen();
+    syncDock();
+  });
+}
+
+/**
+ * The welcome is over, however it ended.
+ *
+ * Closing the window counts. Someone who shuts it on the second step has
+ * answered the question — they do not want to be walked through it — and being
+ * asked again at every launch would be the app arguing with them.
+ */
+function markWelcomeSeen(): void {
+  if (config().onboardedVersion === app.getVersion()) return;
+  writeConfig({ onboardedVersion: app.getVersion() });
+  logEvent('notchlight', `welcome seen for ${app.getVersion()}`);
+}
+
+function finishWelcome(): void {
+  markWelcomeSeen();
+  if (welcome && !welcome.isDestroyed()) welcome.close();
 }
 
 function openCustomize(): void {
@@ -273,6 +322,7 @@ function refreshTray(): void {
       { label: `Open for the keyboard${config().shortcut ? ` (${shortcutLabel(config().shortcut)})` : ''}`, click: () => openForKeyboard() },
       { label: 'Add files to Tray…', click: () => { void pickFiles?.().catch(e => companion.notice(String(e.message))); } },
       { label: 'Customize Notchlight…', click: () => openCustomize() },
+      { label: 'Show the welcome again', click: () => openWelcome() },
       { label: 'Open faces gallery', click: () => openGallery() },
       hooksInstalled()
         ? { label: 'Claude Code hooks installed', enabled: false }
@@ -412,6 +462,7 @@ async function boot(): Promise<void> {
     syncClipboard();
     notch?.broadcast('companion', state);
     send(customize, 'companion', state);
+    send(welcome, 'companion', state);
     syncLevels();
     syncHud();
     syncBattery();
@@ -430,11 +481,16 @@ async function boot(): Promise<void> {
     return store.current();
   });
   pickFiles = installCompanionIpc(companion, spotify, clips,
-    win => !!win && (win === customize || !!notch?.owns(win)),
+    win => !!win && (win === customize || win === welcome || !!notch?.owns(win)),
     () => { openCustomize(); return customize!; }, account, smart);
   if (spotifyEnabled) { spotify.setEnabled(true); watcher.setActive(!DEMO); }
   smart.setEnabled(!DEMO && spotifyEnabled && companion.current().preferences.smartShuffle);
   shelfTimer = setInterval(() => { void companion.refresh().catch(() => companion.notice('Tray could not refresh.')); }, 10000);
+  // After the island exists, not before: the welcome points at a notch, and
+  // pointing at one that has not been drawn yet is a poor introduction.
+  if (WELCOME_PREVIEW || (!DEMO && !GALLERY_ONLY && !CUSTOMIZE && config().onboardedVersion !== app.getVersion())) {
+    setTimeout(() => openWelcome(), WELCOME_PREVIEW ? 0 : 900);
+  }
 
   // Hover intent and the open state belong to each overlay: the cursor is only
   // ever on one screen, and an island unfolding on the display you are not
@@ -612,6 +668,11 @@ ipcMain.handle('session:focus', async (event, sessionId) => {
   } catch (error) { return { ok: false, error: (error as Error).message }; }
 });
 
+ipcMain.on('welcome:done', event => {
+  if (BrowserWindow.fromWebContents(event.sender) !== welcome) return;
+  finishWelcome();
+});
+
 ipcMain.on('island:close', event => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!notch?.owns(win)) return;
@@ -642,7 +703,7 @@ ipcMain.on('hit-rect', (event, r: HitRect) => {
 
 function trustedAgentWindow(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) {
   const win = BrowserWindow.fromWebContents(event.sender);
-  return event.senderFrame === event.sender.mainFrame && !!win && (!!notch?.owns(win) || win === customize);
+  return event.senderFrame === event.sender.mainFrame && !!win && (!!notch?.owns(win) || win === customize || win === welcome);
 }
 ipcMain.handle('decide', (event, msg) => {
   try {

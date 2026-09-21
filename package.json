@@ -20,6 +20,7 @@
     "start": "npm run build && electron .",
     "demo": "npm run build && electron . --demo",
     "customize": "npm run build && electron . --customize",
+    "welcome": "npm run build && electron . --welcome",
     "gallery": "npm run build && electron . --gallery",
     "update-preview": "npm run build && electron . --demo --update-preview",
     "service": "node bin/service.mjs install",

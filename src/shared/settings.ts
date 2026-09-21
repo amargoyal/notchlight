@@ -136,4 +136,6 @@ export interface AppBridge {
   revealConfigFolder(): Promise<{ ok: boolean; error?: string }>;
   openGallery(): Promise<{ ok: boolean; error?: string }>;
   installClaudeHooks(): Promise<{ ok: boolean; error?: string }>;
+  /** The first run is over: remember it and close the window. */
+  finishWelcome(): void;
 }
