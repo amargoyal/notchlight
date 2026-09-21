@@ -127,6 +127,7 @@
 .mp-empty .mp-soft-button { margin-top: 17px; font-size: 11px; }
 .mp-soft-button:hover { background: #ffffff18; }
 .mp-tray { padding: 15px 17px 0; }
+.mp-today { display: flex; flex-direction: column; padding: 15px 17px 0; }
 .mp-tray-heading { display: flex; justify-content: space-between; color: #a69c93; font-size: 11px; margin-bottom: 13px; }
 .mp-tray-heading > span:last-child { color: #b6ada1; }
 .mp-file-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; max-height: 188px; overflow-y: auto; padding: 4px 2px 8px; scrollbar-width: thin; scrollbar-color: #4c443b transparent; }
