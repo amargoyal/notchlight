@@ -713,6 +713,8 @@ export function Island({ snap, hovering, open, onDecide, onDismiss, onJump, onBo
   const sessions = snap.sessions;
   const single = sessions.length === 1 ? sessions[0] : null;
   const drilled = drill ? (sessions.find((s) => s.id === drill) ?? null) : null;
+  // The corner scale and the shadow are set as custom properties on the surface
+  // above; the shell reads them so one CSS variable changes every state at once.
   const radius = open ? 26 : 15;
   /** Only the unfolded faces cross-fade; the collapsed bar just morphs. */
   const animate = open && !snap.dormant;
@@ -780,13 +782,13 @@ export function Island({ snap, hovering, open, onDecide, onDismiss, onJump, onBo
             width: box.w || snap.notchW,
             height: box.h || snap.notchH,
             transform: `translateX(${box.dx}px)`,
-            borderRadius: `0 0 ${radius}px ${radius}px`,
+            borderRadius: `0 0 calc(${radius}px * var(--mp-radius, 1)) calc(${radius}px * var(--mp-radius, 1))`,
             background: invisible ? 'transparent' : C.ink,
             boxShadow: invisible
               ? 'none'
               : open
-                ? '0 26px 52px -18px rgba(0,0,0,.85)'
-                : '0 14px 30px -12px rgba(0,0,0,.8)'
+                ? 'var(--mp-shadow-open, 0 26px 52px -18px rgba(0,0,0,.85))'
+                : 'var(--mp-shadow-rest, 0 14px 30px -12px rgba(0,0,0,.8))'
           }}
         >
           <div ref={contentRef} className="cl-content">

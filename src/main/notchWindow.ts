@@ -208,8 +208,20 @@ class NotchOverlay {
     this.applyGeometry();
   }
 
-  /** The island measured itself; this is where it says it ended up. */
-  setHitRect(r: HitRect): void { this.hit = r; }
+  /**
+   * The island measured itself; this is where it says it ended up.
+   *
+   * `padding` is slack around that box, in points. The island is a small target
+   * at the top of the screen and the cursor is often moving fast when it gets
+   * there; a few points of give turn a near miss into a hover. It is added on
+   * this side rather than drawn into the box, so the island's own layout and
+   * the thing the cursor has to hit stay separate ideas.
+   */
+  setHitRect(r: HitRect, padding = 0): void {
+    this.hit = padding > 0
+      ? { x: r.x - padding, y: r.y, w: r.w + padding * 2, h: r.h + padding }
+      : r;
+  }
 
   /**
    * Cursor polling, not mouse events: the window is click-through, so it does
@@ -479,8 +491,8 @@ export class NotchWindow {
     for (const overlay of this.overlays) overlay.hover.hold(held && overlay === target);
   }
 
-  setHitRect(win: BrowserWindow | null, r: HitRect): void {
-    this.overlays.find(o => o.win === win)?.setHitRect(r);
+  setHitRect(win: BrowserWindow | null, r: HitRect, padding = 0): void {
+    this.overlays.find(o => o.win === win)?.setHitRect(r, padding);
   }
 
   /**

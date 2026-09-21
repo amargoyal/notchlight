@@ -7,7 +7,7 @@ import { CompanionSurface, useCompanion, type LiveController } from './LiveCompa
 import { BATTERY_SAMPLES, DEFAULT_PREFERENCES, HUD_SAMPLES, SAMPLE_CALENDARS, sampleDay, SAMPLE_FILES } from './previewModel';
 import { Icon, PreviewSurface, usePreview } from './Preview';
 import type { PreviewAction, PreviewPreferences, PreviewState } from './previewModel';
-import { batteryIsLow, batteryTime, describeAccount, describeBattery, describeCalendar, describeCapture, describeHud, HUD_NAMES, MUSIC_CONTROLS, MUSIC_CONTROL_NAMES, type MusicControl, PLAYER_NAMES, SPOTIFY_REDIRECT_URI, type HudChannel } from '../shared/companion';
+import { ACCENTS, accentColor, batteryIsLow, batteryTime, describeAccount, describeBattery, describeCalendar, describeCapture, describeHud, HUD_NAMES, MUSIC_CONTROLS, MUSIC_CONTROL_NAMES, type MusicControl, PLAYER_NAMES, SPOTIFY_REDIRECT_URI, type HudChannel } from '../shared/companion';
 import { DISPLAY_CHOICES, HOVER_DELAYS, LINGER_CHOICES, NOTCH_HEIGHT_CHOICES, SAMPLE_APP_SETTINGS, STALE_CHOICES, describeScreen, shortcutLabel, withCurrent, type AppSettings, type AppSettingsPatch } from '../shared/settings';
 
 /* ---- sections ---- */
@@ -258,7 +258,21 @@ function AppearancePane({ live, state, dispatch, prefs, pref }: PaneProps) {
         <span className="settings-theme">{(['light', 'dark', 'system'] as const).map(theme => <label key={theme} className={prefs.theme === theme ? 'selected' : ''}><input type="radio" name="desktop-theme" checked={prefs.theme === theme} onChange={() => pref('theme', theme)}/><span className={`theme-swatch swatch-${theme}`}><i/><b/><em/></span><span>{theme[0].toUpperCase() + theme.slice(1)}</span></label>)}</span>
       </Row>
     </Group>
-    <Group title="Notch">
+    <Group title="Notch" footer="The island stays black, like the hardware. The accent is the small amount of colour left over — a filled bar, a slider, a lit toggle. The status lights mean something and are never restyled.">
+      <Row title="Accent">
+        <span className="settings-accents" role="radiogroup" aria-label="Accent colour">{ACCENTS.map(item => <label key={item.value} className={prefs.accent === item.value ? 'is-selected' : ''} title={item.label}>
+          <input type="radio" name="accent" checked={prefs.accent === item.value} onChange={() => pref('accent', item.value)}/>
+          <span className={`settings-accent-dot${item.color ? '' : ' is-system'}`} style={item.color ? { background: item.color } : undefined} aria-hidden="true"/>
+          <span className="settings-accent-name">{item.label}</span>
+        </label>)}</span>
+      </Row>
+      <Row title="Corners" description="How round the island's bottom corners are. Small reads as part of the hardware; large reads as a card hanging from it.">
+        <Segmented label="Corners" value={prefs.cornerRadius} options={[{ value: 'small', label: 'Small' }, { value: 'medium', label: 'Medium' }, { value: 'large', label: 'Large' }]} onChange={v => pref('cornerRadius', v)}/>
+      </Row>
+      <Toggle title="Shadow" description="A shadow under the island, so it reads as lifted off the screen rather than flush with it." value={prefs.windowShadow} onChange={v => pref('windowShadow', v)}/>
+      <Row title="Hover slack" description="Points of give around the island's own edges. The notch is a small target and the pointer is usually moving fast when it gets there.">
+        <Popup label="Hover slack" value={prefs.hoverPadding} options={[{ value: '0', label: 'None' }, { value: '6', label: '6 pt' }, { value: '14', label: '14 pt' }, { value: '24', label: '24 pt' }]} onChange={v => pref('hoverPadding', v)}/>
+      </Row>
       <Row title="Spacing" description="Comfortable gives rows a little more room when the notch is open."><Segmented label="Spacing" value={prefs.density} options={[{ value: 'compact', label: 'Compact' }, { value: 'comfortable', label: 'Comfortable' }]} onChange={v => pref('density', v)}/></Row>
       <Toggle title="Reduce motion" description="Keeps transitions, the pulse and the bars still." value={prefs.reducedMotion} onChange={v => pref('reducedMotion', v)}/>
     </Group>
@@ -507,7 +521,10 @@ function App() {
   };
   const panes: Record<Section, (props: PaneProps) => ReactNode> = { general: GeneralPane, appearance: AppearancePane, hud: HudPane, agents: AgentsPane, music: MusicPane, today: TodayPane, tray: TrayPane, clipboard: ClipboardPane, about: AboutPane };
   const Pane = panes[section];
-  return <div className={`customize-app theme-${prefs.theme}`}>
+  // The settings window takes the same accent as the notch, so the choice is
+  // visible while it is being made rather than only after closing the window.
+  const accent = accentColor(prefs.accent);
+  return <div className={`customize-app theme-${prefs.theme}`} style={accent ? { '--ui-accent': accent } as React.CSSProperties : undefined}>
     <SearchContext.Provider value={query}>
       <Sidebar section={section} onSelect={navigate} query={query} onQuery={setQuery} live={live.available} version={app.settings.version}/>
       <main className="settings-main">

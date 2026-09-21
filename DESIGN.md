@@ -15,6 +15,32 @@ Original vector record sleeves and a landscape illustration, bundled locally. Th
 ## Boundaries
 Use the same Island shell and Claude components in previews. Sample controls must remain isolated from production state. Native appearance preferences persist separately from Claude gate configuration. Every preview has empty/error/overflow examples. Gallery remains the exhaustive visual regression surface.
 
+## Accent, corners and slack
+
+The island is black because the notch is black, and warm off-white because that
+is what reads on black. Neither is a choice. The status lights are not a choice
+either: green means observed work, amber an observed request, red recorded done
+or failed, and a palette that could restyle them would be a palette that could
+make them lie.
+
+What is left is the accent — the filled part of a bar, a slider, a lit toggle —
+and that is the one colour someone picks. Eight presets plus *System*, which sets
+nothing and lets the stylesheet's own default stand rather than guessing at the
+macOS accent. The settings window takes the same accent, so the choice is visible
+while it is being made rather than only after the window closes.
+
+Corners scale rather than being set: small reads as part of the hardware, large
+as a card hanging from it, and the open and collapsed states scale together off
+one property so they can never disagree. The shadow can go, which puts the island
+flush with the screen instead of floating over it.
+
+Hover slack is points of give around the island's own box, added on the daemon
+side rather than drawn into the layout — what the island looks like and what the
+cursor has to hit are separate ideas. The notch is a small target at the top of
+the screen and the pointer is usually moving fast when it arrives; a few points
+turn a near miss into a hover. Six points by default, and none is allowed for
+anyone who finds the island opening when they meant to reach the menu bar.
+
 ## Transport slots
 
 Play always keeps the middle of the row: it is the largest control, and a

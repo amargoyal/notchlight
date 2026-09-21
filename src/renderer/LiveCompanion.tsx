@@ -4,7 +4,7 @@ import { Icon, BatteryGlyph, DayList, FileThumb, HudBar, RestingWings, batteryRe
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
 import type { AgentFilter, Snapshot } from '../shared/types';
-import { batteryIsLow, describeCalendar, nextEvent, visibleEvents, MUSIC_CONTROL_NAMES, DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CALENDAR, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type BatteryActivity, type CompanionView, type HudActivity, type MusicControl, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
+import { accentColor, batteryIsLow, describeCalendar, nextEvent, visibleEvents, MUSIC_CONTROL_NAMES, DEFAULT_COMPANION_PREFERENCES, EMPTY_BATTERY, EMPTY_CALENDAR, EMPTY_CAPTURE, EMPTY_CLIPBOARD, EMPTY_HUD, EMPTY_SMART_SHUFFLE, EMPTY_SPOTIFY, PLAYER_NAMES, playhead, type CaptureSnapshot, type CompanionSnapshot, type BatteryActivity, type CompanionView, type HudActivity, type MusicControl, type OperationResult, type ShelfFile, type SpotifySnapshot } from '../shared/companion';
 import { useReducedMotion } from './pulse';
 import { barFrame, bassOf, type EqualizerLayout } from './equalizer';
 import { NO_SWIPE, swipeStep } from './swipe';
@@ -512,7 +512,10 @@ export function CompanionSurface({ live, open, hovering, keyboard = false, onBox
   const right = <div className="mp-right-wing" onWheel={view === 'music' ? volume.onWheel : undefined}>{snapshot.overall === 'asking' && <button className="mp-attention-button" aria-label="Agents need attention" onClick={() => choose('agents')}><span className="mp-attention-dot"/></button>}{view === 'music' ? volume.shown !== null ? <VolumeReadout level={volume.shown}/> : <LiveEqualizer active={live.state.music.playing && preferences.visualizer} live={!preferences.reducedMotion} capture={live.state.capture.status} layout={preferences.equalizerLayout} tint={preferences.artworkGlow ? live.state.music.track?.tint : undefined}/> : view === 'today' ? <Icon name="today" size={16}/> : view === 'clipboard' ? <span className="mp-clip-kind" aria-hidden="true">{clipboard.paused ? '‖' : 'T'}</span> : <Icon name="file" size={16}/>}</div>;
   const wing = (full: boolean) => <Wings notchW={snapshot.notchW} height={snapshot.notchH} width={full ? PANEL_W : undefined} left={left} right={right}/>;
   const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
-  return <div onWheel={expanded ? onSwipe : undefined} className={`mp-surface ${preferences.density} ${preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!preferences.buddy ? 'mp-hide-buddy' : ''} ${!preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''} ${keyboard ? 'mp-keyboard' : ''}`}
+  // The accent is a property rather than a class, so `system` can simply not
+  // set it and let the stylesheet's own default stand.
+  const skin: CSSProperties = accentColor(preferences.accent) ? { '--mp-accent': accentColor(preferences.accent) } as CSSProperties : {};
+  return <div onWheel={expanded ? onSwipe : undefined} style={skin} className={`mp-surface radius-${preferences.cornerRadius} ${preferences.windowShadow ? '' : 'no-shadow'} ${preferences.density} ${preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!preferences.buddy ? 'mp-hide-buddy' : ''} ${!preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''} ${keyboard ? 'mp-keyboard' : ''}`}
     onKeyDown={e => { if (e.key === 'Escape' && keyboard && window.notchlight?.keyboardDone) { e.preventDefault(); window.notchlight.keyboardDone(); } }}
     onDragOver={e => { if (isFileDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; if (leaveTimer.current) clearTimeout(leaveTimer.current); setDragging(true); } }}
     onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) leaveTimer.current = setTimeout(() => setDragging(false),220); }}

@@ -741,7 +741,7 @@ const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFi
 
 ipcMain.on('hit-rect', (event, r: HitRect) => {
   if (!r || !finite(r.x) || !finite(r.y) || !finite(r.w) || !finite(r.h)) return;
-  notch?.setHitRect(BrowserWindow.fromWebContents(event.sender), r);
+  notch?.setHitRect(BrowserWindow.fromWebContents(event.sender), r, Number(companion?.current().preferences.hoverPadding ?? 0));
 });
 
 function trustedAgentWindow(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) {

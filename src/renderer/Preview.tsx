@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState, type Dispatch, type DragEvent, type ReactNode } from 'react';
 import { nextIndex, span, until } from './today';
-import { nextEvent, visibleEvents, MUSIC_CONTROL_NAMES, type MusicControl } from '../shared/companion';
+import { accentColor, nextEvent, visibleEvents, MUSIC_CONTROL_NAMES, type MusicControl } from '../shared/companion';
 import { Island, Stubs, Wings } from './IslandView';
 import { Buddy } from './Buddy';
 import { PANEL_W } from './theme';
@@ -380,7 +380,8 @@ export function PreviewSurface({ state, dispatch, onCustomize, notchW = 190, not
     : <RestingWings notchW={notchW} height={notchH} parts={[hudRestingPart(hud, hudLook)]}/>;
   const resting = hudResting ?? (parts.length || attention ? <RestingWings notchW={notchW} height={notchH} parts={parts} attention={attention}/>
     : !prefs.restClaude && snap.sessions.length ? <Stubs snap={snap}/> : undefined);
-  return <div className={`mp-surface ${state.preferences.density} ${state.preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!state.preferences.buddy ? 'mp-hide-buddy' : ''} ${!state.preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''}`}
+  const skin = accentColor(prefs.accent) ? { '--mp-accent': accentColor(prefs.accent) } as React.CSSProperties : {};
+  return <div style={skin} className={`mp-surface radius-${prefs.cornerRadius} ${prefs.windowShadow ? '' : 'no-shadow'} ${state.preferences.density} ${state.preferences.reducedMotion ? 'mp-reduced-motion' : ''} ${!state.preferences.buddy ? 'mp-hide-buddy' : ''} ${!state.preferences.codexBuddy ? 'mp-hide-codex-buddy' : ''}`}
     onDragOver={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; dispatch({ type: 'drag-enter' }); } }}
     onDrop={e => { if (state.drag?.origin === 'finder') { e.preventDefault(); dispatch({ type: 'add', id: state.drag.id }); } }}>
     <Island snap={{ ...filteredSnapshot(snap,filter), sparkline: prefs.sparkline }} open={state.open} hovering
@@ -448,6 +449,9 @@ const scenarios: { name: string; note: string; patch: (s: PreviewState) => Previ
   { name: 'Music · missing artwork', note: 'The music symbol holds the composition together.', patch: s => ({ ...s, music: { ...s.music, missingArtwork: true } }) },
   { name: 'Music · unavailable', note: 'Explain what happened and offer a way back.', patch: s => ({ ...s, music: { ...s.music, source: 'unavailable' } }) },
   { name: 'Music · long title, wider notch', note: 'A two-line title and a 240 × 38pt camera exclusion.', notchW: 240, notchH: 38, patch: s => ({ ...s, music: { ...s.music, index: 2 } }) },
+  { name: 'Appearance · slate accent', note: 'The accent paints the bar, the slider and a lit toggle. Nothing else moves.', patch: s => ({ ...s, preferences: { ...s.preferences, accent: 'slate', hudEnabled: true, musicSlots: ['shuffle', 'previous', 'next', 'repeat'] }, music: { ...s.music, shuffling: true } }) },
+  { name: 'Appearance · small corners', note: 'A/B: the island reads as part of the hardware.', patch: s => ({ ...s, open: true, preferences: { ...s.preferences, cornerRadius: 'small' } }) },
+  { name: 'Appearance · large corners, no shadow', note: 'A/B: a card hanging from the edge, sitting flush.', patch: s => ({ ...s, open: true, preferences: { ...s.preferences, cornerRadius: 'large', windowShadow: false } }) },
   { name: 'Music · four controls', note: 'Play keeps the middle; shuffle and repeat fill out from it.', patch: s => ({ ...s, preferences: { ...s.preferences, musicSlots: ['shuffle', 'previous', 'next', 'repeat'] } }) },
   { name: 'Music · shuffle and repeat on', note: 'A lit toggle carries a dot, so the state survives a small icon.', patch: s => ({ ...s, music: { ...s.music, shuffling: true, repeating: true }, preferences: { ...s.preferences, musicSlots: ['shuffle', 'previous', 'next', 'repeat'] } }) },
   { name: 'Music · play alone', note: 'No slots at all. The seek bar and the scroll wheel still work.', patch: s => ({ ...s, preferences: { ...s.preferences, musicSlots: [] } }) },
