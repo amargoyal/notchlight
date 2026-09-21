@@ -21,6 +21,7 @@
     "test:today": "node scripts/test-today.mjs",
     "typecheck": "tsc --noEmit",
     "check": "node scripts/test-all.mjs",
+    "traffic": "node scripts/traffic.mjs",
     "start": "npm run build && electron .",
     "demo": "npm run build && electron . --demo",
     "customize": "npm run build && electron . --customize",
