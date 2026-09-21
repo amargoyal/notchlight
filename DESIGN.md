@@ -15,6 +15,27 @@ Original vector record sleeves and a landscape illustration, bundled locally. Th
 ## Boundaries
 Use the same Island shell and Claude components in previews. Sample controls must remain isolated from production state. Native appearance preferences persist separately from Claude gate configuration. Every preview has empty/error/overflow examples. Gallery remains the exhaustive visual regression surface.
 
+## The first run
+
+Everything Notchlight can do is off until someone says otherwise. That is the
+right default for each of them and the wrong first impression for all of them at
+once: a new install is a black notch that does nothing, with the switches that
+would change that buried four panes deep.
+
+So the welcome asks once, in the order the answers matter — agents, then music,
+then the rest — and every step can be skipped. Skip leaves the setting exactly
+where it was; nothing here is a wall, and every row appears again under the same
+name in the settings window. Closing the window counts as answering it: someone
+who shuts it on the second step has said they do not want to be walked through,
+and asking again at every launch would be the app arguing with them.
+
+It takes focus, which the island never does, so it needs the Dock icon for as
+long as it is open. It is shown after the island exists, because it points at a
+notch, and pointing at one that has not been drawn yet introduces nothing.
+
+What it has been shown for is a version rather than a flag, so a release that
+adds something worth introducing can show it again.
+
 ## Small touches
 
 **Sneak peek.** A new track shows its title and artist on the resting bar for a
