@@ -145,8 +145,8 @@ export interface IslandBridge extends CompanionBridge, UpdateBridge, AppBridge {
   setHitRect(r: HitRect): void;
   /** Cursor entered or left the island's box, decided by the daemon. */
   onHover(cb: (inside: boolean) => void): () => void;
-  /** This overlay's own screen: its cutout, which no other screen shares. */
-  onGeometry(cb: (geometry: { notchW: number; notchH: number }) => void): () => void;
+  /** This overlay's own screen: its cutout, and whether something is fullscreen over it. */
+  onGeometry(cb: (geometry: { notchW: number; notchH: number; fullscreen: boolean }) => void): () => void;
   /** The hover dwell was satisfied — unfold. */
   onOpen(cb: (open: boolean) => void): () => void;
   /** The island has been given the keyboard (or has given it back). */

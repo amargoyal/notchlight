@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('notchlight', {
   openCustomize: () => ipcRenderer.send('open-customize'),
   onSnapshot: (cb: (s: Snapshot) => void) => subscribe('snapshot', cb),
   onHover: (cb: (inside: boolean) => void) => subscribe('hover', cb),
-  onGeometry: (cb: (geometry: { notchW: number; notchH: number }) => void) => subscribe('geometry', cb),
+  onGeometry: (cb: (geometry: { notchW: number; notchH: number; fullscreen: boolean }) => void) => subscribe('geometry', cb),
   onOpen: (cb: (open: boolean) => void) => subscribe('open', cb),
   onKeyboard: (cb: (taken: boolean) => void) => subscribe('keyboard', cb),
   keyboardDone: () => ipcRenderer.send('keyboard:done'),

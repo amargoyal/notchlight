@@ -16,8 +16,21 @@ import { probeFor, resetProbe, type DisplayProbe } from './notchProbe';
 import { logEvent } from './lifecycle';
 import type { HitRect } from '../shared/types';
 
-/** How wide and how tall the collapsed bar is on one screen. */
-export interface NotchGeometry { notchW: number; notchH: number }
+/** How wide and how tall the collapsed bar is on one screen, and what is over it. */
+export interface NotchGeometry { notchW: number; notchH: number; fullscreen: boolean }
+
+/**
+ * Something is fullscreen on this screen.
+ *
+ * Electron has no API for it and macOS does not announce it, but it does hide
+ * the menu bar — so a screen whose work area has swallowed its own top inset
+ * has something fullscreen over it. The same is true of an auto-hidden menu
+ * bar, which is a fair reading: in both cases the owner has asked for the top
+ * of the screen back.
+ */
+export function isFullscreen(d: Display): boolean {
+  return d.workArea.y - d.bounds.y <= 0;
+}
 
 /** The real menu bar height on a screen — the collapsed bar must cover it exactly. */
 function menuBarHeightOf(d: Display): number {
@@ -40,9 +53,9 @@ export function geometryFor(d: Display, cfg: Pick<Config, 'notchHeight' | 'notch
     const height = cfg.notchHeight === 'menu-bar' ? menuBar
       : cfg.notchHeight === 'custom' ? cfg.notchHeightCustom
       : Math.max(Math.round(measured.notchH ?? cfg.notchH), menuBar);
-    return { notchW: Math.round(measured.notchW ?? cfg.notchW), notchH: height };
+    return { notchW: Math.round(measured.notchW ?? cfg.notchW), notchH: height, fullscreen: isFullscreen(d) };
   }
-  return { notchW: cfg.notchW, notchH: cfg.plainNotchHeight || menuBar };
+  return { notchW: cfg.notchW, notchH: cfg.plainNotchHeight || menuBar, fullscreen: isFullscreen(d) };
 }
 
 /**
@@ -181,9 +194,18 @@ class NotchOverlay {
 
   /** Re-measure this screen and tell the island what it is sitting in. */
   applyGeometry(): NotchGeometry {
-    this.geometry = geometryFor(this.display);
-    this.send('geometry', this.geometry);
-    return this.geometry;
+    const next = geometryFor(this.display);
+    const before = this.geometry;
+    this.geometry = next;
+    if (before.notchW !== next.notchW || before.notchH !== next.notchH || before.fullscreen !== next.fullscreen) this.send('geometry', next);
+    return next;
+  }
+
+  /** The screen may have changed under us — a window went fullscreen, or came back. */
+  refresh(displays: Display[]): void {
+    const fresh = displays.find(d => d.id === this.display.id);
+    if (fresh) this.display = fresh;
+    this.applyGeometry();
   }
 
   /** The island measured itself; this is where it says it ended up. */
@@ -328,7 +350,10 @@ export class NotchWindow {
     // Cheap insurance against anything else lowering us — Spaces, fullscreen,
     // screen sharing, a display waking up.
     this.levelPoll = setInterval(() => {
-      for (const overlay of this.overlays) { overlay.assertLevel(); overlay.assertTop(); }
+      // The same pass notices a window going fullscreen: macOS says nothing
+      // about it, but the menu bar disappearing from the work area does.
+      const displays = screen.getAllDisplays();
+      for (const overlay of this.overlays) { overlay.assertLevel(); overlay.assertTop(); overlay.refresh(displays); }
     }, 2000);
     return this.windows();
   }

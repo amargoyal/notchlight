@@ -43,6 +43,7 @@ export interface PreviewPreferences {
   sneakPeek: boolean;
   musicIdleHide: 'never' | '30' | '120' | '600';
   swipeToClose: boolean;
+  fullscreenHide: 'never' | 'media' | 'all';
   calendarEnabled: boolean;
   calendarReminders: boolean;
   restToday: boolean;
@@ -83,7 +84,7 @@ export const DEFAULT_PREFERENCES: PreviewPreferences = {
   musicPlayer: 'spotify', equalizerLayout: 'rising', artworkGlow: true, artworkPulse: true, sparkline: false, spotifyClientId: '', smartShuffle: true,
   hudEnabled: false, hudOptionKey: 'settings', hudStyle: 'solid', hudGlow: true, hudPercentage: false, hudOpenNotch: true, hudClosed: 'inline',
   batteryEnabled: false, restBattery: true, batteryPercentage: true, batteryAlerts: true,
-  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true,
+  rememberTab: true, sneakPeek: true, musicIdleHide: 'never', swipeToClose: true, fullscreenHide: 'never',
   calendarEnabled: false, calendarReminders: false, restToday: true, calendarHidden: [], hideAllDay: false, hideDone: true, fullEventTitles: false
 };
 /**
